@@ -6,6 +6,7 @@ import { badRequest, HttpError } from '@/lib/server/http'
 import { getOrder, type UltraOrder } from '@/lib/server/jupiter'
 import { getPrices } from '@/lib/server/prices'
 import { toUi, uiMultiplier } from '@/lib/server/tokens'
+import { LOW_LIQUIDITY_USD } from '@/lib/stocks'
 import type { TradeQuote, TradeSide } from '@/lib/types'
 
 /** Trades priced further than this from the market reference are stopped (thin pools, bad fills) */
@@ -40,6 +41,26 @@ async function getOrderWithFee(params: OrderParams, side: TradeSide): Promise<Ul
   return getOrder(params)
 }
 
+/**
+ * A market maker prices a trade for one wallet and declines when that wallet can't pay for it,
+ * so someone short on cash gets no price at all rather than a number to look at. For a quote we
+ * ask again without the wallet: it still shows what the trade would look like. Nothing signable
+ * comes of it — `POST /api/trades` reads the real balance before it builds anything.
+ */
+async function orderForQuote(
+  params: OrderParams,
+  side: TradeSide,
+  allowPreview: boolean,
+): Promise<{ order: UltraOrder; preview: boolean }> {
+  try {
+    return { order: await getOrderWithFee(params, side), preview: false }
+  } catch (error) {
+    if (!allowPreview || !(error instanceof HttpError)) throw error
+    const { taker: _taker, ...withoutWallet } = params
+    return { order: await getOrderWithFee(withoutWallet, side), preview: true }
+  }
+}
+
 export async function tradeAssets(side: TradeSide, mint: string) {
   const stock = await findStock(mint)
   if (!stock) throw badRequest('Pick a stock.')
@@ -57,13 +78,15 @@ export async function quoteTrade(
   mint: string,
   amount: bigint,
   taker: PublicKey,
+  /** Show a wallet-free price when this wallet can't be quoted; never set for a real trade */
+  { allowPreview = false }: { allowPreview?: boolean } = {},
 ): Promise<{ order: UltraOrder; view: TradeQuote }> {
   if (amount <= 0n) throw badRequest('Enter an amount.')
   const { input, output, stock } = await tradeAssets(side, mint)
   const stockMint = stock.mint.toBase58()
 
-  const [order, multiplier, prices] = await Promise.all([
-    getOrderWithFee(
+  const [{ order, preview }, multiplier, prices] = await Promise.all([
+    orderForQuote(
       {
         inputMint: input.mint.toBase58(),
         outputMint: output.mint.toBase58(),
@@ -71,6 +94,7 @@ export async function quoteTrade(
         taker: taker.toBase58(),
       },
       side,
+      allowPreview,
     ),
     uiMultiplier(stockMint),
     getPrices([stockMint]),
@@ -111,6 +135,8 @@ export async function quoteTrade(
       feePct: order.feeBps / 100,
       gasless: order.gasless,
       slippagePct: order.slippageBps / 100,
+      lowLiquidity: stock.liquidityUsd < LOW_LIQUIDITY_USD,
+      preview,
     },
   }
 }
@@ -121,13 +147,18 @@ export function assertFairPrice(view: TradeQuote) {
   if (deviation == null) return
   const tooExpensive = view.side === 'buy' && deviation > MAX_PRICE_DEVIATION_PCT
   const tooCheap = view.side === 'sell' && deviation < -MAX_PRICE_DEVIATION_PCT
-  if (tooExpensive || tooCheap) {
-    throw new HttpError(
-      422,
-      'unfair_price',
-      `The price right now is ${Math.abs(deviation).toFixed(1)}% off the market, so we stopped this trade. Try again in a bit.`,
-    )
-  }
+  if (!tooExpensive && !tooCheap) return
+
+  const gap = `${Math.abs(deviation).toFixed(1)}%`
+  // A thin market can sit off the real price for days, so don't promise that waiting helps
+  const advice = view.lowLiquidity
+    ? 'Few people trade it, so this can last a while.'
+    : 'Try again in a bit.'
+  throw new HttpError(
+    422,
+    'unfair_price',
+    `${view.name} is changing hands ${gap} ${tooExpensive ? 'above' : 'below'} its market price, so we stopped this. ${advice}`,
+  )
 }
 
 /**

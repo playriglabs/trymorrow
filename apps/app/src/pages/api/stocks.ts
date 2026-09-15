@@ -3,10 +3,8 @@ import { getStocks } from '@/lib/server/catalog'
 import { json, route } from '@/lib/server/http'
 import { getPortfolio } from '@/lib/server/portfolio'
 import { requireUser, requireWallet } from '@/lib/server/users'
+import { LOW_LIQUIDITY_USD } from '@/lib/stocks'
 import type { StockListing, StocksResponse } from '@/lib/types'
-
-/** Below this, fills get expensive and quotes often fail, so the list says so */
-const LOW_LIQUIDITY_USD = 10_000
 
 export const GET = route(async ({ request }) => {
   const user = await requireUser(request)

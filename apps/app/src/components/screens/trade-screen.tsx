@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { match, P } from 'ts-pattern'
 import { PriceChart } from '@/components/price-chart'
 import { withProviders } from '@/components/providers'
+import { StockAbout } from '@/components/stock-about'
 import { StockLogo } from '@/components/stock-logo'
 import { SuccessMark } from '@/components/success-mark'
 import { TradeShareCard } from '@/components/trade-share-card'
@@ -44,7 +45,9 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
   const [amountText, setAmountText] = useState('25')
   /** Set when a sell shortcut is picked, so "All" sells exactly every share */
   const [sellPercent, setSellPercent] = useState<number | null>(null)
-  const [stage, setStage] = useState<'form' | 'review' | 'done'>('form')
+  const [stage, setStage] = useState<'overview' | 'amount' | 'review' | 'done'>(
+    initialSide === 'sell' ? 'amount' : 'overview',
+  )
 
   const stock = stocks.data?.stocks.find((item) => item.ticker === ticker)
   const cashRaw = BigInt(stocks.data?.cashRaw ?? '0')
@@ -79,8 +82,13 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
   const quote = useTradeQuoteQuery(
     { side, mint: stock?.mint ?? '', amountRaw: quotedRaw },
     {
+      // Not gated on the balance: someone deciding whether to add cash needs to see the trade
+      // first. The server prices it without the wallet when the wallet can't pay.
       enabled:
-        session.ready && Boolean(stock) && BigInt(quotedRaw) > 0n && hasEnough && stage !== 'done',
+        session.ready &&
+        Boolean(stock) &&
+        BigInt(quotedRaw) > 0n &&
+        (stage === 'amount' || stage === 'review'),
     },
   )
 
@@ -210,7 +218,7 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
         footer={
           <>
             {trade.isError && (
-              <p className="text-center text-[13px] text-loss">{errorMessage(trade.error)}</p>
+              <p className="text-center text-[13px] text-loss mb-1">{errorMessage(trade.error)}</p>
             )}
             <Button
               loading={trade.isPending}
@@ -226,7 +234,7 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
                 ? `Buy for ${formatUsd(current.cashUsd)}`
                 : `Sell for about ${formatUsd(current.cashUsd)}`}
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => setStage('form')}>
+            <Button variant="ghost" size="sm" onClick={() => setStage('amount')}>
               Edit amount
             </Button>
           </>
@@ -237,7 +245,7 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
           <div className="flex flex-col">
             <span className="text-[13px] text-stone">{buying ? 'You get about' : 'You sell'}</span>
             <span className="font-sans text-[26px] leading-[1.2] font-medium tracking-[-0.02em]">
-              {formatShares(current.shares)} {stock.name} shares
+              {formatShares(current.shares)} ${stock.ticker} shares
             </span>
           </div>
         </div>
@@ -291,6 +299,9 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
     hint = { text: 'Trades under $10 can cost more in fees.', tone: 'muted' }
   } else if (sellingTooMuch) {
     hint = { text: `You have about ${formatUsd(stock.ownedValueUsd)} to sell.`, tone: 'error' }
+  } else if (current?.preview) {
+    // Priced without the wallet, so say it's a look rather than something they can act on
+    hint = { text: 'This is how the trade would look. Add cash to make it.', tone: 'muted' }
   }
 
   const estimate = match({
@@ -312,14 +323,68 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
     )
     .otherwise(() => ' ')
 
+  if (stage === 'overview') {
+    return (
+      <Screen
+        title={`Trade $${stock.ticker}`}
+        back="/buy"
+        footer={
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              onClick={() => {
+                switchSide('buy')
+                setStage('amount')
+              }}
+            >
+              Buy
+            </Button>
+            <Button
+              variant="soft"
+              disabled={ownedRaw === 0n}
+              onClick={() => {
+                switchSide('sell')
+                setStage('amount')
+              }}
+            >
+              Sell
+            </Button>
+          </div>
+        }
+      >
+        <PriceChart
+          mint={stock.mint}
+          name={stock.name}
+          ticker={stock.ticker}
+          iconUrl={stock.iconUrl}
+          fallbackPrice={stock.priceUsd}
+          lowLiquidity={stock.lowLiquidity}
+        />
+
+        <Card className="flex flex-col divide-y divide-line px-4 text-[15px]">
+          <Row
+            label="Your position"
+            value={
+              stock.ownedShares > 0
+                ? `${formatShares(stock.ownedShares)} shares · ${formatUsd(stock.ownedValueUsd)}`
+                : 'Not invested yet'
+            }
+          />
+          <Row label="Cash available" value={formatUsd(stocks.data?.cashUsd ?? 0)} />
+        </Card>
+
+        <StockAbout mint={stock.mint} name={stock.name} />
+      </Screen>
+    )
+  }
+
   return (
     <Screen
-      title={stock.name}
-      back="/buy"
+      title={`${buying ? 'Buy' : 'Sell'} ${stock.ticker}`}
+      back={() => setStage('overview')}
       footer={
         <>
-          {quote.isError && hasEnough && (
-            <p className="text-center text-[13px] text-loss">{errorMessage(quote.error)}</p>
+          {quote.isError && (
+            <p className="text-center text-[13px] text-loss mb-1">{errorMessage(quote.error)}</p>
           )}
           <Button
             disabled={!hasEnough || !settled || !current || quote.isError}
@@ -328,44 +393,21 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
               setStage('review')
             }}
           >
-            Review
+            Review {buying ? 'buy' : 'sell'}
           </Button>
         </>
       }
     >
-      <PriceChart
-        mint={stock.mint}
-        name={stock.name}
-        ticker={stock.ticker}
-        iconUrl={stock.iconUrl}
-        fallbackPrice={stock.priceUsd}
-        lowLiquidity={stock.lowLiquidity}
-      />
-
-      <div className="grid grid-cols-2 gap-1 rounded-link border border-line bg-surface p-1">
-        {(['buy', 'sell'] as const).map((option) => (
-          <button
-            key={option}
-            type="button"
-            disabled={option === 'sell' && ownedRaw === 0n}
-            onClick={() => switchSide(option)}
-            className={clsx(
-              'h-10 rounded-link font-sans text-[15px] font-medium capitalize disabled:opacity-40',
-              {
-                'bg-orange-wash text-ink': side === option,
-                'text-stone': side !== option,
-              },
-            )}
-          >
-            {option}
-          </button>
-        ))}
-      </div>
-
-      <div className="-mt-2 flex flex-col items-center gap-1">
+      <div className="flex flex-col items-center gap-2 pt-7 pb-3">
+        <div className="mb-2 flex items-center gap-2 rounded-full bg-orange-wash py-1.5 pr-3 pl-1.5">
+          <StockLogo iconUrl={stock.iconUrl} ticker={stock.ticker} size={28} />
+          <span className="font-sans text-[14px] font-medium">
+            {buying ? 'Buying' : 'Selling'} {stock.ticker}
+          </span>
+        </div>
         <label
           htmlFor="trade-amount"
-          className="flex max-w-full items-baseline justify-center font-sans text-[60px] leading-[1.05] font-medium tracking-[-0.02em] tabular-nums"
+          className="flex max-w-full items-baseline justify-center font-sans text-[64px] leading-[1.05] font-medium tracking-[-0.03em] tabular-nums"
         >
           <span className={clsx({ 'text-steel': !amountText })}>$</span>
           <span className="sr-only">
@@ -375,6 +417,8 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
             id="trade-amount"
             inputMode="decimal"
             autoComplete="off"
+            // biome-ignore lint/a11y/noAutofocus: <>
+            autoFocus
             placeholder="0"
             value={amountText}
             onChange={(event) => {
@@ -409,7 +453,7 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
       </div>
 
       <div
-        className={clsx('-mt-2 grid gap-2', {
+        className={clsx('grid gap-2', {
           'grid-cols-4': buying,
           'grid-cols-3': !buying,
         })}

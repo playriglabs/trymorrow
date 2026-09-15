@@ -58,11 +58,7 @@ export async function getOrder({
   const response = await fetch(`${ULTRA_API}/order?${params}`)
   const body = (await response.json().catch(() => null)) as UltraOrder | null
   if (!response.ok || !body?.outAmount) {
-    throw new HttpError(
-      422,
-      'no_route',
-      'We couldn’t get a price for that right now. Try another amount.',
-    )
+    throw new HttpError(422, 'no_route', 'We couldn’t get a price for that right now.')
   }
   return body
 }

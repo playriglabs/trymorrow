@@ -13,5 +13,5 @@ export const GET = route(async ({ params, request, url }) => {
   if (!stock) throw notFound('We couldn’t find that stock.')
 
   // The catalog's market price lets the chart reject histories from broken pools
-  return json(await getPriceChart(stock.mint.toBase58(), range, stock.priceUsd))
+  return json(await getPriceChart(stock.mint.toBase58(), stock.ticker, range, stock.priceUsd))
 })

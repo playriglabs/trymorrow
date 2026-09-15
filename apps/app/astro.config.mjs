@@ -56,6 +56,9 @@ export default defineConfig({
       // needed to send a push; without them notifications stay in the feed.
       VAPID_PRIVATE_KEY: envField.string({ context: 'server', access: 'secret', optional: true }),
       VAPID_SUBJECT: envField.string({ context: 'server', access: 'secret', optional: true }),
+      // Financial Modeling Prep key, for the one-line company descriptions on a stock page.
+      // Unset means no descriptions: every stock page just leaves the section out.
+      FMP_API_KEY: envField.string({ context: 'server', access: 'secret', optional: true }),
       // Our trading fee in basis points; Jupiter allows 50-255 and keeps 20% of it
       TRADE_FEE_BPS: envField.number({
         context: 'server',

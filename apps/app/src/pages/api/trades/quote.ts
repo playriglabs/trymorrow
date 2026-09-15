@@ -11,7 +11,16 @@ export const GET = route(async ({ request, url }) => {
   if ((side !== 'buy' && side !== 'sell') || !/^[1-9]\d{0,19}$/.test(amount)) {
     throw badRequest('Enter an amount.')
   }
-  // Quoted for this wallet so the gasless fee shown matches what the trade will cost
-  const { view } = await quoteTrade(side, mint, BigInt(amount), new PublicKey(requireWallet(user)))
+  // Quoted for this wallet so the gasless fee shown matches what the trade will cost, falling
+  // back to a wallet-free price so an empty account still sees what the trade would look like
+  const { view } = await quoteTrade(
+    side,
+    mint,
+    BigInt(amount),
+    new PublicKey(requireWallet(user)),
+    {
+      allowPreview: true,
+    },
+  )
   return json(view)
 })

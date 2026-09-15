@@ -1,4 +1,5 @@
 import { HttpError } from '@/lib/server/http'
+import { getMarketCandles } from '@/lib/server/market'
 import { db } from '@/lib/server/supabase'
 import type { ChartRange, PriceChart, PricePoint } from '@/lib/types'
 
@@ -236,7 +237,11 @@ function merge(stored: PricePoint[], fresh: PricePoint[]): PricePoint[] {
   return [...byTime.values()].sort((a, b) => a.t - b.t)
 }
 
-function toChart(range: ChartRange, points: PricePoint[]): PriceChart {
+function toChart(
+  range: ChartRange,
+  points: PricePoint[],
+  source: PriceChart['source'] = 'pool',
+): PriceChart {
   const first = points[0]?.price
   const last = points.at(-1)?.price
   return {
@@ -244,16 +249,36 @@ function toChart(range: ChartRange, points: PricePoint[]): PriceChart {
     points,
     changePct: first && last ? ((last - first) / first) * 100 : null,
     stale: false,
+    source,
   }
 }
 
+/**
+ * Ranges a day's worth of candles can honestly fill. 1D and 3D can't: the only intraday data
+ * we can reach is the pool's, so a day with no pool trades stays a day with no chart.
+ */
+const MARKET_FALLBACK_RANGES = new Set<ChartRange>(['1W', '1M', '1Y', 'ALL'])
+
 export async function getPriceChart(
   mint: string,
+  ticker: string,
   range: ChartRange,
   referencePrice: number | null,
 ): Promise<PriceChart> {
   const key = `${mint}:${range}`
   const spec = RANGES[range]
+
+  /**
+   * The pool had nothing to draw. The listed stock's daily closes are a real answer for the
+   * longer ranges, as long as this stock trades near the listed one — if the pool is miles off,
+   * the market's line next to our price would mislead rather than inform.
+   */
+  const fromMarket = async (): Promise<PriceChart | null> => {
+    if (!MARKET_FALLBACK_RANGES.has(range)) return null
+    const points = await getMarketCandles(mint, ticker, spec.windowSeconds)
+    if (!points || points.length < 2 || !matchesReference(points, referencePrice)) return null
+    return toChart(range, points, 'market')
+  }
   const cached = charts.get(key)
   const cachedIsSane = cached ? matchesReference(cached.chart.points, referencePrice) : false
   if (cached && cachedIsSane && Date.now() - cached.at < spec.cacheMs) return cached.chart
@@ -263,8 +288,8 @@ export async function getPriceChart(
     return null
   })
   const storedIsSane = stored ? matchesReference(stored.points, referencePrice) : false
-  const remember = (points: PricePoint[]) => {
-    const chart = toChart(range, points)
+  const remember = (points: PricePoint[], source: PriceChart['source'] = 'pool') => {
+    const chart = toChart(range, points, source)
     charts.set(key, { chart, at: Date.now() })
     return chart
   }
@@ -286,6 +311,8 @@ export async function getPriceChart(
       // Don't remember a stale answer: the next request should try the pools again
       if (stored && storedIsSane) return { ...toChart(range, stored.points), stale: true }
       charts.delete(key)
+      const market = await fromMarket()
+      if (market) return remember(market.points, 'market')
       throw new HttpError(404, 'no_chart', 'There’s no reliable price history for this stock yet.')
     }
 
@@ -295,6 +322,9 @@ export async function getPriceChart(
     if (error instanceof HttpError) throw error
     if (cached && cachedIsSane) return { ...cached.chart, stale: true }
     if (stored && storedIsSane) return { ...toChart(range, stored.points), stale: true }
+    // Rate-limited or the pool source is down: the listed stock still has a line to draw
+    const market = await fromMarket()
+    if (market) return remember(market.points, 'market')
     if (error instanceof RateLimited) {
       throw new HttpError(503, 'chart_busy', 'The chart is busy right now. Try again in a minute.')
     }
