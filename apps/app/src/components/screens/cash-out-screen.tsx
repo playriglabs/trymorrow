@@ -275,7 +275,7 @@ function CashOut() {
                 ) + 0.1
               }ch`,
             }}
-            className="min-w-[1ch] bg-transparent text-center text-ink outline-none placeholder:text-steel"
+            className="min-w-[1ch] bg-transparent text-left text-ink outline-none placeholder:text-steel"
           />
         </label>
         <span
@@ -331,7 +331,7 @@ function CashOut() {
 
       <div className="flex flex-col gap-2">
         <Label htmlFor="cashout-address">Where it goes</Label>
-        <div className="flex gap-2">
+        <div className="flex min-w-0 gap-2">
           <TextInput
             id="cashout-address"
             value={address}
@@ -340,7 +340,7 @@ function CashOut() {
             autoComplete="off"
             placeholder="Paste the account address"
             onChange={(event) => setAddress(event.target.value)}
-            className="font-body text-[14px] placeholder:text-[14px]"
+            className="min-w-0 flex-1 text-ellipsis font-body text-[14px] placeholder:text-[14px]"
           />
           <Button variant="soft" size="sm" className="h-14 shrink-0 px-4" onClick={paste}>
             <ClipboardIcon className="size-4.5" />
