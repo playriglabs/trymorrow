@@ -82,7 +82,7 @@ function PnlShareSheet({
       >
         <div className="flex items-center justify-between">
           <div>
-            <h2 id="pnl-share-title" className="font-sans text-lg font-medium tracking-[-0.02em]">
+            <h2 id="pnl-share-title" className="font-sans text-xl font-medium tracking-[-0.02em]">
               Share your P&amp;L
             </h2>
             <p className="text-[13px] text-stone">Save it or share it wherever you like.</p>

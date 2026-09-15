@@ -1,4 +1,4 @@
-import { ShieldCheckIcon, WarningIcon } from '@phosphor-icons/react'
+import { ShareIcon, ShieldCheckIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { useEffect, useRef, useState } from 'react'
 import { match, P } from 'ts-pattern'
@@ -48,6 +48,7 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
   const [stage, setStage] = useState<'overview' | 'amount' | 'review' | 'done'>(
     initialSide === 'sell' ? 'amount' : 'overview',
   )
+  const [shareCardOpen, setShareCardOpen] = useState(false)
 
   const stock = stocks.data?.stocks.find((item) => item.ticker === ticker)
   const cashRaw = BigInt(stocks.data?.cashRaw ?? '0')
@@ -123,66 +124,111 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
     const result = trade.data.quote
     const bought = result.side === 'buy'
     return (
-      <Screen
-        footer={
-          <div
-            className={clsx('grid gap-2', {
-              'grid-cols-2': bought,
-              'grid-cols-1': !bought,
-            })}
-          >
-            {bought && (
-              <LinkButton href="/send" variant="soft" size="md">
-                Gift some
-              </LinkButton>
-            )}
-            <LinkButton href="/">Done</LinkButton>
-          </div>
-        }
-      >
-        <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
-          <SuccessMark />
-          <div className="flex flex-col gap-1.5">
-            <h1 className="font-sans text-[30px] leading-[1.15] font-medium tracking-[-0.02em] text-balance">
-              {bought
-                ? `You bought ${formatUsd(result.cashUsd)} of ${result.name}`
-                : `You sold ${formatShares(result.shares)} ${result.name} shares`}
-            </h1>
-            <p className="text-stone">
-              Done in under a minute. Amounts are estimates until settled.
-            </p>
-          </div>
-          <Card className="flex w-full flex-col divide-y divide-line px-4 text-left text-[15px]">
-            <Row
-              label={bought ? 'Bought' : 'Sold'}
-              value={`${formatShares(result.shares)} ${result.name} shares`}
-            />
-            <Row label={bought ? 'Paid' : 'Received'} value={formatUsd(result.cashUsd)} />
-            <div className="flex items-center justify-between py-3">
-              <span className="text-stone">Receipt</span>
-              <a
-                href={`https://solscan.io/tx/${trade.data.signature}`}
-                target="_blank"
-                rel="noreferrer"
-                className="underline"
-              >
-                View
-              </a>
+      <>
+        <Screen
+          footer={
+            <div
+              className={clsx('grid gap-2', {
+                'grid-cols-2': bought,
+                'grid-cols-1': !bought,
+              })}
+            >
+              {bought && (
+                <LinkButton href="/send" variant="soft" size="md">
+                  Gift some
+                </LinkButton>
+              )}
+              <LinkButton href="/">Done</LinkButton>
             </div>
-          </Card>
-          {bought && (
-            <TradeShareCard
-              mint={result.mint}
-              name={result.name}
-              ticker={result.ticker}
-              pricePerShareUsd={result.pricePerShareUsd}
-              shares={result.shares}
-              changePct={stock.lowLiquidity ? null : stock.change24hPct}
-              handle={session.profile?.handle ?? null}
+          }
+        >
+          <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
+            <SuccessMark />
+            <div className="flex flex-col gap-1.5">
+              <h1 className="font-sans text-[30px] leading-[1.15] font-medium tracking-[-0.02em] text-balance">
+                {bought
+                  ? `You bought ${formatUsd(result.cashUsd)} of ${result.name}`
+                  : `You sold ${formatShares(result.shares)} ${result.name} shares`}
+              </h1>
+              <p className="text-stone">
+                Done in under a minute. Amounts are estimates until settled.
+              </p>
+            </div>
+            <Card className="flex w-full flex-col divide-y divide-line px-4 text-left text-[15px]">
+              <Row
+                label={bought ? 'Bought' : 'Sold'}
+                value={`${formatShares(result.shares)} ${result.name} shares`}
+              />
+              <Row label={bought ? 'Paid' : 'Received'} value={formatUsd(result.cashUsd)} />
+              <div className="flex items-center justify-between py-3">
+                <span className="text-stone">Receipt</span>
+                <a
+                  href={`https://solscan.io/tx/${trade.data.signature}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline"
+                >
+                  View
+                </a>
+              </div>
+            </Card>
+            {bought && (
+              <Button variant="outline" className="w-full" onClick={() => setShareCardOpen(true)}>
+                <ShareIcon className="size-5" />
+                Share purchase
+              </Button>
+            )}
+          </div>
+        </Screen>
+
+        {bought && shareCardOpen && (
+          <div className="modal-backdrop-in fixed inset-0 z-30 flex items-end justify-center bg-ink/30">
+            <button
+              type="button"
+              aria-label="Close share preview"
+              onClick={() => setShareCardOpen(false)}
+              className="absolute inset-0 cursor-default"
             />
-          )}
-        </div>
-      </Screen>
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="share-purchase-title"
+              className="modal-sheet-in relative flex max-h-[calc(100dvh-16px)] w-full max-w-107.5 flex-col overflow-hidden rounded-t-sheet bg-cream"
+            >
+              <div className="flex shrink-0 items-center justify-between px-5 pt-4 pb-3">
+                <div className="flex flex-col gap-0.5">
+                  <h2
+                    id="share-purchase-title"
+                    className="font-sans text-xl font-medium tracking-[-0.02em]"
+                  >
+                    Share your purchase
+                  </h2>
+                  <p className="text-[13px] text-stone">Preview, share, or save your image.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShareCardOpen(false)}
+                  aria-label="Close"
+                  className="flex size-11 items-center justify-center rounded-full text-stone hover:bg-orange-wash"
+                >
+                  <XIcon className="size-5" />
+                </button>
+              </div>
+              <div className="flex min-h-0 flex-1 justify-center overflow-y-auto px-5 pt-3 pb-[max(28px,env(safe-area-inset-bottom))]">
+                <TradeShareCard
+                  mint={result.mint}
+                  name={result.name}
+                  ticker={result.ticker}
+                  pricePerShareUsd={result.pricePerShareUsd}
+                  shares={result.shares}
+                  changePct={stock.lowLiquidity ? null : stock.change24hPct}
+                  handle={session.profile?.handle ?? null}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </>
     )
   }
 
