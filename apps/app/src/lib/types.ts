@@ -35,6 +35,8 @@ export type Holding = {
   amount: number
   priceUsd: number | null
   valueUsd: number | null
+  /** All-time cost basis (gift value + buys, minus what sells took out); null when unknown */
+  costUsd: number | null
 }
 
 export type Portfolio = {
@@ -162,4 +164,128 @@ export type NotificationSettings = {
   giftReceived: boolean
   giftOpened: boolean
   giftReturned: boolean
+  fundContribution: boolean
+  fundUnlocked: boolean
+  /** Whether this person's phones get a buzz at all; the feed keeps everything either way */
+  pushEnabled: boolean
+}
+
+export type NotificationKind =
+  | 'gift_sent'
+  | 'gift_received'
+  | 'gift_opened'
+  | 'gift_returned'
+  | 'trade_bought'
+  | 'trade_sold'
+  /** You put money into a fund */
+  | 'fund_added'
+  /** Someone else added to a fund you started, or one that's for you */
+  | 'fund_contribution'
+  | 'fund_unlocked'
+  /** Cash landed from an exchange or another wallet */
+  | 'cash_deposited'
+
+export type NotificationView = {
+  id: string
+  kind: NotificationKind
+  title: string
+  body: string
+  read: boolean
+  createdAt: string
+}
+
+export type FundStatus = 'draft' | 'active' | 'withdrawn'
+
+export type FundPurpose = 'college' | 'first_home' | 'wedding' | 'other'
+
+export type FundAllocationView = {
+  mint: string
+  name: string
+  ticker: string
+  iconUrl: string | null
+  /** Share of every contribution that buys this stock */
+  percent: number
+}
+
+export type FundHoldingView = {
+  mint: string
+  name: string
+  ticker: string
+  iconUrl: string | null
+  /** Raw base units in the vault (bigint-safe) */
+  raw: string
+  valueUsd: number | null
+  change24hPct: number | null
+  /** Share of the fund's value today */
+  weightPct: number
+}
+
+/** One person adding to the fund, however many stocks it bought */
+export type FundContributionView = {
+  id: string
+  name: string
+  avatarUrl: string | null
+  note: string | null
+  usdValue: number
+  stocks: string[]
+  createdAt: string
+}
+
+export type FundView = {
+  id: string
+  name: string
+  status: FundStatus
+  purpose: FundPurpose
+  beneficiaryName: string
+  creator: { name: string; handle: string | null; avatarUrl: string | null }
+  allocations: FundAllocationView[]
+  /** What the vaults hold right now, largest first */
+  holdings: FundHoldingView[]
+  valueUsd: number
+  /** What everything was worth when it went in */
+  contributedUsd: number
+  changeUsd: number
+  /** All-time change; null until something has been added */
+  changePct: number | null
+  goalUsd: number | null
+  progressPct: number | null
+  yearsToGo: number
+  unlockAt: string
+  unlocked: boolean
+  createdAt: string
+  contributions: FundContributionView[]
+  /** Cash the creator paid to open the fund; only shown to them */
+  feeUsd: number | null
+  viewer: 'creator' | 'beneficiary' | 'other' | 'anonymous'
+}
+
+/** The short version for lists and Home */
+export type FundCardView = {
+  id: string
+  name: string
+  beneficiaryName: string
+  purpose: FundPurpose
+  status: FundStatus
+  contributedUsd: number
+  goalUsd: number | null
+  progressPct: number | null
+  unlockAt: string
+  yearsToGo: number
+}
+
+/** What opening a fund, or adding a stock it doesn't hold yet, costs the person doing it */
+export type FundFeeQuote = {
+  feeUsd: number
+  /** Stocks this would open a vault for; each one is what makes a fund cost anything */
+  newVaults: number
+}
+
+/** A stock bought on the way into a fund, for the client to sign and hand to Jupiter */
+export type FundBuyOrder = {
+  mint: string
+  transaction: string
+  requestId: string
+  /** Raw base units the order delivers at worst, after slippage */
+  minRaw: string
+  quote: TradeQuote
 }

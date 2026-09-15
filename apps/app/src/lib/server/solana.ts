@@ -5,7 +5,7 @@ import {
   ComputeBudgetProgram,
   Connection,
   Keypair,
-  type PublicKey,
+  PublicKey,
   SendTransactionError,
   type TransactionInstruction,
   TransactionMessage,
@@ -188,7 +188,22 @@ export function parseRelayedTransaction(base64: string): VersionedTransaction {
   return transaction
 }
 
-export type MorrowAction = 'createGift' | 'claimGift' | 'refundGift'
+const MORROW_ACTIONS = [
+  'createGift',
+  'claimGift',
+  'refundGift',
+  'createFund',
+  'contribute',
+  'withdraw',
+  'closeFund',
+] as const
+
+export type MorrowAction = (typeof MORROW_ACTIONS)[number]
+
+const actionOf = (data: Uint8Array): MorrowAction | undefined => {
+  const head = Array.from(data.slice(0, 8))
+  return MORROW_ACTIONS.find((name) => DISCRIMINATORS[name].every((byte, i) => head[i] === byte))
+}
 
 /** Which Morrow instructions in the transaction touch `target` (a gift or fund address) */
 export function morrowActions(
@@ -200,13 +215,64 @@ export function morrowActions(
   for (const ix of transaction.message.compiledInstructions) {
     if (!keys[ix.programIdIndex]?.equals(MORROW_PROGRAM_ID)) continue
     if (!ix.accountKeyIndexes.some((index) => keys[index]?.equals(target))) continue
-    const head = Array.from(ix.data.slice(0, 8))
-    const action = (['createGift', 'claimGift', 'refundGift'] as const).find((name) =>
-      DISCRIMINATORS[name].every((byte, i) => head[i] === byte),
-    )
+    const action = actionOf(ix.data)
     if (action) actions.push(action)
   }
   return actions
+}
+
+export type FundInstruction = {
+  action: MorrowAction
+  /** The stock the instruction moves; null for `createFund` and `closeFund` */
+  mint: PublicKey | null
+  amount: bigint | null
+  /** `createFund` only */
+  beneficiary: PublicKey | null
+  /** `createFund` only, unix seconds */
+  unlockAt: bigint | null
+}
+
+/**
+ * Reads what each fund instruction in the transaction really does, straight from its accounts and
+ * arguments, so a fund route never has to trust the client about the stock or the amount.
+ */
+export function fundInstructions(
+  transaction: VersionedTransaction,
+  fund: PublicKey,
+): FundInstruction[] {
+  const keys = transaction.message.staticAccountKeys
+  const found: FundInstruction[] = []
+  for (const ix of transaction.message.compiledInstructions) {
+    if (!keys[ix.programIdIndex]?.equals(MORROW_PROGRAM_ID)) continue
+    if (!ix.accountKeyIndexes.some((index) => keys[index]?.equals(fund))) continue
+    const action = actionOf(ix.data)
+    if (!action) continue
+
+    const data = Buffer.from(ix.data)
+    const account = (position: number) => keys[ix.accountKeyIndexes[position] ?? -1] ?? null
+    if (action === 'createFund' && data.length === 8 + 16 + 32 + 8) {
+      found.push({
+        action,
+        mint: null,
+        amount: null,
+        beneficiary: new PublicKey(data.subarray(24, 56)),
+        unlockAt: data.readBigInt64LE(56),
+      })
+    } else if (action === 'contribute' && data.length === 16) {
+      found.push({
+        action,
+        mint: account(3),
+        amount: data.readBigUInt64LE(8),
+        beneficiary: null,
+        unlockAt: null,
+      })
+    } else if (action === 'withdraw' && data.length === 8) {
+      found.push({ action, mint: account(4), amount: null, beneficiary: null, unlockAt: null })
+    } else {
+      found.push({ action, mint: null, amount: null, beneficiary: null, unlockAt: null })
+    }
+  }
+  return found
 }
 
 export type TokenTransfer = {

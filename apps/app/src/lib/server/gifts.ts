@@ -1,3 +1,5 @@
+import { formatUsd } from '@/lib/format'
+import { giftAssetsLabel } from '@/lib/gifts'
 import { getStocks } from '@/lib/server/catalog'
 import { notFound } from '@/lib/server/http'
 import { avatarUrl, db } from '@/lib/server/supabase'
@@ -133,4 +135,16 @@ export async function toGiftView(gift: GiftRow, viewer: UserRow | null): Promise
   const [view] = await toGiftViews([gift], viewer)
   if (!view) throw notFound()
   return view
+}
+
+/** "$25 of Apple and Nvidia" — how a notification names a gift */
+export async function giftLabel(gift: GiftRow): Promise<string> {
+  const stocks = await getStocks()
+  const names = gift.gift_items.flatMap((item) => {
+    const stock = stocks.find((entry) => entry.mint.toBase58() === item.mint)
+    return stock ? [stock.name] : []
+  })
+  const usd = gift.gift_items.reduce((sum, item) => sum + (Number(item.usd_value) || 0), 0)
+  if (names.length === 0) return formatUsd(usd)
+  return `${formatUsd(usd)} of ${giftAssetsLabel(names.map((name) => ({ name })))}`
 }

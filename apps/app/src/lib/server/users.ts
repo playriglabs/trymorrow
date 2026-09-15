@@ -20,10 +20,13 @@ export type UserRow = {
   country: string | null
   not_us_person: boolean
   terms_accepted_at: string | null
+  /** Cash balance at the last look, in USDC base units; deposits are what came in above it */
+  cash_seen_raw: string | null
+  cash_seen_signature: string | null
 }
 
 export const USER_COLUMNS =
-  'id, privy_id, email, wallet_address, handle, name, avatar_path, country, not_us_person, terms_accepted_at'
+  'id, privy_id, email, wallet_address, handle, name, avatar_path, country, not_us_person, terms_accepted_at, cash_seen_raw, cash_seen_signature'
 
 export const HANDLE_PATTERN = /^[a-z0-9_]{3,20}$/
 export const RESERVED_HANDLES = new Set([

@@ -1,10 +1,12 @@
 import { HttpError } from '@/lib/server/http'
+import { db } from '@/lib/server/supabase'
 import type { ChartRange, PriceChart, PricePoint } from '@/lib/types'
 
 /**
  * Price history from GeckoTerminal (free, keyless). The free tier allows only a handful of calls a
- * minute, so pools and candles are cached here and the last good copy is served when rate-limited.
- * Free history reaches back about six months, so 1Y and ALL can show the same window.
+ * minute, so pools are cached in memory and every candle we fetch is kept in `price_candles`.
+ * That cache is shared across serverless instances, answers while we're rate-limited, and lets
+ * daily history grow past the six months the free tier will still hand back.
  */
 const GECKO_API = 'https://api.geckoterminal.com/api/v2/networks/solana'
 const POOL_CACHE_MS = 60 * 60_000
@@ -29,6 +31,8 @@ type RangeSpec = {
   aggregate: number
   limit: number
   cacheMs: number
+  /** Candle size as stored in `price_candles`, so ranges sharing a size share the rows */
+  timeframeKey: string
   /**
    * The range's real time span. Thin pools skip empty candles, so a fixed candle count can reach
    * much further back; cutting to the span keeps "1D" meaning the last 24 hours.
@@ -40,13 +44,28 @@ const HOUR = 3600
 const DAY = 24 * HOUR
 
 const RANGES: Record<ChartRange, RangeSpec> = {
-  '1D': { timeframe: 'minute', aggregate: 15, limit: 96, cacheMs: 60_000, windowSeconds: DAY },
-  '3D': { timeframe: 'hour', aggregate: 1, limit: 72, cacheMs: 5 * 60_000, windowSeconds: 3 * DAY },
+  '1D': {
+    timeframe: 'minute',
+    aggregate: 15,
+    limit: 96,
+    cacheMs: 60_000,
+    timeframeKey: '15m',
+    windowSeconds: DAY,
+  },
+  '3D': {
+    timeframe: 'hour',
+    aggregate: 1,
+    limit: 72,
+    cacheMs: 5 * 60_000,
+    timeframeKey: '1h',
+    windowSeconds: 3 * DAY,
+  },
   '1W': {
     timeframe: 'hour',
     aggregate: 4,
     limit: 42,
     cacheMs: 10 * 60_000,
+    timeframeKey: '4h',
     windowSeconds: 7 * DAY,
   },
   '1M': {
@@ -54,6 +73,7 @@ const RANGES: Record<ChartRange, RangeSpec> = {
     aggregate: 12,
     limit: 60,
     cacheMs: 30 * 60_000,
+    timeframeKey: '12h',
     windowSeconds: 30 * DAY,
   },
   '1Y': {
@@ -61,10 +81,21 @@ const RANGES: Record<ChartRange, RangeSpec> = {
     aggregate: 1,
     limit: 365,
     cacheMs: 60 * 60_000,
+    timeframeKey: '1d',
     windowSeconds: 365 * DAY,
   },
-  ALL: { timeframe: 'day', aggregate: 1, limit: 1000, cacheMs: 60 * 60_000, windowSeconds: null },
+  ALL: {
+    timeframe: 'day',
+    aggregate: 1,
+    limit: 1000,
+    cacheMs: 60 * 60_000,
+    timeframeKey: '1d',
+    windowSeconds: null,
+  },
 }
+
+/** Sub-daily candles are only ever shown inside their window; daily ones are kept forever */
+const PRUNE_AFTER_WINDOWS = 2
 
 const pools = new Map<string, { addresses: string[]; at: number }>()
 const charts = new Map<string, { chart: PriceChart; at: number }>()
@@ -141,6 +172,81 @@ function matchesReference(points: PricePoint[], referencePrice: number | null): 
   return Math.abs(last - referencePrice) / referencePrice <= MAX_REFERENCE_GAP
 }
 
+type StoredCandles = { points: PricePoint[]; fetchedAt: number }
+
+/** Candles already kept for this size, inside the range's window, with our last fetch time */
+async function readStored(mint: string, spec: RangeSpec): Promise<StoredCandles | null> {
+  const cutoff = spec.windowSeconds ? Math.floor(Date.now() / 1000 - spec.windowSeconds) : 0
+  const { data, error } = await db
+    .from('price_candles')
+    .select('t, price, fetched_at')
+    .eq('mint', mint)
+    .eq('timeframe', spec.timeframeKey)
+    .gte('t', cutoff)
+    // Newest first so the row cap trims old candles, never the ones on screen
+    .order('t', { ascending: false })
+    .limit(spec.limit)
+  if (error) throw error
+  if (!data || data.length < 2) return null
+
+  let fetchedAt = 0
+  const points = data.map((row) => {
+    fetchedAt = Math.max(fetchedAt, new Date(row.fetched_at).getTime())
+    return { t: Number(row.t), price: Number(row.price) }
+  })
+  points.reverse()
+  return { points, fetchedAt }
+}
+
+/** Best effort: a chart that can't be cached is still a chart */
+async function storeCandles(mint: string, spec: RangeSpec, points: PricePoint[]): Promise<void> {
+  try {
+    const fetchedAt = new Date().toISOString()
+    const { error } = await db.from('price_candles').upsert(
+      points.map((point) => ({
+        mint,
+        timeframe: spec.timeframeKey,
+        t: point.t,
+        price: point.price,
+        fetched_at: fetchedAt,
+      })),
+      { onConflict: 'mint,timeframe,t' },
+    )
+    if (error) throw error
+
+    // Sub-daily candles never show again once they leave their window; daily ones are the
+    // long history we're accumulating, so they stay
+    if (spec.timeframe !== 'day' && spec.windowSeconds) {
+      await db
+        .from('price_candles')
+        .delete()
+        .eq('mint', mint)
+        .eq('timeframe', spec.timeframeKey)
+        .lt('t', Math.floor(Date.now() / 1000 - spec.windowSeconds * PRUNE_AFTER_WINDOWS))
+    }
+  } catch (error) {
+    console.error('Caching candles failed', error)
+  }
+}
+
+/** Fresh candles win, stored ones fill in what the free tier no longer reaches back to */
+function merge(stored: PricePoint[], fresh: PricePoint[]): PricePoint[] {
+  const byTime = new Map(stored.map((point) => [point.t, point]))
+  for (const point of fresh) byTime.set(point.t, point)
+  return [...byTime.values()].sort((a, b) => a.t - b.t)
+}
+
+function toChart(range: ChartRange, points: PricePoint[]): PriceChart {
+  const first = points[0]?.price
+  const last = points.at(-1)?.price
+  return {
+    range,
+    points,
+    changePct: first && last ? ((last - first) / first) * 100 : null,
+    stale: false,
+  }
+}
+
 export async function getPriceChart(
   mint: string,
   range: ChartRange,
@@ -152,6 +258,21 @@ export async function getPriceChart(
   const cachedIsSane = cached ? matchesReference(cached.chart.points, referencePrice) : false
   if (cached && cachedIsSane && Date.now() - cached.at < spec.cacheMs) return cached.chart
 
+  const stored = await readStored(mint, spec).catch((error) => {
+    console.error('Reading cached candles failed', error)
+    return null
+  })
+  const storedIsSane = stored ? matchesReference(stored.points, referencePrice) : false
+  const remember = (points: PricePoint[]) => {
+    const chart = toChart(range, points)
+    charts.set(key, { chart, at: Date.now() })
+    return chart
+  }
+  // A cold instance with candles someone else fetched recently: no call to make
+  if (stored && storedIsSane && Date.now() - stored.fetchedAt < spec.cacheMs) {
+    return remember(stored.points)
+  }
+
   try {
     let points: PricePoint[] | null = null
     for (const pool of await poolsFor(mint)) {
@@ -162,23 +283,18 @@ export async function getPriceChart(
       }
     }
     if (!points) {
+      // Don't remember a stale answer: the next request should try the pools again
+      if (stored && storedIsSane) return { ...toChart(range, stored.points), stale: true }
       charts.delete(key)
       throw new HttpError(404, 'no_chart', 'There’s no reliable price history for this stock yet.')
     }
 
-    const first = points[0]?.price
-    const last = points.at(-1)?.price
-    const chart: PriceChart = {
-      range,
-      points,
-      changePct: first && last ? ((last - first) / first) * 100 : null,
-      stale: false,
-    }
-    charts.set(key, { chart, at: Date.now() })
-    return chart
+    await storeCandles(mint, spec, points)
+    return remember(stored && storedIsSane ? merge(stored.points, points) : points)
   } catch (error) {
     if (error instanceof HttpError) throw error
     if (cached && cachedIsSane) return { ...cached.chart, stale: true }
+    if (stored && storedIsSane) return { ...toChart(range, stored.points), stale: true }
     if (error instanceof RateLimited) {
       throw new HttpError(503, 'chart_busy', 'The chart is busy right now. Try again in a minute.')
     }

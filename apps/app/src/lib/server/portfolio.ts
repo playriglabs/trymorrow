@@ -1,6 +1,7 @@
 import { TOKEN_2022_PROGRAM, TOKEN_PROGRAM, USDC } from '@morrow/sdk'
 import { PublicKey } from '@solana/web3.js'
 import { getStocks } from '@/lib/server/catalog'
+import { getCostBasis } from '@/lib/server/pnl'
 import { getPrices } from '@/lib/server/prices'
 import { connection } from '@/lib/server/solana'
 import type { Holding, Portfolio } from '@/lib/types'
@@ -48,6 +49,7 @@ export async function getPortfolio(walletAddress: string): Promise<Portfolio> {
       amount: cash?.amount ?? 0,
       priceUsd: 1,
       valueUsd: cash?.amount ?? 0,
+      costUsd: null,
     },
     ...ownedStockMints.flatMap((mint) => {
       const stock = stockByMint.get(mint)
@@ -67,12 +69,23 @@ export async function getPortfolio(walletAddress: string): Promise<Portfolio> {
           amount: balance.amount,
           priceUsd,
           valueUsd: priceUsd == null ? null : balance.amount * priceUsd,
+          costUsd: null,
         },
       ]
     }),
   ]
 
   const sum = (items: Holding[]) => items.reduce((total, item) => total + (item.valueUsd ?? 0), 0)
+  const stockHoldings = holdings.filter((item) => !item.isCash && item.amount > 0)
+  if (stockHoldings.length > 0) {
+    const basis = await getCostBasis(
+      walletAddress,
+      new Map(
+        stockHoldings.map((item) => [item.mint, { decimals: item.decimals, amount: item.amount }]),
+      ),
+    )
+    for (const item of stockHoldings) item.costUsd = basis.get(item.mint) ?? null
+  }
   return {
     walletAddress,
     cashUsd: sum(holdings.filter((item) => item.isCash)),

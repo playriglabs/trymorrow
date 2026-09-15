@@ -39,6 +39,9 @@ const PRICE_HEADROOM = 1.15
 /** Plain SPL Token account size, no extensions */
 const TOKEN_ACCOUNT_SIZE = 165
 
+/** 8-byte Anchor discriminator + the `Fund` fields */
+const FUND_ACCOUNT_SIZE = 8 + 123
+
 type GiftAsset = { mint: PublicKey; tokenProgram: PublicKey }
 
 export type GiftFee = {
@@ -103,6 +106,45 @@ async function shareAccountRent(asset: GiftAsset): Promise<number> {
   return lamports
 }
 
+const holdingAccount = (owner: PublicKey, asset: GiftAsset) =>
+  getAssociatedTokenAddressSync(asset.mint, owner, true, asset.tokenProgram)
+
+const rentBySize = new Map<number, number>()
+
+async function accountRent(size: number): Promise<number> {
+  const cached = rentBySize.get(size)
+  if (cached) return cached
+  const lamports = await connection.getMinimumBalanceForRentExemption(size)
+  rentBySize.set(size, lamports)
+  return lamports
+}
+
+/** What one of our relayed transactions costs right now, signatures plus the priority fee */
+async function transactionLamports(): Promise<number> {
+  const microLamports = await priorityFeeMicroLamports()
+  return (
+    BASE_LAMPORTS_PER_TRANSACTION + Math.ceil((ESTIMATED_COMPUTE_UNITS * microLamports) / 1_000_000)
+  )
+}
+
+async function solPrice(): Promise<number> {
+  const price = (await getPrices([SOL_MINT]))[SOL_MINT]
+  if (!price) {
+    throw new HttpError(
+      503,
+      'price_unavailable',
+      'We couldn’t work out the fee right now. Try again in a moment.',
+    )
+  }
+  return price
+}
+
+/** SOL we spend, charged as cash to the cent with headroom for the price moving meanwhile */
+function cashAtCost(lamports: number, solUsd: number): { raw: bigint; usd: number } {
+  const cents = Math.ceil((lamports / LAMPORTS_PER_SOL) * solUsd * PRICE_HEADROOM * 100)
+  return { raw: BigInt(cents) * 10_000n, usd: cents / 100 }
+}
+
 /**
  * What each recipient's gift costs us for good, charged to the sender in cash at cost.
  *
@@ -129,22 +171,12 @@ export async function giftFees(
         )
       : [],
   )
-  const [accounts, rents, prices, microLamports] = await Promise.all([
+  const [accounts, rents, solUsd, lamportsPerTransaction] = await Promise.all([
     addresses.length ? connection.getMultipleAccountsInfo(addresses) : Promise.resolve([]),
     Promise.all(assets.map(shareAccountRent)),
-    getPrices([SOL_MINT]),
-    priorityFeeMicroLamports(),
+    solPrice(),
+    transactionLamports(),
   ])
-  const lamportsPerTransaction =
-    BASE_LAMPORTS_PER_TRANSACTION + Math.ceil((ESTIMATED_COMPUTE_UNITS * microLamports) / 1_000_000)
-  const solUsd = prices[SOL_MINT]
-  if (!solUsd) {
-    throw new HttpError(
-      503,
-      'price_unavailable',
-      'We couldn’t work out the fee right now. Try again in a moment.',
-    )
-  }
 
   let cursor = 0
   return wallets.map((wallet) => {
@@ -154,9 +186,72 @@ export async function giftFees(
 
     const rent = holds.reduce((sum, held, index) => (held ? sum : sum + (rents[index] ?? 0)), 0)
     const lamports = rent + TRANSACTIONS_PER_GIFT * lamportsPerTransaction
-    const cents = Math.ceil((lamports / LAMPORTS_PER_SOL) * solUsd * PRICE_HEADROOM * 100)
-    return { newAccounts, raw: BigInt(cents) * 10_000n, usd: cents / 100 }
+    return { newAccounts, ...cashAtCost(lamports, solUsd) }
   })
+}
+
+/**
+ * A fund holds rent for years: the fund account itself, plus a vault per stock. The relayer pays
+ * that SOL, so the creator covers what it costs, exactly like a gift's fee. It comes back to the
+ * relayer when the fund is withdrawn and closed, which is why nothing is charged twice.
+ */
+export async function fundCreateFee(): Promise<{ raw: bigint; usd: number }> {
+  const [rent, solUsd, lamportsPerTransaction] = await Promise.all([
+    accountRent(FUND_ACCOUNT_SIZE),
+    solPrice(),
+    transactionLamports(),
+  ])
+  return cashAtCost(rent + lamportsPerTransaction, solUsd)
+}
+
+export type ContributionFee = {
+  raw: bigint
+  usd: number
+  /** What each stock costs, so a contribution records the fee against the stock that caused it */
+  perMint: Record<string, { raw: bigint; usd: number }>
+  /** Mints the fund doesn't hold yet, which this contribution opens a vault for */
+  newVaults: string[]
+}
+
+/**
+ * What adding to a fund costs us. Every contribution pays for its transaction; a stock the fund
+ * doesn't hold yet also opens a vault and, at unlock, an account for the beneficiary, which never
+ * comes back. The contributor pays that at cost rather than the creator, since they chose to be
+ * the first to put that stock in.
+ */
+export async function contributionFee(
+  fund: PublicKey,
+  beneficiary: PublicKey,
+  assets: GiftAsset[],
+): Promise<ContributionFee> {
+  const [vaults, beneficiaryAccounts, rents, solUsd, lamportsPerTransaction] = await Promise.all([
+    connection.getMultipleAccountsInfo(assets.map((asset) => holdingAccount(fund, asset))),
+    connection.getMultipleAccountsInfo(assets.map((asset) => holdingAccount(beneficiary, asset))),
+    Promise.all(assets.map(shareAccountRent)),
+    solPrice(),
+    transactionLamports(),
+  ])
+
+  const newVaults: string[] = []
+  const perMint: Record<string, { raw: bigint; usd: number }> = {}
+  let raw = 0n
+  let usd = 0
+  assets.forEach((asset, index) => {
+    const mint = asset.mint.toBase58()
+    // The contribution's own transaction is shared; the rest belongs to the stock that needs it
+    let lamports = Math.ceil(lamportsPerTransaction / assets.length)
+    if (!vaults[index]) {
+      newVaults.push(mint)
+      const rent = rents[index] ?? 0
+      // Vault rent returns at withdrawal; the beneficiary's own account is opened then and stays
+      lamports += rent + (beneficiaryAccounts[index] ? 0 : rent) + lamportsPerTransaction
+    }
+    const cost = cashAtCost(lamports, solUsd)
+    perMint[mint] = cost
+    raw += cost.raw
+    usd += cost.usd
+  })
+  return { raw, usd, perMint, newVaults }
 }
 
 /** What a fee is paid in: cash (USDC) or one of the gift's stocks */
@@ -207,9 +302,6 @@ export function planFeePayment(
   const best = options.sort((a, b) => b.leftUsd - a.leftUsd)[0]
   return best ? { asset: best.asset, raws: best.raws } : null
 }
-
-const holdingAccount = (owner: PublicKey, asset: FeeAsset) =>
-  getAssociatedTokenAddressSync(asset.mint, owner, true, asset.tokenProgram)
 
 const openTreasuryAccounts = new Set<string>()
 
