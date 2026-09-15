@@ -36,6 +36,7 @@ Program: needs the Solana CLI and Anchor 0.32.1. `pnpm build:program` uses platf
 | `pnpm generate`      | Static landing build to `apps/landing/.output/public`  |
 | `pnpm build`         | Build all apps                                         |
 | `pnpm build:program` | Build the Anchor program and its IDL                   |
+| `pnpm test:program`  | Run the fund flow on a throwaway local validator       |
 | `pnpm typecheck`     | `nuxt typecheck`, `astro check`, `tsc` across packages |
 | `pnpm lint`          | Biome check + Prettier check                           |
 | `pnpm format`        | Biome + Prettier write                                 |
@@ -81,3 +82,6 @@ Program: needs the Solana CLI and Anchor 0.32.1. `pnpm build:program` uses platf
 | `CRON_SECRET`               | app     | Auth for the daily expired-gift refund cron   |
 | `JUPITER_REFERRAL_ACCOUNT`  | app     | Jupiter Ultra referral account; enables fee   |
 | `TRADE_FEE_BPS`             | app     | Trading fee, 50–255 bps (default 50)          |
+| `PUBLIC_VAPID_PUBLIC_KEY`   | app     | Web push public key; unset = no phone alerts  |
+| `VAPID_PRIVATE_KEY`         | app     | Web push private key                          |
+| `VAPID_SUBJECT`             | app     | `mailto:` we identify ourselves to push with  |
