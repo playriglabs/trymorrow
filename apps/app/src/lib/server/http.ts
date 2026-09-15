@@ -16,6 +16,7 @@ export const unauthorized = () => new HttpError(401, 'unauthorized', 'Sign in to
 export const forbidden = (message: string, code = 'forbidden') => new HttpError(403, code, message)
 export const notFound = (message = 'Not found.') => new HttpError(404, 'not_found', message)
 export const conflict = (message: string, code = 'conflict') => new HttpError(409, code, message)
+export const tooManyRequests = (message: string) => new HttpError(429, 'rate_limited', message)
 
 export function json(data: unknown, init: ResponseInit = {}): Response {
   const headers = new Headers(init.headers)

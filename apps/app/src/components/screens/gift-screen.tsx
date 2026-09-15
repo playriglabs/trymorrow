@@ -7,7 +7,7 @@ import { StockLogo } from '@/components/stock-logo'
 import { SuccessMark } from '@/components/success-mark'
 import { Avatar, Button, LinkButton, Loading, Notice, Screen } from '@/components/ui'
 import { ApiError, errorMessage } from '@/lib/client/api'
-import { useClaimGiftMutation, useGiftQuery } from '@/lib/client/queries'
+import { useClaimGiftMutation, useGiftQuery, useRefundGiftMutation } from '@/lib/client/queries'
 import { useSession } from '@/lib/client/session'
 import { formatDate, formatUsd } from '@/lib/format'
 import { giftAssetsLabel } from '@/lib/gifts'
@@ -64,8 +64,11 @@ function GiftCard({ gift }: { gift: GiftView }) {
 function Gift({ giftId }: { giftId: string }) {
   const session = useSession({ required: false })
   const [opened, setOpened] = useState(false)
+  const [tookBack, setTookBack] = useState(false)
+  const [confirming, setConfirming] = useState(false)
   const gift = useGiftQuery(giftId, session.profile?.id ?? null, { enabled: session.ready })
   const claim = useClaimGiftMutation(giftId)
+  const takeBack = useRefundGiftMutation(giftId)
 
   if (!session.ready || gift.isPending) return <Loading />
 
@@ -87,6 +90,44 @@ function Gift({ giftId }: { giftId: string }) {
     .with({ viewer: 'sender' }, () => `${view.recipientLabel} claimed your gift`)
     .with({ bundle: true }, () => `${assets} are yours`)
     .otherwise(() => `${assets} is yours`)
+
+  if (view.status === 'refunded' || tookBack) {
+    // The shares landed back with the sender either way, so they get the small win; anyone else
+    // still gets to see what the gift was, with the reason it can't be opened
+    if (view.viewer === 'sender') {
+      return (
+        <Screen
+          footer={
+            <LinkButton href={session.profile?.onboarded ? '/' : '/onboarding'}>
+              {session.profile?.onboarded ? 'See your stocks' : 'Finish setting up'}
+            </LinkButton>
+          }
+        >
+          <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
+            <SuccessMark />
+            <div className="flex flex-col gap-1.5">
+              <h1 className="font-sans text-[30px] leading-[1.15] font-medium tracking-[-0.02em] text-balance">
+                {tookBack ? 'You took your gift back' : 'Your gift came back'}
+              </h1>
+              <p className="text-stone">
+                The {formatUsd(view.usdValue)} of {assets} is yours again.
+              </p>
+            </div>
+          </div>
+        </Screen>
+      )
+    }
+    return (
+      <Screen back="/" title="Gift" footer={<LinkButton href="/">Go home</LinkButton>}>
+        <GiftCard gift={view} />
+        <Notice icon={<LockIcon className="size-4.5 text-stone" />}>
+          {view.viewer === 'recipient'
+            ? `This gift went back to ${view.sender.name} before it was opened.`
+            : `This gift wasn’t opened in time, so it went back to ${view.sender.name}.`}
+        </Notice>
+      </Screen>
+    )
+  }
 
   if (view.status === 'claimed' || opened) {
     return (
@@ -118,17 +159,36 @@ function Gift({ giftId }: { giftId: string }) {
     )
   }
 
-  if (view.status === 'refunded') {
-    return (
-      <Screen back="/">
-        <Notice>This gift wasn’t opened in time, so it went back to {view.sender.name}.</Notice>
-      </Screen>
-    )
-  }
-
   if (view.viewer === 'sender') {
     return (
-      <Screen back="/" title="Your gift">
+      <Screen
+        back="/"
+        title="Your gift"
+        footer={
+          <>
+            {takeBack.isError && (
+              <p className="text-center text-[13px] text-loss">{errorMessage(takeBack.error)}</p>
+            )}
+            {confirming ? (
+              <>
+                <Button
+                  loading={takeBack.isPending}
+                  onClick={() => takeBack.mutate(undefined, { onSuccess: () => setTookBack(true) })}
+                >
+                  Yes, take it back
+                </Button>
+                <Button variant="soft" onClick={() => setConfirming(false)}>
+                  Keep it waiting
+                </Button>
+              </>
+            ) : (
+              <Button variant="soft" onClick={() => setConfirming(true)}>
+                Take it back
+              </Button>
+            )}
+          </>
+        }
+      >
         <GiftCard gift={view} />
         <Notice icon={<LockIcon className="size-4.5 text-stone" />}>
           Waiting for {view.recipientLabel} to open it. If they don’t by{' '}

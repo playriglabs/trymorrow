@@ -3,6 +3,7 @@ import { MAX_GIFT_RECIPIENTS, MAX_GIFT_STOCKS } from '@/lib/gifts'
 import { findStock } from '@/lib/server/catalog'
 import { giftFees } from '@/lib/server/fees'
 import { badRequest, json, readBody, route } from '@/lib/server/http'
+import { enforceRateLimit } from '@/lib/server/rate-limit'
 import { resolveGiftRecipients } from '@/lib/server/recipients'
 import { requireUser } from '@/lib/server/users'
 import type { GiftFeeQuote } from '@/lib/types'
@@ -15,6 +16,7 @@ const schema = z.object({
 /** The fee a gift would cost right now, before anything is created */
 export const POST = route(async ({ request }) => {
   const sender = await requireUser(request)
+  enforceRateLimit(sender.id, 'giftQuote')
   const body = await readBody(request, schema)
 
   const assets = await Promise.all(

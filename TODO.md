@@ -65,9 +65,9 @@ A fund is a long-term pot for someone ("Aisyah's college fund"): locked until a 
 
 - [ ] **Relayer health**: alert when its SOL runs low. Show a clear "gifts are paused" state instead of failing transactions.
 - [ ] **Treasury top-up loop**: swap collected fees (USDC and shares) to SOL and refill the relayer, manually at first.
-- [ ] **Take a gift back**: sender cancels before it's opened. The program already allows it (`refund_gift` with the sender as authority); needs a route, a submit case and a button on the sender's gift view.
-- [ ] **Reconcile stuck gifts**: the cron reports `alreadyClosed` when a gift is pending in the DB but closed on-chain (e.g. a claim that landed after its request failed). Read the gift's last transaction and set `claimed` or `refunded`.
-- [ ] **Rate limits** on `/api/recipients`, `/api/gifts/quote` and `/api/gifts`. Creating gifts pregenerates Privy users for any email, which can be abused.
+- [x] **Take a gift back**: sender cancels before it's opened. `POST /api/gifts/[id]/refund` builds the `refund_gift` transaction (sender as authority, browser signs), `submit` verifies and broadcasts it, and the sender's gift view has a two-step "Take it back" button.
+- [x] **Reconcile stuck gifts**: the refund cron reads a fully closed gift's last on-chain transaction and sets `claimed` or `refunded` (summary: `reconciledClaimed`/`reconciledRefunded`). It also checks up to 200 not-yet-expired pending gifts per run, so a claim whose submit failed doesn't show a broken claim button for 30 days.
+- [x] **Rate limits** on `/api/recipients` (30/min), `/api/gifts/quote` (20/min) and `/api/gifts` (5/min), per user, in `lib/server/rate-limit.ts`. In-memory, so a soft cap across Vercel instances — revisit a shared store before real traffic.
 - [ ] **Upgrade authority to a multisig** (e.g. Squads) and back up the deployer seed phrase and `programs/target/deploy/morrow-keypair.json` offline.
 - [ ] **Tests**
   - [ ] Unit: `tokenTransfers`, `isFeeTransfer`, `planFeePayment`, `giftFees`, fair-price math

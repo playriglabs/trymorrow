@@ -70,6 +70,14 @@ export const POST = route(async ({ params, request }) => {
       claimed_at: new Date().toISOString(),
       recipient_id: viewer.id,
     }
+  } else if (action === 'refundGift') {
+    if (viewer.id !== gift.sender_id)
+      throw forbidden('Only the sender can take a gift back.', 'wrong_account')
+    if (gift.status !== 'pending')
+      throw badRequest('This gift can’t be taken back anymore.', 'not_refundable')
+    // If a claim lands first, this transaction fails on-chain before anything is written here;
+    // the unique settle_signature is the backstop if both should ever get through.
+    update = { status: 'refunded', settle_signature: await sendRelayedTransaction(transaction) }
   } else {
     throw badRequest('That request doesn’t match this gift.')
   }
@@ -86,6 +94,8 @@ export const POST = route(async ({ params, request }) => {
   // The gift is on-chain by now, so nothing here may fail the request
   try {
     const label = await giftLabel(sent)
+    // A take-back doesn't notify: the sender did it themselves and sees the result on screen,
+    // and notify only buzzes for things that happened while someone was away
     const rows: NotificationInput[] =
       action === 'createGift'
         ? [
@@ -110,16 +120,18 @@ export const POST = route(async ({ params, request }) => {
                 ]
               : []),
           ]
-        : [
-            {
-              userId: sent.sender_id,
-              kind: 'gift_opened',
-              title: `${viewer.name ?? 'They'} claimed your gift`,
-              body: label,
-              giftId: sent.id,
-              url: `/gift/${sent.id}`,
-            },
-          ]
+        : action === 'claimGift'
+          ? [
+              {
+                userId: sent.sender_id,
+                kind: 'gift_opened',
+                title: `${viewer.name ?? 'They'} claimed your gift`,
+                body: label,
+                giftId: sent.id,
+                url: `/gift/${sent.id}`,
+              },
+            ]
+          : []
     await notify(rows)
   } catch (notifyError) {
     console.error('Gift notification failed', notifyError)

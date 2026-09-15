@@ -61,6 +61,7 @@ Server modules in `src/lib/server`:
 | `privy.ts`      | Access-token auth, wallet lookup, `walletForEmail` (creates) vs `findWalletForEmail` (read-only)                                    |
 | `users.ts`      | Profile rows, `requireUser`, onboarding state                                                                                       |
 | `recipients.ts` | `@handle`/email resolution, `resolveGiftRecipients`                                                                                 |
+| `rate-limit.ts` | Per-user fixed windows on the recipient lookup and the gift routes; in-memory, so a soft cap across instances                       |
 | `solana.ts`     | Relayer, `signRelayed` (simulate, size compute, sign), `sendRelayedTransaction` (resend loop), transaction parsing and verification |
 | `gifts.ts`      | Gift rows (`gift_items` embedded) to `GiftView`                                                                                     |
 | `fees.ts`       | Gift fee math, fee payment plan (cash, else shares), treasury accounts, fee transfer checks                                         |
@@ -88,8 +89,8 @@ Server modules in `src/lib/server`:
 2. `POST /api/gifts` resolves recipients (pregenerating Privy wallets for new emails), checks balances, plans the fee, inserts one `gifts` row per recipient with its `gift_items`, and returns one relayer-signed transaction per recipient: one `create_gift` per stock plus at most one fee transfer.
 3. The browser adds the sender's signature (Privy, no UI) and calls `POST /api/gifts/[id]/submit`.
 4. `submit` re-reads the transaction and only broadcasts if it's exactly one expected action per gift item, all the same kind, and the only token instruction is the recorded fee transfer. Keep that check strict when adding features.
-5. Claim is the same shape: `POST /api/gifts/[id]/claim` builds it, `submit` verifies and sends.
-6. `GET /api/cron/refund-gifts` (daily on Vercel, `Authorization: Bearer CRON_SECRET`) refunds expired gifts and deletes stale drafts.
+5. Claim is the same shape: `POST /api/gifts/[id]/claim` builds it, `submit` verifies and sends. Take-back mirrors it: `POST /api/gifts/[id]/refund` builds `refund_gift` with the sender as authority, `submit` verifies and sends, no notification (the sender is watching it happen).
+6. `GET /api/cron/refund-gifts` (daily on Vercel, `Authorization: Bearer CRON_SECRET`) refunds expired gifts and deletes stale drafts. A gift closed on-chain but still pending in the DB is reconciled by reading its last on-chain transaction (`claimed` or `refunded`); the cron also scans up to 200 not-yet-expired pending gifts per run for the same problem.
 
 ### Cash out flow
 

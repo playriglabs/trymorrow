@@ -587,6 +587,30 @@ export function useClaimGiftMutation(giftId: string) {
   })
 }
 
+/** Only succeeds for the sender, and only before the gift is opened */
+export function useRefundGiftMutation(giftId: string) {
+  const api = useApi()
+  const sign = useSignRelayed()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const { transaction } = await api<{ transaction: string }>(`/api/gifts/${giftId}/refund`, {
+        method: 'POST',
+      })
+      const { gift } = await api<{ gift: GiftView }>(`/api/gifts/${giftId}/submit`, {
+        method: 'POST',
+        body: { transaction: await sign(transaction) },
+      })
+      return gift
+    },
+    onSuccess: (gift) => {
+      queryClient.setQueriesData({ queryKey: queryKeys.gift(giftId) }, gift)
+      queryClient.invalidateQueries({ queryKey: queryKeys.portfolio() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.gifts() })
+    },
+  })
+}
+
 // Trading
 
 export function useStocksQuery({ enabled = true }: Options = {}) {

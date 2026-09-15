@@ -14,6 +14,7 @@ import {
 import { GIFT_COLUMNS, GIFT_LIFETIME_DAYS, type GiftRow, toGiftViews } from '@/lib/server/gifts'
 import { badRequest, forbidden, json, readBody, route } from '@/lib/server/http'
 import { getPrices } from '@/lib/server/prices'
+import { enforceRateLimit } from '@/lib/server/rate-limit'
 import { resolveGiftRecipients } from '@/lib/server/recipients'
 import { buildRelayedTransaction, relayer, tokenBalance } from '@/lib/server/solana'
 import { db } from '@/lib/server/supabase'
@@ -58,6 +59,8 @@ const createSchema = z.object({
  */
 export const POST = route(async ({ request }) => {
   const sender = await requireUser(request)
+  // Before resolveGiftRecipients, which pregenerates accounts for any email typed in
+  enforceRateLimit(sender.id, 'createGifts')
   if (!isOnboarded(sender))
     throw forbidden('Finish setting up your account first.', 'not_onboarded')
   const senderWallet = new PublicKey(requireWallet(sender))

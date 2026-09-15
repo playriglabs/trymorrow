@@ -200,7 +200,8 @@ const MORROW_ACTIONS = [
 
 export type MorrowAction = (typeof MORROW_ACTIONS)[number]
 
-const actionOf = (data: Uint8Array): MorrowAction | undefined => {
+/** Which Morrow instruction this data starts with, by discriminator; works on parsed history too */
+export const actionOf = (data: Uint8Array): MorrowAction | undefined => {
   const head = Array.from(data.slice(0, 8))
   return MORROW_ACTIONS.find((name) => DISCRIMINATORS[name].every((byte, i) => head[i] === byte))
 }
