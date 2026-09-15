@@ -147,7 +147,7 @@ export function Screen({
       )}
       <div className="flex flex-1 flex-col gap-5.5 px-5 pt-2 pb-4">{children}</div>
       {footer && (
-        <footer className="sticky bottom-0 flex flex-col bg-cream px-5 pt-4 pb-[max(28px,env(safe-area-inset-bottom))]">
+        <footer className="sticky bottom-0 flex flex-col gap-2.5 bg-cream px-5 pt-4 pb-[max(28px,env(safe-area-inset-bottom))]">
           {footer}
         </footer>
       )}
