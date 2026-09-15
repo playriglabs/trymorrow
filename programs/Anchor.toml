@@ -1,0 +1,19 @@
+[toolchain]
+anchor_version = "0.32.1"
+
+[features]
+resolution = true
+skip-lint = false
+
+[workspace]
+members = ["morrow"]
+
+[programs.localnet]
+morrow = "AjwKavx3r4NJ9tgmjxv24mCpFLp2QMnKzcRC5J7vaupa"
+
+[programs.mainnet]
+morrow = "AjwKavx3r4NJ9tgmjxv24mCpFLp2QMnKzcRC5J7vaupa"
+
+[provider]
+cluster = "localnet"
+wallet = "~/.config/solana/id.json"
