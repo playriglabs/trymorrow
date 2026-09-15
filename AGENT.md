@@ -91,9 +91,17 @@ Server modules in `src/lib/server`:
 5. Claim is the same shape: `POST /api/gifts/[id]/claim` builds it, `submit` verifies and sends.
 6. `GET /api/cron/refund-gifts` (daily on Vercel, `Authorization: Bearer CRON_SECRET`) refunds expired gifts and deletes stale drafts.
 
+### Cash out flow
+
+1. `POST /api/cashouts/quote` prices it: `planCashout` validates the address, checks the balance and returns the fee. Nothing is recorded.
+2. `POST /api/cashouts` re-plans server-side, opens the destination's cash account if it needs one (its own relayer transaction, like `ensureTreasuryAccount`), records a draft row, and returns one relayer-signed transfer plus at most one fee transfer.
+3. `POST /api/cashouts/submit` reads the signed transaction back and only broadcasts when the cash leaves the user's own account for the address and amount on the draft row, with nothing else but the recorded fee.
+
+The address must be on-curve and either unused or system-owned, so a pasted cash-account address or a program is refused rather than sent to. That rules out multisigs; refusing what we can't check beats sending and hoping.
+
 ### Ask a friend
 
-`/ask` builds a link to the asker's own handle page carrying the wish: `morrow.fi/maya?stock=AAPLX&amount=25&note=Birthday`. Nothing is stored, so there's no row to abuse and no cleanup. `[handle].astro` renders the ask with its own OG preview and points at `/send` with the same values; `send-gift-screen.tsx` preselects the stock only when the sender actually holds it, and says so when they don't.
+`/ask` builds a link to the asker's own handle page carrying the wish: `trymorrow.money/maya?stock=AAPLX&amount=25&note=Birthday`. Nothing is stored, so there's no row to abuse and no cleanup. `[handle].astro` renders the ask with its own OG preview and points at `/send` with the same values; `send-gift-screen.tsx` preselects the stock only when the sender actually holds it, and says so when they don't.
 
 ### Share cards
 
@@ -112,6 +120,7 @@ Everything goes through `notify()`. It reads `notification_settings` (no row mea
 - The fee is paid in cash first, otherwise in shares of the gift's stock with the most left over, always on top of the gift. The client mirrors this in `send-gift-screen.tsx`; the server is authoritative.
 - Trading fee: Jupiter referral fee only when the order stays gasless. JupiterZ (RFQ) can't carry integrator fees; if the fee order isn't gasless, fall back to fee-free and pause the fee for that pair for 10 minutes.
 - A fund locks rent for years: the relayer pays it, and the creator pays what the fund account costs while the contributor pays for each new vault plus the account the beneficiary will need at unlock. `withdraw` closes the vaults and `close_fund` (daily cron) closes the fund, so the SOL comes home.
+- Cashing out is free when the destination already has a cash account (the network fee is well under a cent). When it doesn't, the relayer opens one and that rent never comes back, so it's charged at cost — taken out of the amount, not added on top, so "All" always works.
 - When you add an on-chain flow, decide who pays rent, whether it comes back, and charge unrecoverable costs at cost.
 
 ### Limits you'll hit

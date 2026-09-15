@@ -12,7 +12,7 @@ import { db } from '@/lib/server/supabase'
 const configured = Boolean(PUBLIC_VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY)
 if (configured) {
   webpush.setVapidDetails(
-    VAPID_SUBJECT ?? 'mailto:help@morrow.fi',
+    VAPID_SUBJECT ?? 'mailto:help@trymorrow.money',
     PUBLIC_VAPID_PUBLIC_KEY as string,
     VAPID_PRIVATE_KEY as string,
   )

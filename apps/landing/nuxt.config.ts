@@ -11,7 +11,7 @@ export default defineNuxtConfig({
 
   // Override in production with NUXT_SITE_URL
   site: {
-    url: 'https://morrow.fi',
+    url: 'https://trymorrow.money',
     name: 'Morrow',
   },
 

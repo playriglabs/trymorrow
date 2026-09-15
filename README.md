@@ -67,21 +67,21 @@ Program: needs the Solana CLI and Anchor 0.32.1. `pnpm build:program` uses platf
 
 ## Environment
 
-| Variable                    | App     | Notes                                         |
-| --------------------------- | ------- | --------------------------------------------- |
-| `NUXT_SITE_URL`             | landing | Defaults to `https://morrow.fi` (placeholder) |
-| `PUBLIC_APP_URL`            | app     | Used for share links and OG tags              |
-| `PUBLIC_PRIVY_APP_ID`       | app     | Privy dashboard                               |
-| `PUBLIC_PRIVY_CLIENT_ID`    | app     | Optional                                      |
-| `PRIVY_APP_SECRET`          | app     | Server only                                   |
-| `SUPABASE_URL`              | app     | Server only                                   |
-| `SUPABASE_SERVICE_ROLE_KEY` | app     | Server only                                   |
-| `SOLANA_RPC_URL`            | app     | Mainnet RPC                                   |
-| `RELAYER_SECRET_KEY`        | app     | Base58 key of the fee and rent payer          |
-| `TREASURY_WALLET`           | app     | Receives gift fees; defaults to the relayer   |
-| `CRON_SECRET`               | app     | Auth for the daily expired-gift refund cron   |
-| `JUPITER_REFERRAL_ACCOUNT`  | app     | Jupiter Ultra referral account; enables fee   |
-| `TRADE_FEE_BPS`             | app     | Trading fee, 50–255 bps (default 50)          |
-| `PUBLIC_VAPID_PUBLIC_KEY`   | app     | Web push public key; unset = no phone alerts  |
-| `VAPID_PRIVATE_KEY`         | app     | Web push private key                          |
-| `VAPID_SUBJECT`             | app     | `mailto:` we identify ourselves to push with  |
+| Variable                    | App     | Notes                                               |
+| --------------------------- | ------- | --------------------------------------------------- |
+| `NUXT_SITE_URL`             | landing | Defaults to `https://trymorrow.money` (placeholder) |
+| `PUBLIC_APP_URL`            | app     | Used for share links and OG tags                    |
+| `PUBLIC_PRIVY_APP_ID`       | app     | Privy dashboard                                     |
+| `PUBLIC_PRIVY_CLIENT_ID`    | app     | Optional                                            |
+| `PRIVY_APP_SECRET`          | app     | Server only                                         |
+| `SUPABASE_URL`              | app     | Server only                                         |
+| `SUPABASE_SERVICE_ROLE_KEY` | app     | Server only                                         |
+| `SOLANA_RPC_URL`            | app     | Mainnet RPC                                         |
+| `RELAYER_SECRET_KEY`        | app     | Base58 key of the fee and rent payer                |
+| `TREASURY_WALLET`           | app     | Receives gift fees; defaults to the relayer         |
+| `CRON_SECRET`               | app     | Auth for the daily expired-gift refund cron         |
+| `JUPITER_REFERRAL_ACCOUNT`  | app     | Jupiter Ultra referral account; enables fee         |
+| `TRADE_FEE_BPS`             | app     | Trading fee, 50–255 bps (default 50)                |
+| `PUBLIC_VAPID_PUBLIC_KEY`   | app     | Web push public key; unset = no phone alerts        |
+| `VAPID_PRIVATE_KEY`         | app     | Web push private key                                |
+| `VAPID_SUBJECT`             | app     | `mailto:` we identify ourselves to push with        |

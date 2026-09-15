@@ -87,7 +87,7 @@ A fund is a long-term pot for someone ("Aisyah's college fund"): locked until a 
   - [ ] The second moment: share from a holding with the real return as the hero ("+12.4%",
         "Bought at" / "Now"). The template already takes it; needs an entry point on the holding
         and an empty state for when `pnl.ts` has no basis
-- [x] **Ask a friend**: `/ask` builds a link (`morrow.fi/maya?stock=AAPLX&amount=25&note=…`). The ask
+- [x] **Ask a friend**: `/ask` builds a link (`trymorrow.money/maya?stock=AAPLX&amount=25&note=…`). The ask
       lives in the link, so nothing is stored and there's nothing to abuse. The handle page renders
       it with an OG preview and `/send` opens prefilled, warning when the sender doesn't own it yet
 - [x] **Gift share card and OG image** built on `renderShareCard`, which the trade card now shares
