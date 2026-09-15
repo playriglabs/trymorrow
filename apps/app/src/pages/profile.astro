@@ -1,0 +1,8 @@
+---
+import ProfileScreen from '@/components/screens/profile-screen'
+import AppLayout from '@/layouts/app-layout.astro'
+---
+
+<AppLayout title="Profile · Morrow">
+  <ProfileScreen client:only="react" />
+</AppLayout>

@@ -1,0 +1,8 @@
+---
+import NotificationsScreen from '@/components/screens/notifications-screen'
+import AppLayout from '@/layouts/app-layout.astro'
+---
+
+<AppLayout title="Notifications · Morrow">
+  <NotificationsScreen client:only="react" />
+</AppLayout>

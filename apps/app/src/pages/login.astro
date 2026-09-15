@@ -1,0 +1,8 @@
+---
+import LoginScreen from '@/components/screens/login-screen'
+import AppLayout from '@/layouts/app-layout.astro'
+---
+
+<AppLayout title="Sign in · Morrow">
+  <LoginScreen client:only="react" />
+</AppLayout>

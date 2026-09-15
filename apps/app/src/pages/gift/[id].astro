@@ -1,0 +1,35 @@
+---
+import GiftScreen from '@/components/screens/gift-screen'
+import AppLayout from '@/layouts/app-layout.astro'
+import { giftAssetsLabel } from '@/lib/gifts'
+import { findStock } from '@/lib/server/catalog'
+import { db } from '@/lib/server/supabase'
+
+// Rendered on the server so WhatsApp, iMessage and Telegram show a real preview of the gift
+const { id = '' } = Astro.params
+const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+
+const { data: gift } = isUuid
+  ? await db.from('gifts').select('status, sender_id, gift_items (mint)').eq('id', id).maybeSingle()
+  : { data: null }
+const mints = ((gift?.gift_items ?? []) as { mint: string }[]).map((item) => item.mint)
+const [{ data: sender }, foundStocks] = gift
+  ? await Promise.all([
+      db.from('users').select('name').eq('id', gift.sender_id).maybeSingle(),
+      Promise.all(mints.map((mint) => findStock(mint))),
+    ])
+  : [{ data: null }, []]
+const stocks = foundStocks.flatMap((stock) => (stock ? [stock] : []))
+
+const found = Boolean(gift && gift.status !== 'draft')
+if (!found) Astro.response.status = 404
+
+const title = found ? `${sender?.name ?? 'Someone'} sent you a gift` : 'Gift not found · Morrow'
+const description = found
+  ? `${stocks.length > 1 ? `Shares of ${giftAssetsLabel(stocks)}` : `A piece of ${giftAssetsLabel(stocks)}`}, waiting for you on Morrow. Only the person it’s for can open it.`
+  : 'This gift link doesn’t exist.'
+---
+
+<AppLayout title={title} description={description} image={found ? stocks[0]?.iconUrl : undefined}>
+  <GiftScreen client:only="react" giftId={id} />
+</AppLayout>

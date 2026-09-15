@@ -1,0 +1,423 @@
+import { ShieldCheck, TriangleAlert } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { PriceChart } from '@/components/price-chart'
+import { withProviders } from '@/components/providers'
+import { StockLogo } from '@/components/stock-logo'
+import { SuccessMark } from '@/components/success-mark'
+import { TradeShareCard } from '@/components/trade-share-card'
+import { Button, Card, cx, LinkButton, Loading, Notice, Screen } from '@/components/ui'
+import { errorMessage } from '@/lib/client/api'
+import { useDebounced } from '@/lib/client/debounce'
+import { useStocksQuery, useTradeMutation, useTradeQuoteQuery } from '@/lib/client/queries'
+import { useSession } from '@/lib/client/session'
+import { formatShares, formatUsd } from '@/lib/format'
+import type { TradeSide } from '@/lib/types'
+
+const BUY_PRESETS = [10, 25, 50, 100]
+const SELL_PRESETS = [25, 50, 100]
+const USDC_UNITS = 1_000_000
+const MIN_USD = 1
+/** Below this Jupiter often can't make the trade fee-free, so fees take a bigger bite */
+const FEE_FRIENDLY_USD = 10
+/** Same limit the server enforces; shown so people know why a trade was stopped */
+const FAIR_PRICE_LIMIT_PCT = 3
+/** Up to 7 whole digits and 2 decimals: dollars and cents */
+const AMOUNT_PATTERN = /^\d{0,7}(\.\d{0,2})?$/
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between gap-3 py-3">
+      <span className="text-stone">{label}</span>
+      <span className="text-right">{value}</span>
+    </div>
+  )
+}
+
+function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: TradeSide }) {
+  const session = useSession()
+  const stocks = useStocksQuery({ enabled: session.ready })
+  const trade = useTradeMutation()
+  const [side, setSide] = useState<TradeSide>(initialSide)
+  /** What the person typed or picked, in dollars */
+  const [amountText, setAmountText] = useState('25')
+  /** Set when a sell shortcut is picked, so "All" sells exactly every share */
+  const [sellPercent, setSellPercent] = useState<number | null>(null)
+  const [stage, setStage] = useState<'form' | 'review' | 'done'>('form')
+
+  const stock = stocks.data?.stocks.find((item) => item.ticker === ticker)
+  const cashRaw = BigInt(stocks.data?.cashRaw ?? '0')
+  const ownedRaw = BigInt(stock?.ownedRaw ?? '0')
+  const amountUsd = Number.parseFloat(amountText) || 0
+
+  // Dollars typed for a sell become raw base units through the share price and scaled amount
+  const rawPerShare = stock && stock.ownedShares > 0 ? Number(ownedRaw) / stock.ownedShares : 0
+  const sellRawFromUsd =
+    stock?.priceUsd && rawPerShare
+      ? BigInt(Math.floor((amountUsd / stock.priceUsd) * rawPerShare))
+      : 0n
+  const sellingTooMuch = side === 'sell' && sellPercent == null && sellRawFromUsd > ownedRaw
+
+  const amountRaw =
+    side === 'buy'
+      ? BigInt(Math.round(amountUsd * USDC_UNITS))
+      : sellPercent != null
+        ? (ownedRaw * BigInt(sellPercent)) / 100n
+        : sellRawFromUsd > ownedRaw
+          ? ownedRaw
+          : sellRawFromUsd
+
+  const hasEnough =
+    side === 'buy'
+      ? amountUsd >= MIN_USD && cashRaw >= amountRaw
+      : amountRaw > 0n && !sellingTooMuch
+
+  // Quote once typing pauses; Review waits until the quote matches what's on screen
+  const quotedRaw = useDebounced(amountRaw.toString(), 400)
+  const settled = quotedRaw === amountRaw.toString()
+
+  const quote = useTradeQuoteQuery(
+    { side, mint: stock?.mint ?? '', amountRaw: quotedRaw },
+    {
+      enabled:
+        session.ready && Boolean(stock) && BigInt(quotedRaw) > 0n && hasEnough && stage !== 'done',
+    },
+  )
+
+  // Nothing to sell yet: open on Buy instead
+  useEffect(() => {
+    if (stocks.data && side === 'sell' && ownedRaw === 0n) setSide('buy')
+  }, [stocks.data, side, ownedRaw])
+
+  if (!session.ready || stocks.isPending) return <Loading />
+
+  if (!stock) {
+    return (
+      <Screen back="/buy">
+        <Notice tone="warning">
+          {stocks.isError ? errorMessage(stocks.error) : 'We couldn’t find that stock.'}
+        </Notice>
+      </Screen>
+    )
+  }
+
+  if (stage === 'done' && trade.data) {
+    const result = trade.data.quote
+    const bought = result.side === 'buy'
+    return (
+      <Screen
+        footer={
+          <>
+            {bought && (
+              <LinkButton href="/send" variant="soft" size="md">
+                Gift some
+              </LinkButton>
+            )}
+            <LinkButton href="/">Done</LinkButton>
+          </>
+        }
+      >
+        <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
+          <SuccessMark />
+          <div className="flex flex-col gap-1.5">
+            <h1 className="font-sans text-[30px] leading-[1.15] font-medium tracking-[-0.02em] text-balance">
+              {bought
+                ? `You bought ${formatUsd(result.cashUsd)} of ${result.name}`
+                : `You sold ${formatShares(result.shares)} ${result.name} shares`}
+            </h1>
+            <p className="text-stone">
+              Done in under a minute. Amounts are estimates until settled.
+            </p>
+          </div>
+          <Card className="flex w-full flex-col divide-y divide-line px-4 text-left text-[15px]">
+            <Row
+              label={bought ? 'Bought' : 'Sold'}
+              value={`${formatShares(result.shares)} ${result.name} shares`}
+            />
+            <Row label={bought ? 'Paid' : 'Received'} value={formatUsd(result.cashUsd)} />
+            <div className="flex items-center justify-between py-3">
+              <span className="text-stone">Receipt</span>
+              <a
+                href={`https://solscan.io/tx/${trade.data.signature}`}
+                target="_blank"
+                rel="noreferrer"
+                className="underline"
+              >
+                View
+              </a>
+            </div>
+          </Card>
+          {bought && (
+            <TradeShareCard
+              mint={result.mint}
+              name={result.name}
+              ticker={result.ticker}
+              changePct={stock.lowLiquidity ? null : stock.change24hPct}
+            />
+          )}
+        </div>
+      </Screen>
+    )
+  }
+
+  const current = quote.data
+  const buying = side === 'buy'
+  const deviation = current?.fairPriceDeviationPct ?? null
+  const fair =
+    deviation == null ||
+    (buying ? deviation <= FAIR_PRICE_LIMIT_PCT : deviation >= -FAIR_PRICE_LIMIT_PCT)
+
+  if (stage === 'review' && current) {
+    return (
+      <Screen
+        title="Review"
+        footer={
+          <>
+            {trade.isError && (
+              <p className="text-center text-[13px] text-loss">{errorMessage(trade.error)}</p>
+            )}
+            <Button
+              loading={trade.isPending}
+              disabled={!fair}
+              onClick={() =>
+                trade.mutate(
+                  { side, mint: stock.mint, amount: quotedRaw },
+                  { onSuccess: () => setStage('done') },
+                )
+              }
+            >
+              {buying
+                ? `Buy for ${formatUsd(current.cashUsd)}`
+                : `Sell for about ${formatUsd(current.cashUsd)}`}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setStage('form')}>
+              Edit amount
+            </Button>
+          </>
+        }
+      >
+        <div className="flex items-center gap-3.5 py-2">
+          <StockLogo iconUrl={stock.iconUrl} ticker={stock.ticker} size={52} />
+          <div className="flex flex-col">
+            <span className="text-[13px] text-stone">{buying ? 'You get about' : 'You sell'}</span>
+            <span className="font-sans text-[26px] leading-[1.2] font-medium tracking-[-0.02em]">
+              {formatShares(current.shares)} {stock.name} shares
+            </span>
+          </div>
+        </div>
+
+        <Card className="flex flex-col divide-y divide-line px-4 text-[15px]">
+          <Row
+            label={buying ? 'You pay from cash' : 'You get about'}
+            value={formatUsd(current.cashUsd)}
+          />
+          <Row
+            label="You get at least"
+            value={
+              buying
+                ? `${formatShares(current.minReceived)} shares`
+                : formatUsd(current.minReceived)
+            }
+          />
+          <Row label="Price a share" value={formatUsd(current.pricePerShareUsd)} />
+          <Row
+            label="Price"
+            value={current.slippagePct > 0 ? `Can move up to ${current.slippagePct}%` : 'Locked in'}
+          />
+          <Row label="Fees" value={`${current.feePct.toFixed(1)}%, already included`} />
+        </Card>
+
+        {deviation == null ? null : fair ? (
+          <Notice
+            tone="success"
+            icon={<ShieldCheck className="size-[18px] text-gain" strokeWidth={1.75} />}
+          >
+            <span className="font-medium text-gain">Fair price check passed.</span> Before fees,
+            this price is within {FAIR_PRICE_LIMIT_PCT}% of the market price.
+          </Notice>
+        ) : (
+          <Notice
+            tone="warning"
+            icon={<TriangleAlert className="size-[18px] text-loss" strokeWidth={1.75} />}
+          >
+            This price is {Math.abs(deviation).toFixed(1)}% off the market, so we won’t place it.
+            Try again in a bit.
+          </Notice>
+        )}
+      </Screen>
+    )
+  }
+
+  const presets = buying ? BUY_PRESETS : SELL_PRESETS
+  const pickSellPercent = (value: number) => {
+    setSellPercent(value)
+    setAmountText(
+      stock.ownedValueUsd != null ? ((stock.ownedValueUsd * value) / 100).toFixed(2) : '',
+    )
+  }
+  const switchSide = (next: TradeSide) => {
+    setSide(next)
+    if (next === 'sell') pickSellPercent(100)
+    else {
+      setSellPercent(null)
+      setAmountText('25')
+    }
+  }
+
+  let hint: { text: string; tone: 'muted' | 'error' } | null = null
+  if (buying && amountUsd > 0 && amountUsd < MIN_USD) {
+    hint = { text: `The minimum is ${formatUsd(MIN_USD)}.`, tone: 'error' }
+  } else if (buying && amountUsd >= MIN_USD && amountUsd < FEE_FRIENDLY_USD) {
+    hint = { text: 'Trades under $10 can cost more in fees.', tone: 'muted' }
+  } else if (sellingTooMuch) {
+    hint = { text: `You have about ${formatUsd(stock.ownedValueUsd)} to sell.`, tone: 'error' }
+  }
+
+  const estimate =
+    amountRaw === 0n
+      ? ' '
+      : !settled || (quote.isFetching && !current)
+        ? 'Getting the price…'
+        : current
+          ? buying
+            ? `≈ ${formatShares(current.shares)} shares`
+            : `≈ ${formatShares(current.shares)} shares for about ${formatUsd(current.cashUsd)}`
+          : ' '
+
+  return (
+    <Screen
+      title={stock.name}
+      back="/buy"
+      footer={
+        <>
+          {quote.isError && hasEnough && (
+            <p className="text-center text-[13px] text-loss">{errorMessage(quote.error)}</p>
+          )}
+          <Button
+            disabled={!hasEnough || !settled || !current || quote.isError}
+            onClick={() => {
+              trade.reset()
+              setStage('review')
+            }}
+          >
+            Review
+          </Button>
+        </>
+      }
+    >
+      <PriceChart
+        mint={stock.mint}
+        name={stock.name}
+        ticker={stock.ticker}
+        iconUrl={stock.iconUrl}
+        fallbackPrice={stock.priceUsd}
+        lowLiquidity={stock.lowLiquidity}
+      />
+
+      <div className="grid grid-cols-2 gap-1 rounded-link border border-line bg-surface p-1">
+        {(['buy', 'sell'] as const).map((option) => (
+          <button
+            key={option}
+            type="button"
+            disabled={option === 'sell' && ownedRaw === 0n}
+            onClick={() => switchSide(option)}
+            className={cx(
+              'h-10 rounded-link font-sans text-[15px] font-medium capitalize disabled:opacity-40',
+              side === option ? 'bg-orange-wash text-ink' : 'text-stone',
+            )}
+          >
+            {option}
+          </button>
+        ))}
+      </div>
+
+      <div className="-mt-2 flex flex-col items-center gap-1">
+        <label
+          htmlFor="trade-amount"
+          className="flex max-w-full items-baseline justify-center font-sans text-[60px] leading-[1.05] font-medium tracking-[-0.02em] tabular-nums"
+        >
+          <span className={cx(!amountText && 'text-steel')}>$</span>
+          <span className="sr-only">
+            {buying ? 'Amount to buy in dollars' : 'Amount to sell in dollars'}
+          </span>
+          <input
+            id="trade-amount"
+            inputMode="decimal"
+            autoComplete="off"
+            placeholder="0"
+            value={amountText}
+            onChange={(event) => {
+              const next = event.target.value.replace(',', '.').replace(/[^\d.]/g, '')
+              if (!AMOUNT_PATTERN.test(next)) return
+              setAmountText(next)
+              if (!buying) setSellPercent(null)
+            }}
+            style={{ width: `${Math.max(1, amountText.length) + 0.3}ch` }}
+            className="min-w-[1ch] bg-transparent text-ink outline-none placeholder:text-steel"
+          />
+        </label>
+        <span className="text-[14px] text-stone">{estimate}</span>
+        {hint && (
+          <span className={cx('text-[13px]', hint.tone === 'error' ? 'text-loss' : 'text-stone')}>
+            {hint.text}
+          </span>
+        )}
+      </div>
+
+      <div className={cx('-mt-2 grid gap-2', buying ? 'grid-cols-4' : 'grid-cols-3')}>
+        {presets.map((value) => {
+          const selected = buying
+            ? sellPercent == null && amountUsd === value
+            : sellPercent === value
+          return (
+            <button
+              key={value}
+              type="button"
+              onClick={() => (buying ? setAmountText(String(value)) : pickSellPercent(value))}
+              className={cx(
+                'h-11 rounded-button border font-sans text-[15px] font-medium',
+                selected ? 'border-orange bg-orange-wash' : 'border-line bg-surface',
+              )}
+            >
+              {buying ? `$${value}` : value === 100 ? 'All' : `${value}%`}
+            </button>
+          )
+        })}
+      </div>
+
+      {buying ? (
+        <Card className="flex items-center gap-3 py-3.5 pr-3.5 pl-4">
+          <div className="flex flex-1 flex-col">
+            <span>Pay with cash</span>
+            <span className={cx('text-[13px]', cashRaw >= amountRaw ? 'text-stone' : 'text-loss')}>
+              {formatUsd(stocks.data?.cashUsd ?? 0)} available
+              {cashRaw >= amountRaw ? '' : ' · not enough'}
+            </span>
+          </div>
+          <LinkButton href="/add-cash" variant="soft" size="sm">
+            Add cash
+          </LinkButton>
+        </Card>
+      ) : (
+        <Card className="flex flex-col px-4 py-3.5">
+          <span>You have {formatShares(stock.ownedShares)} shares</span>
+          <span className="text-[13px] text-stone">
+            Worth about {formatUsd(stock.ownedValueUsd)}
+          </span>
+        </Card>
+      )}
+
+      <div className="flex flex-col text-[15px]">
+        <div className="flex justify-between py-1">
+          <span className="text-stone">Fees</span>
+          <span>{current ? `${current.feePct.toFixed(1)}%, included` : 'Included in price'}</span>
+        </div>
+        <div className="flex justify-between py-1">
+          <span className="text-stone">Arrives</span>
+          <span>In under a minute</span>
+        </div>
+      </div>
+    </Screen>
+  )
+}
+
+export default withProviders(Trade)

@@ -1,0 +1,8 @@
+---
+import HomeScreen from '@/components/screens/home-screen'
+import AppLayout from '@/layouts/app-layout.astro'
+---
+
+<AppLayout>
+  <HomeScreen client:only="react" />
+</AppLayout>

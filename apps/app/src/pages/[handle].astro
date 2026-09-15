@@ -1,0 +1,65 @@
+---
+import AppLayout from '@/layouts/app-layout.astro'
+import { avatarUrl, db } from '@/lib/server/supabase'
+
+// Public gift link: morrow.fi/maya
+const handle = (Astro.params.handle ?? '').toLowerCase()
+const valid = /^[a-z0-9_]{3,20}$/.test(handle)
+const { data: person } = valid
+  ? await db.from('users').select('handle, name, avatar_path').eq('handle', handle).maybeSingle()
+  : { data: null }
+if (!person) Astro.response.status = 404
+
+const name = person?.name ?? handle
+const photo = avatarUrl(person?.avatar_path ?? null)
+const initials = name
+  .split(/\s+/)
+  .slice(0, 2)
+  .map((part: string) => part[0]?.toUpperCase() ?? '')
+  .join('')
+---
+
+<AppLayout
+  title={person ? `Send ${name} a gift · Morrow` : 'Not found · Morrow'}
+  description={
+    person ? `Give ${name} a piece of a real company.` : 'No one has this gift link yet.'
+  }
+  image={photo ?? undefined}
+>
+  <div class="flex flex-1 flex-col items-center justify-center gap-6 px-5 py-10 text-center">
+    {person ? (
+      <>
+        {photo ? (
+          <img src={photo} alt="" class="size-24 rounded-full object-cover" />
+        ) : (
+          <span class="flex size-24 items-center justify-center rounded-full bg-orange-wash font-sans text-[32px] font-medium">
+            {initials}
+          </span>
+        )}
+        <div class="flex flex-col gap-1">
+          <h1 class="font-sans text-[30px] leading-[1.15] font-medium tracking-[-0.02em]">
+            {name}
+          </h1>
+          <p class="text-stone">@{person.handle}</p>
+        </div>
+        <a
+          href={`/send?to=@${person.handle}`}
+          class="inline-flex h-14 w-full items-center justify-center rounded-button bg-orange px-5 font-sans text-[17px] font-medium text-white"
+        >
+          Send {name.split(' ')[0]} a gift
+        </a>
+      </>
+    ) : (
+      <>
+        <h1 class="font-sans text-[30px] font-medium tracking-[-0.02em]">No one’s here yet</h1>
+        <p class="text-stone">This gift link isn’t taken. Grab it when you sign up.</p>
+        <a
+          href="/login"
+          class="inline-flex h-14 w-full items-center justify-center rounded-button bg-orange px-5 font-sans text-[17px] font-medium text-white"
+        >
+          Get started
+        </a>
+      </>
+    )}
+  </div>
+</AppLayout>
