@@ -1,0 +1,25 @@
+node_modules
+dist
+.nuxt
+.output
+.nitro
+.astro
+.vercel
+.cache
+.data
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+.DS_Store
+*.log
+lefthook-local.yml
+
+# Solana / Anchor
+target
+.anchor
+test-ledger
+
+# Supabase CLI
+supabase/.temp
+supabase/.branches

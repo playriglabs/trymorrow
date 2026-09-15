@@ -1,0 +1,16 @@
+pre-commit:
+  piped: true
+  jobs:
+    - name: biome
+      glob: '*.{js,mjs,cjs,ts,mts,cts,tsx,jsx,json,jsonc,css,vue,astro}'
+      run: pnpm exec biome check --write --no-errors-on-unmatched --files-ignore-unknown=true {staged_files}
+      stage_fixed: true
+    - name: prettier
+      glob: '*.{vue,astro,md,yaml,yml,html}'
+      run: pnpm exec prettier --write --ignore-unknown {staged_files}
+      stage_fixed: true
+
+pre-push:
+  jobs:
+    - name: typecheck
+      run: pnpm typecheck

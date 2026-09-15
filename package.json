@@ -1,0 +1,29 @@
+{
+  "name": "morrow",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.6.1",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @morrow/landing dev",
+    "dev:app": "pnpm --filter @morrow/app dev",
+    "build": "pnpm --filter './apps/*' build",
+    "build:program": "cd programs && anchor build --no-idl -- --tools-version v1.51 && anchor idl build -o target/idl/morrow.json",
+    "generate": "pnpm --filter @morrow/landing generate",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "biome check . && prettier --check .",
+    "format": "biome check --write . && prettier --write .",
+    "prepare": "lefthook install"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.13",
+    "lefthook": "2.1.12",
+    "prettier": "3.9.6",
+    "prettier-plugin-astro": "1.0.0",
+    "prettier-plugin-tailwindcss": "0.8.1",
+    "typescript": "5.9.3",
+    "vue-tsc": "3.3.11"
+  }
+}

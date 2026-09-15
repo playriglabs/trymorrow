@@ -1,0 +1,11 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Fail fast on Node older than package.json "engines" (Nuxt 4 breaks on Node 20)
+engineStrict: true
+
+onlyBuiltDependencies:
+  - '@parcel/watcher'
+  - esbuild
+  - lefthook

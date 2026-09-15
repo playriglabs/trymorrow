@@ -1,0 +1,16 @@
+{
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.biome": "explicit",
+    "source.organizeImports.biome": "explicit"
+  },
+  "[javascript][typescript][json][jsonc][css]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[typescriptreact][javascriptreact]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[vue][astro][markdown][yaml][html]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  }
+}

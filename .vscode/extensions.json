@@ -1,0 +1,11 @@
+{
+  "recommendations": [
+    "biomejs.biome",
+    "esbenp.prettier-vscode",
+    "vue.volar",
+    "bradlc.vscode-tailwindcss",
+    "editorconfig.editorconfig",
+    "astro-build.astro-vscode",
+    "rust-lang.rust-analyzer"
+  ]
+}

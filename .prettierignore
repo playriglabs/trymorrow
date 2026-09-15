@@ -1,0 +1,21 @@
+# Biome owns formatting for these
+**/*.js
+**/*.mjs
+**/*.cjs
+**/*.ts
+**/*.mts
+**/*.cts
+**/*.tsx
+**/*.jsx
+**/*.json
+**/*.jsonc
+**/*.css
+
+pnpm-lock.yaml
+node_modules
+dist
+.nuxt
+.output
+.astro
+.vercel
+target
