@@ -1,17 +1,8 @@
-import QRCode from 'qrcode'
 import { useMemo } from 'react'
+import { MODULE_RADIUS, qrLayout } from '@/lib/client/qr-layout'
 
 /** Swap this file (or pass `logoSrc`) to change the mark in the middle of every QR code */
 export const QR_LOGO_SRC = '/qr-logo.svg'
-
-/** Standard 4-module white border scanners expect */
-const QUIET_ZONE = 4
-const FINDER = 7
-/**
- * Modules must touch their neighbours: round dots or inset squares broke decoding in tests,
- * while full squares with this corner radius scanned every time.
- */
-const MODULE_RADIUS = 0.25
 
 type QrCodeProps = {
   value: string
@@ -36,44 +27,10 @@ export function QrCode({
   label = 'QR code',
   className,
 }: QrCodeProps) {
-  const layout = useMemo(() => {
-    // Level H keeps the code readable with ~30% of it hidden, which leaves room for the logo
-    const modules = QRCode.create(value, { errorCorrectionLevel: 'H' }).modules
-    const count = modules.size
-
-    // Odd size keeps the cleared square centered on the module grid
-    let logo = logoSrc ? Math.floor(count * logoScale) : 0
-    if (logo > 0 && logo % 2 === 0) logo += 1
-    const logoStart = (count - logo) / 2
-    const clearFrom = logoStart - 1
-    const clearTo = logoStart + logo + 1
-
-    const cells: { x: number; y: number }[] = []
-    for (let row = 0; row < count; row++) {
-      for (let col = 0; col < count; col++) {
-        const finder =
-          (row < FINDER && col < FINDER) ||
-          (row < FINDER && col >= count - FINDER) ||
-          (row >= count - FINDER && col < FINDER)
-        const underLogo =
-          logo > 0 && row >= clearFrom && row < clearTo && col >= clearFrom && col < clearTo
-        if (modules.get(row, col) && !finder && !underLogo) {
-          cells.push({ x: col + QUIET_ZONE, y: row + QUIET_ZONE })
-        }
-      }
-    }
-
-    return {
-      cells,
-      total: count + QUIET_ZONE * 2,
-      finders: [
-        { x: QUIET_ZONE, y: QUIET_ZONE },
-        { x: QUIET_ZONE + count - FINDER, y: QUIET_ZONE },
-        { x: QUIET_ZONE, y: QUIET_ZONE + count - FINDER },
-      ],
-      logo: logo > 0 ? { position: QUIET_ZONE + logoStart, size: logo } : null,
-    }
-  }, [value, logoSrc, logoScale])
+  const layout = useMemo(
+    () => qrLayout(value, logoSrc ? logoScale : 0),
+    [value, logoSrc, logoScale],
+  )
 
   return (
     <svg
