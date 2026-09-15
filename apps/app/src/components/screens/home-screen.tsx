@@ -1,6 +1,9 @@
-import { BagIcon, BellIcon, GiftIcon, PaperPlaneTiltIcon, PlusIcon } from '@phosphor-icons/react'
+import { BagIcon, BellIcon, GiftIcon, PlusIcon } from '@phosphor-icons/react'
 import clsx from 'clsx'
+import { useEffect, useState } from 'react'
 import { FundCard } from '@/components/fund-card'
+import { GiftRow } from '@/components/gift-row'
+import { byValue, HoldingRow } from '@/components/holding-row'
 import { InstallPrompt } from '@/components/install-prompt'
 import { withProviders } from '@/components/providers'
 import { StockLogo } from '@/components/stock-logo'
@@ -14,10 +17,11 @@ import {
   usePortfolioQuery,
 } from '@/lib/client/queries'
 import { useSession } from '@/lib/client/session'
-import { formatShares, formatUsd } from '@/lib/format'
+import { formatUsd } from '@/lib/format'
 import { giftAssetsLabel } from '@/lib/gifts'
 
-const STATUS_LABEL = { draft: 'Draft', pending: 'Waiting', claimed: 'Opened', refunded: 'Returned' }
+/** Home shows the biggest handful; the rest live on their own page */
+const HOME_STOCKS = 7
 
 function House() {
   const session = useSession()
@@ -31,15 +35,29 @@ function House() {
   const total = portfolio.data ? portfolio.data.cashUsd + portfolio.data.stocksUsd : null
   const shownTotal = useAnimatedNumber(total)
 
+  // Header grows slightly once the page scrolls, so it reads as a bar rather than floating space
+  const [scrolled, setScrolled] = useState(false)
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 4)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
   if (!session.ready || !session.profile) return <Loading />
 
   const toClaim = received.data?.filter((gift) => gift.status === 'pending') ?? []
-  const stocks = portfolio.data?.holdings.filter((holding) => !holding.isCash) ?? []
+  const stocks = (portfolio.data?.holdings.filter((holding) => !holding.isCash) ?? []).sort(byValue)
 
   return (
     <div className="flex min-h-dvh flex-col">
       <div className="flex flex-1 flex-col gap-6 px-5 pt-4 pb-6">
-        <header className="sticky top-0 z-20 -mx-5 flex h-11 items-center justify-between bg-cream px-5">
+        <header
+          className={clsx(
+            'sticky top-0 z-20 -mx-5 flex items-center justify-between bg-cream px-5 transition-[height] duration-150',
+            scrolled ? 'h-13' : 'h-11',
+          )}
+        >
           <span className="font-sans text-[22px] font-medium tracking-[-0.02em]">Morrow</span>
           <div className="flex items-center gap-1">
             <a
@@ -126,7 +144,14 @@ function House() {
         )}
 
         <section className="flex flex-col gap-3">
-          <h2 className="font-sans text-lg font-medium tracking-[-0.02em]">Your stocks</h2>
+          <div className="flex items-baseline justify-between">
+            <h2 className="font-sans text-lg font-medium tracking-[-0.02em]">Your stocks</h2>
+            {stocks.length > HOME_STOCKS && (
+              <a href="/stocks" className="text-[14px] text-stone">
+                See all
+              </a>
+            )}
+          </div>
           {stocks.length === 0 ? (
             <Card className="px-4 py-5 text-[15px] text-stone">
               {portfolio.isPending
@@ -135,48 +160,9 @@ function House() {
             </Card>
           ) : (
             <Card className="flex flex-col divide-y divide-line px-4">
-              {stocks.map((holding) => {
-                const pnl =
-                  holding.costUsd != null && holding.valueUsd != null
-                    ? holding.valueUsd - holding.costUsd
-                    : null
-                const pnlPct =
-                  pnl != null && holding.costUsd && holding.costUsd > 0
-                    ? (pnl / holding.costUsd) * 100
-                    : null
-                return (
-                  <a
-                    key={holding.mint}
-                    href={`/trade/${holding.ticker.toLowerCase()}`}
-                    className="flex items-center gap-3 py-3"
-                  >
-                    <StockLogo iconUrl={holding.iconUrl} ticker={holding.ticker} size={40} />
-                    <div className="flex flex-1 flex-col">
-                      <span>{holding.name}</span>
-                      <span className="text-[13px] text-stone">
-                        {formatShares(holding.amount)} shares
-                      </span>
-                    </div>
-                    <div className="flex flex-col items-end">
-                      <span>{formatUsd(holding.valueUsd)}</span>
-                      {pnl != null && (
-                        <span
-                          // A flat +$0.00 is a non-event, not a gain: show it in stone
-                          className={clsx('text-[13px]', {
-                            'text-gain': pnl > 0,
-                            'text-loss': pnl < 0,
-                            'text-stone': pnl === 0,
-                          })}
-                        >
-                          {pnl > 0 ? '+' : ''}
-                          {formatUsd(pnl)}
-                          {pnlPct != null && ` (${pnlPct > 0 ? '+' : ''}${pnlPct.toFixed(0)}%)`}
-                        </span>
-                      )}
-                    </div>
-                  </a>
-                )
-              })}
+              {stocks.slice(0, HOME_STOCKS).map((holding) => (
+                <HoldingRow key={holding.mint} holding={holding} />
+              ))}
             </Card>
           )}
         </section>
@@ -186,27 +172,7 @@ function House() {
             <h2 className="font-sans text-lg font-medium tracking-[-0.02em]">Gifts you sent</h2>
             <Card className="flex flex-col divide-y divide-line px-4">
               {sent.data?.map((gift) => (
-                <a key={gift.id} href={`/gift/${gift.id}`} className="flex items-center gap-3 py-3">
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    <div className="flex space-x-1 items-center">
-                      <PaperPlaneTiltIcon className="size-4 shrink-0" />
-                      <span className="truncate">
-                        {formatUsd(gift.usdValue)} of {giftAssetsLabel(gift.items)}
-                      </span>
-                    </div>
-                    <span className="truncate text-[13px] text-stone">
-                      To {gift.recipientLabel}
-                    </span>
-                  </div>
-                  <span
-                    className={clsx('rounded-link px-2.5 text-[13px]', {
-                      'bg-gain-wash text-gain': gift.status === 'claimed',
-                      'bg-orange-wash text-ink': gift.status !== 'claimed',
-                    })}
-                  >
-                    {STATUS_LABEL[gift.status]}
-                  </span>
-                </a>
+                <GiftRow key={gift.id} gift={gift} sent />
               ))}
             </Card>
           </section>

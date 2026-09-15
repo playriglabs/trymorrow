@@ -15,7 +15,9 @@ export function formatUsdWhole(value: number): string {
   return wholeUsd.format(value)
 }
 
+/** A balance that rounds to nothing still isn't nothing: say so rather than printing "0" */
 export function formatShares(value: number): string {
+  if (value > 0 && value < 0.00005) return '<0.0001'
   return value.toLocaleString('en-US', { maximumFractionDigits: 4 })
 }
 

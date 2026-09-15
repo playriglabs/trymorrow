@@ -1,0 +1,17 @@
+---
+import HoldingScreen from '@/components/screens/holding-screen'
+import AppLayout from '@/layouts/app-layout.astro'
+import { findStockByTicker } from '@/lib/server/catalog'
+
+const stock = await findStockByTicker(decodeURIComponent(Astro.params.ticker ?? ''))
+if (!stock) return Astro.redirect('/stocks')
+---
+
+<AppLayout title={`Your ${stock.name} shares · Morrow`} image={stock.iconUrl}>
+  <HoldingScreen
+    client:only="react"
+    mint={stock.mint.toBase58()}
+    ticker={stock.ticker}
+    name={stock.name}
+  />
+</AppLayout>

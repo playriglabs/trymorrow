@@ -1,0 +1,8 @@
+---
+import StocksScreen from '@/components/screens/stocks-screen'
+import AppLayout from '@/layouts/app-layout.astro'
+---
+
+<AppLayout title="Your stocks · Morrow">
+  <StocksScreen client:only="react" />
+</AppLayout>
