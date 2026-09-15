@@ -127,8 +127,6 @@ function CreateFund() {
   const fee = useFundFeeQuery({ enabled: session.ready })
   const create = useCreateFundMutation()
 
-  const [showAll, setShowAll] = useState(false)
-
   // Stocks this person already holds come first: a mix you recognise is easier to commit to for
   // years, and it's the only way to spot one that isn't in the most-traded handful
   const listings = useMemo(() => {
@@ -254,7 +252,7 @@ function CreateFund() {
             type="checkbox"
             checked={forSomeoneElse}
             onChange={(event) => setForSomeoneElse(event.target.checked)}
-            className="mt-0.5 size-4.5 accent-[#F66F00]"
+            className="mt-0.5 size-4.5 accent-orange"
           />
           They have their own email, and only they should be able to take it out
         </label>
@@ -277,17 +275,20 @@ function CreateFund() {
 
       <div className="flex flex-col gap-2">
         <Label>What it’s for</Label>
-        <div className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-2 gap-2">
           {FUND_PURPOSES.map((option) => (
             <button
               key={option.value}
               type="button"
               aria-pressed={purpose === option.value}
               onClick={() => setPurpose(option.value)}
-              className={clsx('h-11 rounded-link border px-4 font-sans text-[15px] font-medium', {
-                'border-orange bg-orange-wash': purpose === option.value,
-                'border-line bg-surface': purpose !== option.value,
-              })}
+              className={clsx(
+                'flex h-11 items-center justify-center rounded-link border px-4 font-sans text-[15px] font-medium',
+                {
+                  'border-orange bg-orange-wash': purpose === option.value,
+                  'border-line bg-surface': purpose !== option.value,
+                },
+              )}
             >
               {option.label}
             </button>
@@ -377,7 +378,7 @@ function CreateFund() {
           </button>
         )}
         <div className="flex flex-wrap gap-2">
-          {(showAll ? listings : listings.slice(0, 12)).map((stock) => {
+          {listings.slice(0, 12).map((stock) => {
             const selected = allocations.some((item) => item.mint === stock.mint)
             return (
               <button
@@ -402,14 +403,13 @@ function CreateFund() {
               </button>
             )
           })}
-          {!showAll && listings.length > 12 && (
-            <button
-              type="button"
-              onClick={() => setShowAll(true)}
-              className="h-11 rounded-link border border-line bg-surface px-4 font-sans text-[15px] font-medium text-stone"
+          {listings.length > 12 && (
+            <a
+              href="/buy"
+              className="flex h-11 items-center rounded-link border border-line bg-surface px-4 font-sans text-[15px] font-medium text-stone"
             >
               Show all {listings.length}
-            </button>
+            </a>
           )}
         </div>
         <p className="text-[13px] text-stone">

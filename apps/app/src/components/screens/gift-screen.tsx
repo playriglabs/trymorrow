@@ -15,8 +15,9 @@ import type { GiftView } from '@/lib/types'
 
 function GiftCard({ gift }: { gift: GiftView }) {
   const bundle = gift.items.length > 1
+
   return (
-    <div className="relative flex flex-col gap-4.5 overflow-hidden rounded-sheet bg-orange p-6 text-white">
+    <div className="relative flex flex-col gap-4.5 mt-3 overflow-hidden rounded-sheet bg-orange p-6 text-white">
       <div className="absolute -top-20 -right-20 size-45 rounded-full bg-[#ff8f33]" aria-hidden />
       <div className="absolute -top-7.5 -right-7.5 size-22.5 rounded-full bg-sun" aria-hidden />
       <div className="relative flex items-center gap-2.5 text-ink">
@@ -83,7 +84,7 @@ function Gift({ giftId }: { giftId: string }) {
   const assets = giftAssetsLabel(view.items)
   const bundle = view.items.length > 1
   const heading = match({ viewer: view.viewer, bundle })
-    .with({ viewer: 'sender' }, () => `${view.recipientLabel} opened your gift`)
+    .with({ viewer: 'sender' }, () => `${view.recipientLabel} claimed your gift`)
     .with({ bundle: true }, () => `${assets} are yours`)
     .otherwise(() => `${assets} is yours`)
 

@@ -19,6 +19,7 @@ import {
 import { useSession } from '@/lib/client/session'
 import { formatDate, formatUsd, formatUsdWhole } from '@/lib/format'
 import { formatUnlock, MAX_FUND_HOLDINGS, purposeLabel, timeToGo } from '@/lib/funds'
+import { MAX_NOTE } from '@/lib/notes'
 import type { FundView, Holding } from '@/lib/types'
 
 const PRESETS = [10, 25, 50, 100]
@@ -105,6 +106,7 @@ function AddSheet({ fund, onClose }: { fund: FundView; onClose: () => void }) {
   const cashShort = usd + feeUsd > cashUsd
   const feeShort = mode === 'shares' && feeUsd > cashUsd
   const total = mode === 'cash' ? usd : picked
+
   const addDisabled = match(mode)
     .with('cash', () => cashTooSmall || cashShort)
     .with('shares', () => picks.length === 0 || feeShort)
@@ -148,8 +150,8 @@ function AddSheet({ fund, onClose }: { fund: FundView; onClose: () => void }) {
 
   if (done != null) {
     return (
-      <div className="fixed inset-0 z-30 flex items-end justify-center bg-ink/30">
-        <div className="flex w-full max-w-107.5 flex-col items-center gap-5 rounded-t-sheet bg-cream px-5 pt-8 pb-[max(28px,env(safe-area-inset-bottom))] text-center">
+      <div className="modal-backdrop-in fixed inset-0 z-30 flex items-end justify-center bg-ink/30">
+        <div className="modal-sheet-in flex w-full max-w-107.5 flex-col items-center gap-5 rounded-t-sheet bg-cream px-5 pt-8 pb-[max(28px,env(safe-area-inset-bottom))] text-center">
           <SuccessMark />
           <div className="flex flex-col gap-1.5">
             <h2 className="font-sans text-[24px] leading-[1.15] font-medium tracking-[-0.02em]">
@@ -168,8 +170,8 @@ function AddSheet({ fund, onClose }: { fund: FundView; onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-30 flex items-end justify-center bg-ink/30">
-      <div className="flex max-h-dvh w-full max-w-107.5 flex-col gap-4 overflow-y-auto rounded-t-sheet bg-cream px-5 pt-4 pb-[max(28px,env(safe-area-inset-bottom))]">
+    <div className="modal-backdrop-in fixed inset-0 z-30 flex items-end justify-center bg-ink/30">
+      <div className="modal-sheet-in flex max-h-dvh w-full max-w-107.5 flex-col gap-4 overflow-y-auto rounded-t-sheet bg-cream px-5 pt-4 pb-[max(28px,env(safe-area-inset-bottom))]">
         <div className="flex items-center justify-between">
           <h2 className="font-sans text-lg font-medium tracking-[-0.02em]">
             Add to {fund.beneficiaryName}’s fund
@@ -324,7 +326,7 @@ function AddSheet({ fund, onClose }: { fund: FundView; onClose: () => void }) {
           <Label htmlFor="note">Note</Label>
           <input
             id="note"
-            maxLength={140}
+            maxLength={MAX_NOTE}
             placeholder="Happy birthday, kiddo"
             value={note}
             onChange={(event) => setNote(event.target.value)}
@@ -417,15 +419,15 @@ function Fund({ fundId }: { fundId: string }) {
 
   const primaryAction = match({ canWithdraw, canAdd })
     .with({ canWithdraw: true }, () => (
-      <Button loading={withdraw.isPending} onClick={() => withdraw.mutate()}>
-        <LockOpenIcon className="size-5" />
-        {withdraw.isPending ? 'Moving it to your account…' : `Take out ${formatUsd(view.valueUsd)}`}
+      <Button size="md" loading={withdraw.isPending} onClick={() => withdraw.mutate()}>
+        <LockOpenIcon className="size-5 shrink-0" />
+        {withdraw.isPending ? 'Moving it…' : `Take out ${formatUsd(view.valueUsd)}`}
       </Button>
     ))
     .with({ canAdd: true }, () => (
-      <Button onClick={() => setAdding(true)}>
-        <PlusIcon className="size-5" />
-        Add to the fund
+      <Button size="md" onClick={() => setAdding(true)}>
+        <PlusIcon className="size-5 shrink-0" />
+        Add money
       </Button>
     ))
     .otherwise(() => null)
@@ -462,16 +464,19 @@ function Fund({ fundId }: { fundId: string }) {
               {withdraw.isError && (
                 <p className="text-center text-[13px] text-loss">{errorMessage(withdraw.error)}</p>
               )}
-              {primaryAction}
-              <Button variant="soft" onClick={share}>
-                <ShareIcon className="size-5" />
-                Share with the family
-              </Button>
+              {/* Adding and sharing carry equal weight here, so they sit side by side */}
+              <div className={clsx('gap-2', primaryAction ? 'grid grid-cols-2' : 'flex flex-col')}>
+                {primaryAction}
+                <Button variant="soft" size="md" onClick={share}>
+                  <ShareIcon className="size-5 shrink-0" />
+                  Share
+                </Button>
+              </div>
             </>
           ) : undefined
         }
       >
-        <div className="relative flex flex-col gap-4 overflow-hidden rounded-sheet bg-orange p-6 text-white">
+        <div className="relative flex flex-col mt-3 gap-4 overflow-hidden rounded-sheet bg-orange p-6 text-white">
           <div
             className="absolute -top-20 -right-20 size-45 rounded-full bg-[#ff8f33]"
             aria-hidden
@@ -564,12 +569,17 @@ function Fund({ fundId }: { fundId: string }) {
                   <Avatar name={entry.name} url={entry.avatarUrl} size={36} />
                   <div className="flex min-w-0 flex-1 flex-col">
                     <span className="truncate">{entry.name}</span>
-                    {entry.note && (
-                      <span className="text-[13px] leading-[1.45] text-stone">“{entry.note}”</span>
-                    )}
                     <span className="text-[13px] text-stone">{formatDate(entry.createdAt)}</span>
                   </div>
-                  <span className="shrink-0">{formatUsd(entry.usdValue)}</span>
+                  {/* The note rides with the amount, so who and when stay on two tidy lines */}
+                  <div className="flex min-w-0 max-w-[55%] flex-col items-end">
+                    <span className="whitespace-nowrap">{formatUsd(entry.usdValue)}</span>
+                    {entry.note && (
+                      <span className="text-right text-[13px] leading-[1.45] text-stone">
+                        “{entry.note}”
+                      </span>
+                    )}
+                  </div>
                 </div>
               ))}
             </Card>

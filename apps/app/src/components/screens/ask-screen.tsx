@@ -8,6 +8,7 @@ import { errorMessage } from '@/lib/client/api'
 import { useStocksQuery } from '@/lib/client/queries'
 import { useSession } from '@/lib/client/session'
 import { formatUsd } from '@/lib/format'
+import { MAX_NOTE } from '@/lib/notes'
 import type { StockListing } from '@/lib/types'
 
 const PRESETS = [10, 25, 50, 100]
@@ -15,7 +16,6 @@ const RESULTS = 8
 /** Same shape the trade screen accepts: dollars and cents */
 const AMOUNT_PATTERN = /^\d{0,7}(\.\d{0,2})?$/
 /** Enough for a sentence, short enough to survive a link */
-const MAX_NOTE = 80
 
 const canShare = () => typeof navigator.share === 'function'
 

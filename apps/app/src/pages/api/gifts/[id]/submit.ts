@@ -114,7 +114,7 @@ export const POST = route(async ({ params, request }) => {
             {
               userId: sent.sender_id,
               kind: 'gift_opened',
-              title: `${viewer.name ?? 'They'} opened your gift`,
+              title: `${viewer.name ?? 'They'} claimed your gift`,
               body: label,
               giftId: sent.id,
               url: `/gift/${sent.id}`,

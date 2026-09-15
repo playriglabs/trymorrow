@@ -3,6 +3,7 @@ import { PublicKey } from '@solana/web3.js'
 import { z } from 'astro/zod'
 import { formatUsd } from '@/lib/format'
 import { MAX_FUND_HOLDINGS } from '@/lib/funds'
+import { MAX_NOTE } from '@/lib/notes'
 import { findStock } from '@/lib/server/catalog'
 import {
   cashBalance,
@@ -24,7 +25,7 @@ const itemSchema = z.object({
 
 const schema = z.object({
   items: z.array(itemSchema).min(1).max(MAX_FUND_HOLDINGS),
-  note: z.string().trim().max(140).optional(),
+  note: z.string().trim().max(MAX_NOTE).optional(),
 })
 
 /**
