@@ -1,4 +1,5 @@
 import {
+  ArrowLineUpRightIcon,
   CaretRightIcon,
   CopyIcon,
   GiftIcon,
@@ -66,7 +67,12 @@ function ProfilePage() {
             <span className="flex-1">Add cash</span>
             <CaretRightIcon className="size-4.5 text-steel" />
           </a>
-          <a href="mailto:help@morrow.fi" className="flex h-13 items-center gap-3">
+          <a href="/cash-out" className="flex h-13 items-center gap-3">
+            <ArrowLineUpRightIcon className="size-5" />
+            <span className="flex-1">Cash out</span>
+            <CaretRightIcon className="size-4.5 text-steel" />
+          </a>
+          <a href="mailto:help@trymorrow.money" className="flex h-13 items-center gap-3">
             <QuestionIcon className="size-5" />
             <span className="flex-1">Help</span>
             <CaretRightIcon className="size-4.5 text-steel" />

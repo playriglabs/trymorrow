@@ -204,6 +204,32 @@ export async function fundCreateFee(): Promise<{ raw: bigint; usd: number }> {
   return cashAtCost(rent + lamportsPerTransaction, solUsd)
 }
 
+export type CashoutFee = {
+  /** True when the destination has no cash account yet, which is the only thing that costs us */
+  opensAccount: boolean
+  raw: bigint
+  usd: number
+}
+
+/**
+ * What sending cash to an address outside Morrow costs us for good. When the destination already
+ * has a cash account it's a single transfer and the network fee is well under a cent, so it's
+ * free. When it doesn't, the relayer opens one and that rent stays with their account forever,
+ * so it's charged at cost, exactly like a gift opening a share account.
+ */
+export async function cashoutFee(destination: PublicKey): Promise<CashoutFee> {
+  if (await connection.getAccountInfo(cashAccount(destination))) {
+    return { opensAccount: false, raw: 0n, usd: 0 }
+  }
+  const [rent, solUsd, lamportsPerTransaction] = await Promise.all([
+    accountRent(TOKEN_ACCOUNT_SIZE),
+    solPrice(),
+    transactionLamports(),
+  ])
+  // Opening the account is its own relayer transaction, then the payout is a second one
+  return { opensAccount: true, ...cashAtCost(rent + 2 * lamportsPerTransaction, solUsd) }
+}
+
 export type ContributionFee = {
   raw: bigint
   usd: number
