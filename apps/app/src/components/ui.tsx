@@ -1,5 +1,7 @@
-import { CaretLeftIcon, SpinnerIcon } from '@phosphor-icons/react'
+import { CaretLeftIcon } from '@phosphor-icons/react'
 import clsx from 'clsx'
+import { Squircle } from 'ldrs/react'
+import 'ldrs/react/Squircle.css'
 import type {
   AnchorHTMLAttributes,
   ButtonHTMLAttributes,
@@ -50,7 +52,7 @@ export function Button({
       disabled={disabled || loading}
       {...props}
     >
-      {loading && <SpinnerIcon className="size-5 animate-spin" aria-hidden />}
+      {loading && <Squircle size={18} color="currentColor" stroke={4} bgOpacity={0} />}
       {children}
     </button>
   )
@@ -104,9 +106,10 @@ export function Screen({
   footer,
   children,
 }: {
-  title?: string
-  /** A path, or true to go back in history */
-  back?: string | true
+  /** A string, or a node when the screen wants something like a logo beside the name */
+  title?: ReactNode
+  /** A path, true to go back in history, or a callback for an in-place multi-step flow */
+  back?: string | true | (() => void)
   right?: ReactNode
   footer?: ReactNode
   children: ReactNode
@@ -115,12 +118,15 @@ export function Screen({
   return (
     <div className="flex min-h-dvh flex-1 flex-col">
       {hasHeader && (
-        <header className="sticky top-0 z-20 grid h-13 grid-cols-[44px_1fr_44px] items-center border-b border-b-ink/10 bg-cream px-3 pt-1 pb-4">
+        <header className="sticky top-0 z-20 grid h-14 grid-cols-[44px_1fr_44px] items-center justify-center border-b border-b-ink/10 bg-cream px-3">
           {back ? (
             <a
-              href={back === true ? '#' : back}
+              href={typeof back === 'string' ? back : '#'}
               onClick={(event) => {
-                if (back === true) {
+                if (typeof back === 'function') {
+                  event.preventDefault()
+                  back()
+                } else if (back === true) {
                   event.preventDefault()
                   history.back()
                 }
@@ -133,7 +139,7 @@ export function Screen({
           ) : (
             <span />
           )}
-          <h1 className="text-center font-sans text-[17px] font-medium tracking-[-0.02em]">
+          <h1 className="min-w-0 truncate px-2 text-center font-sans text-[17px] font-medium tracking-[-0.02em] whitespace-nowrap">
             {title}
           </h1>
           <div className="flex justify-end">{right}</div>
@@ -141,7 +147,7 @@ export function Screen({
       )}
       <div className="flex flex-1 flex-col gap-5.5 px-5 pt-2 pb-4">{children}</div>
       {footer && (
-        <footer className="sticky bottom-0 flex flex-col gap-2.5 bg-cream px-5 pt-2 pb-[max(28px,env(safe-area-inset-bottom))]">
+        <footer className="sticky bottom-0 flex flex-col bg-cream px-5 pt-4 pb-[max(28px,env(safe-area-inset-bottom))]">
           {footer}
         </footer>
       )}
@@ -257,8 +263,8 @@ export function Ticker({ ticker, size = 44 }: { ticker: string; size?: number })
 
 export function Loading() {
   return (
-    <div className="flex flex-1 items-center justify-center">
-      <SpinnerIcon className="size-7 animate-spin text-orange" aria-label="Loading" />
+    <div className="flex flex-1 items-center justify-center" role="status" aria-label="Loading">
+      <Squircle size={34} color="var(--color-orange)" />
     </div>
   )
 }

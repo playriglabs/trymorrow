@@ -39,6 +39,29 @@ export type Holding = {
   costUsd: number | null
 }
 
+/** Where a holding came from, when our records account for every share of it */
+export type HoldingOrigin = {
+  /** 'gift' when gifts explain it, 'bought' when buys do, 'mixed' when both */
+  kind: 'gift' | 'bought' | 'mixed'
+  /** Who sent it; only set when a single gift is the whole holding */
+  fromName: string | null
+  /** When it arrived: the first gift claimed or the first buy */
+  at: string | null
+}
+
+export type HoldingDetail = {
+  holding: Holding
+  /** null when the lots don't explain the balance, the same rule the cost basis follows */
+  origin: HoldingOrigin | null
+}
+
+/** What a company does, for the stock page. Null everywhere when no provider key is set */
+export type CompanyProfile = {
+  description: string
+  sector: string | null
+  industry: string | null
+}
+
 export type Portfolio = {
   walletAddress: string
   cashUsd: number
@@ -90,6 +113,10 @@ export type TradeQuote = {
   /** Jupiter or a market maker pays network fees and rent, so no SOL is needed */
   gasless: boolean
   slippagePct: number
+  /** Thin market: the price can stay away from the real one, so waiting may not fix a block */
+  lowLiquidity: boolean
+  /** Priced without the wallet, because it can't pay for this trade: a look, not an offer */
+  preview: boolean
 }
 
 export const CHART_RANGES = ['1D', '3D', '1W', '1M', '1Y', 'ALL'] as const
@@ -108,6 +135,11 @@ export type PriceChart = {
   changePct: number | null
   /** True when the data source was rate-limited and this is the last good copy */
   stale: boolean
+  /**
+   * 'pool' is what this stock changes hands for here; 'market' is the listed stock's daily
+   * closes, drawn only when the pool has no history worth showing
+   */
+  source: 'pool' | 'market'
 }
 
 export type TradeResult = {
@@ -121,6 +153,33 @@ export type RecipientResolution =
   | { kind: 'self' }
   | { kind: 'not_found' }
   | { kind: 'invalid' }
+
+export type CashoutStatus = 'draft' | 'sent'
+
+/** What cashing out this amount to this address would do, priced by the server */
+export type CashoutQuote = {
+  destination: string
+  /** Cash leaving the account, in USDC base units: what lands plus the fee */
+  amountRaw: string
+  amountUsd: number
+  /** Taken out of the amount, so cashing out everything always works */
+  feeUsd: number
+  netUsd: number
+  /** True when they have no cash account yet, which is the only thing that costs anything */
+  opensAccount: boolean
+}
+
+export type CashoutView = {
+  id: string
+  destination: string
+  amountUsd: number
+  netUsd: number
+  feeUsd: number
+  status: CashoutStatus
+  /** Receipt, once it's on chain */
+  signature: string | null
+  createdAt: string
+}
 
 export type GiftStatus = 'draft' | 'pending' | 'claimed' | 'refunded'
 
@@ -184,6 +243,8 @@ export type NotificationKind =
   | 'fund_unlocked'
   /** Cash landed from an exchange or another wallet */
   | 'cash_deposited'
+  /** You sent cash out to an account of your own */
+  | 'cash_sent'
 
 export type NotificationView = {
   id: string

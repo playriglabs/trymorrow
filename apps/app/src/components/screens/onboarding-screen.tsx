@@ -12,6 +12,7 @@ import {
 } from '@/lib/client/queries'
 import { useSession } from '@/lib/client/session'
 import { safeNext } from '@/lib/format'
+import { MAX_HANDLE, MIN_HANDLE } from '@/lib/handles'
 import type { Profile } from '@/lib/types'
 
 const COUNTRIES = [
@@ -245,20 +246,23 @@ function Onboarding() {
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="handle">Your gift link</Label>
         <div className="flex h-14 items-center rounded-button border border-line bg-surface px-4 text-[17px] focus-within:border-orange focus-within:ring-4 focus-within:ring-orange-wash">
-          <span className="text-stone">morrow.fi/</span>
+          <span className="text-stone">trymorrow.money/</span>
           <input
             id="handle"
             className="min-w-0 flex-1 bg-transparent outline-none"
             autoCapitalize="none"
             autoCorrect="off"
             value={handle}
+            maxLength={MAX_HANDLE}
             onChange={(event) =>
-              setHandle(event.target.value.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 20))
+              setHandle(event.target.value.replace(/[^a-zA-Z0-9_]/g, '').slice(0, MAX_HANDLE))
             }
           />
         </div>
-        {cleanHandle.length > 0 && cleanHandle.length < 3 && (
-          <p className="text-[13px] text-stone">At least 3 letters, numbers or underscores.</p>
+        {cleanHandle.length > 0 && cleanHandle.length < MIN_HANDLE && (
+          <p className="text-[13px] text-stone">
+            At least {MIN_HANDLE} letters, numbers or underscores.
+          </p>
         )}
         {availability.data && (
           <p

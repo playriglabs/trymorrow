@@ -28,22 +28,31 @@ export type UserRow = {
 export const USER_COLUMNS =
   'id, privy_id, email, wallet_address, handle, name, avatar_path, country, not_us_person, terms_accepted_at, cash_seen_raw, cash_seen_signature'
 
-export const HANDLE_PATTERN = /^[a-z0-9_]{3,20}$/
+export { HANDLE_PATTERN } from '@/lib/handles'
+// Every top-level page route, plus the names we keep for ourselves: a handle that matches one
+// would render the page instead of the person's gift link
 export const RESERVED_HANDLES = new Set([
   'about',
   'admin',
   'api',
   'app',
+  'ask',
+  'buy',
+  'fund',
+  'funds',
   'gift',
   'gifts',
   'help',
   'login',
   'morrow',
   'notifications',
+  'offline',
   'onboarding',
   'profile',
   'send',
+  'stocks',
   'support',
+  'trade',
 ])
 
 /** Pulls email + wallet from Privy (never from the client) and upserts our row */

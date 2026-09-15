@@ -79,7 +79,7 @@ export function AvatarPicker({
       </div>
 
       {source && (
-        <div className="fixed inset-0 z-50 mx-auto flex max-w-107.5 flex-col bg-ink text-cream">
+        <div className="modal-page-in fixed inset-0 z-50 mx-auto flex max-w-107.5 flex-col bg-ink text-cream">
           <div className="grid h-17 grid-cols-[72px_1fr_72px] items-center px-2 pt-4">
             <button type="button" className="h-11 px-3 text-left" onClick={() => setSource(null)}>
               Cancel

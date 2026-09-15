@@ -48,7 +48,7 @@ function AddCash() {
         </div>
         <div className="flex flex-col gap-1">
           <p className="text-center text-[13px] text-stone">Your deposit address</p>
-          <p className="text-center font-mono text-[14px] leading-normal break-all">{address}</p>
+          <p className="text-center text-[14px] leading-normal break-all">{address}</p>
         </div>
         <div className="grid grid-cols-2 gap-2">
           <Button

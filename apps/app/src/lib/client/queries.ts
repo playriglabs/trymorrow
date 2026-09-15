@@ -1,8 +1,12 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useApi } from '@/lib/client/api'
 import { useSignRelayed } from '@/lib/client/sign'
+import { HANDLE_PATTERN } from '@/lib/handles'
 import type {
+  CashoutQuote,
+  CashoutView,
   ChartRange,
+  CompanyProfile,
   FundBuyOrder,
   FundCardView,
   FundFeeQuote,
@@ -10,6 +14,7 @@ import type {
   FundView,
   GiftFeeQuote,
   GiftView,
+  HoldingDetail,
   NotificationSettings,
   NotificationView,
   Portfolio,
@@ -29,6 +34,7 @@ export type GiftBox = 'received' | 'sent'
 export const queryKeys = {
   profile: (walletAddress: string | null) => ['profile', walletAddress] as const,
   portfolio: () => ['portfolio'] as const,
+  holding: (mint: string) => ['holding', mint] as const,
   gifts: (box?: GiftBox) => (box ? (['gifts', box] as const) : (['gifts'] as const)),
   gift: (giftId: string, viewerId?: string | null) =>
     viewerId === undefined ? (['gift', giftId] as const) : (['gift', giftId, viewerId] as const),
@@ -37,6 +43,7 @@ export const queryKeys = {
     ['gift-fee', [...recipients].sort().join(','), [...mints].sort().join(',')] as const,
   handle: (handle: string) => ['handle', handle] as const,
   stocks: () => ['stocks'] as const,
+  stockProfile: (mint: string) => ['stock-profile', mint] as const,
   funds: () => ['funds'] as const,
   fund: (fundId: string, viewerId?: string | null) =>
     viewerId === undefined ? (['fund', fundId] as const) : (['fund', fundId, viewerId] as const),
@@ -47,11 +54,11 @@ export const queryKeys = {
   notificationFeed: () => ['notification-feed'] as const,
   tradeQuote: ({ side, mint, amountRaw }: TradeQuoteParams) =>
     ['trade-quote', side, mint, amountRaw] as const,
+  cashoutQuote: (destination: string, amountRaw: string) =>
+    ['cashout-quote', destination, amountRaw] as const,
 }
 
 type Options = { enabled?: boolean }
-
-const HANDLE_PATTERN = /^[a-z0-9_]{3,20}$/
 
 // Queries
 
@@ -77,6 +84,16 @@ export function usePortfolioQuery({
     enabled,
     refetchInterval: watch ? 10_000 : false,
     queryFn: () => api<Portfolio>('/api/portfolio'),
+  })
+}
+
+/** One stock someone owns, for the screen that shows just that position */
+export function useHoldingQuery(mint: string, { enabled = true }: Options = {}) {
+  const api = useApi()
+  return useQuery({
+    queryKey: queryKeys.holding(mint),
+    enabled: enabled && Boolean(mint),
+    queryFn: () => api<HoldingDetail>(`/api/holdings/${encodeURIComponent(mint)}`),
   })
 }
 
@@ -639,6 +656,21 @@ export function useTradeMutation() {
 }
 
 /** Short ranges refresh often; long ranges barely move, and the data source is rate-limited */
+/** What the company does. Static text, so it never needs refetching in a session */
+export function useStockProfileQuery(mint: string, { enabled = true }: Options = {}) {
+  const api = useApi()
+  return useQuery({
+    queryKey: queryKeys.stockProfile(mint),
+    enabled: enabled && Boolean(mint),
+    staleTime: Number.POSITIVE_INFINITY,
+    retry: false,
+    queryFn: () =>
+      api<{ profile: CompanyProfile | null }>(
+        `/api/stocks/${encodeURIComponent(mint)}/profile`,
+      ).then((data) => data.profile),
+  })
+}
+
 export function usePriceChartQuery(mint: string, range: ChartRange) {
   const api = useApi()
   const intraday = range === '1D' || range === '3D'
@@ -649,5 +681,54 @@ export function usePriceChartQuery(mint: string, range: ChartRange) {
     staleTime: intraday ? 60_000 : 10 * 60_000,
     refetchInterval: range === '1D' ? 60_000 : false,
     queryFn: () => api<PriceChart>(`/api/stocks/${encodeURIComponent(mint)}/chart?range=${range}`),
+  })
+}
+
+// Cashing out
+
+/**
+ * What sending this much to this address would cost. Address mistakes come back as an error here,
+ * which is why it's quoted while people type rather than only on the review screen.
+ */
+export function useCashoutQuoteQuery(
+  destination: string,
+  amountRaw: string,
+  { enabled = true }: Options = {},
+) {
+  const api = useApi()
+  return useQuery({
+    queryKey: queryKeys.cashoutQuote(destination, amountRaw),
+    enabled: enabled && destination.length >= 32 && BigInt(amountRaw || '0') > 0n,
+    retry: false,
+    queryFn: () =>
+      api<CashoutQuote>('/api/cashouts/quote', {
+        method: 'POST',
+        body: { destination, amountRaw },
+      }),
+  })
+}
+
+/** The server builds and pays for the transfer, the user signs it, the server sends it */
+export function useCashoutMutation() {
+  const api = useApi()
+  const sign = useSignRelayed()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { destination: string; amountRaw: string }): Promise<CashoutView> => {
+      const built = await api<{ cashout: CashoutView; transaction: string }>('/api/cashouts', {
+        method: 'POST',
+        body: input,
+      })
+      const { cashout } = await api<{ cashout: CashoutView }>('/api/cashouts/submit', {
+        method: 'POST',
+        body: { cashoutId: built.cashout.id, transaction: await sign(built.transaction) },
+      })
+      return cashout
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.portfolio() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.stocks() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.notificationFeed() })
+    },
   })
 }

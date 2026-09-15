@@ -47,7 +47,7 @@ export function EmailLogin({ intro }: { intro?: string }) {
 
   if (step === 'email') {
     return (
-      <form onSubmit={requestCode} className="flex flex-1 flex-col gap-7">
+      <form onSubmit={requestCode} className="flex flex-1 flex-col gap-7 mt-3">
         <div className="flex flex-col gap-2">
           <h1 className="font-sans text-[30px] leading-[1.12] font-medium tracking-[-0.02em]">
             What’s your email?
@@ -88,7 +88,7 @@ export function EmailLogin({ intro }: { intro?: string }) {
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-7">
+    <div className="flex flex-1 flex-col gap-7 mt-3">
       <div className="flex flex-col gap-2">
         <h1 className="font-sans text-[30px] leading-[1.12] font-medium tracking-[-0.02em]">
           Enter the code
