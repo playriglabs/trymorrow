@@ -2,8 +2,9 @@ import { CRON_SECRET } from 'astro:env/server'
 import { findGiftAddress, type RefundGiftParams, refundGiftInstruction } from '@morrow/sdk'
 import { PublicKey } from '@solana/web3.js'
 import { findStock } from '@/lib/server/catalog'
-import { GIFT_COLUMNS, type GiftRow } from '@/lib/server/gifts'
+import { GIFT_COLUMNS, type GiftRow, giftLabel } from '@/lib/server/gifts'
 import { json, route, unauthorized } from '@/lib/server/http'
+import { notify } from '@/lib/server/notify'
 import { connection, relayer, sendRelayedTransaction, signRelayed } from '@/lib/server/solana'
 import { db } from '@/lib/server/supabase'
 
@@ -79,6 +80,22 @@ export const GET = route(async ({ request }) => {
         .eq('id', gift.id)
       if (updateError) throw updateError
       summary.refunded++
+
+      // The shares are already back; a failed notification must not retry the refund
+      try {
+        await notify([
+          {
+            userId: gift.sender_id,
+            kind: 'gift_returned',
+            title: `${await giftLabel(gift)} came back to you`,
+            body: 'It wasn’t opened in 30 days, so the shares are yours again.',
+            giftId: gift.id,
+            url: `/gift/${gift.id}`,
+          },
+        ])
+      } catch (notifyError) {
+        console.error('Refund notification failed', gift.id, notifyError)
+      }
     } catch (cause) {
       console.error('Refunding expired gift failed', gift.id, cause)
       summary.failed++

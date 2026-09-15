@@ -3,8 +3,9 @@ import { PublicKey } from '@solana/web3.js'
 import { z } from 'astro/zod'
 import { findStock } from '@/lib/server/catalog'
 import { isFeeTransfer } from '@/lib/server/fees'
-import { GIFT_COLUMNS, type GiftRow, getGift, toGiftView } from '@/lib/server/gifts'
+import { GIFT_COLUMNS, type GiftRow, getGift, giftLabel, toGiftView } from '@/lib/server/gifts'
 import { badRequest, forbidden, json, readBody, route } from '@/lib/server/http'
+import { type NotificationInput, notify } from '@/lib/server/notify'
 import {
   morrowActions,
   morrowInstructionCount,
@@ -80,5 +81,49 @@ export const POST = route(async ({ params, request }) => {
     .select(GIFT_COLUMNS)
     .single()
   if (error) throw error
-  return json({ gift: await toGiftView(data as GiftRow, viewer) })
+
+  const sent = data as GiftRow
+  // The gift is on-chain by now, so nothing here may fail the request
+  try {
+    const label = await giftLabel(sent)
+    const rows: NotificationInput[] =
+      action === 'createGift'
+        ? [
+            {
+              userId: sent.sender_id,
+              kind: 'gift_sent',
+              title: `You sent ${label}`,
+              body: 'They have 30 days to open it, or it comes back to you.',
+              giftId: sent.id,
+              url: `/gift/${sent.id}`,
+            },
+            ...(sent.recipient_id
+              ? [
+                  {
+                    userId: sent.recipient_id,
+                    kind: 'gift_received' as const,
+                    title: `${viewer.name ?? 'Someone'} sent you ${label}`,
+                    body: 'Open it to keep the shares.',
+                    giftId: sent.id,
+                    url: `/gift/${sent.id}`,
+                  },
+                ]
+              : []),
+          ]
+        : [
+            {
+              userId: sent.sender_id,
+              kind: 'gift_opened',
+              title: `${viewer.name ?? 'They'} opened your gift`,
+              body: label,
+              giftId: sent.id,
+              url: `/gift/${sent.id}`,
+            },
+          ]
+    await notify(rows)
+  } catch (notifyError) {
+    console.error('Gift notification failed', notifyError)
+  }
+
+  return json({ gift: await toGiftView(sent, viewer) })
 })

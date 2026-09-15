@@ -2,6 +2,7 @@ import { PublicKey } from '@solana/web3.js'
 import { z } from 'astro/zod'
 import { badRequest, forbidden, HttpError, json, readBody, route } from '@/lib/server/http'
 import { connection, tokenBalance } from '@/lib/server/solana'
+import { db } from '@/lib/server/supabase'
 import {
   assertFairPrice,
   assertTradeTransaction,
@@ -58,5 +59,19 @@ export const POST = route(async ({ request }) => {
   }
 
   assertTradeTransaction(order.transaction, wallet, { gasless: order.gasless })
+
+  // The submit handler turns this into a cost-basis fill once Jupiter confirms the landing
+  db.from('pending_trades')
+    .upsert({
+      request_id: order.requestId,
+      wallet: wallet.toBase58(),
+      side: body.side,
+      mint: body.mint,
+    })
+    .then(
+      () => undefined,
+      () => undefined,
+    )
+
   return json({ transaction: order.transaction, requestId: order.requestId, quote: view })
 })
