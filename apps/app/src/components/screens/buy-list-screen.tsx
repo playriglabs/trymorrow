@@ -1,9 +1,10 @@
-import { Search } from 'lucide-react'
+import { MagnifyingGlassIcon } from '@phosphor-icons/react'
+import clsx from 'clsx'
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { ChangePill } from '@/components/change-pill'
 import { withProviders } from '@/components/providers'
 import { StockLogo } from '@/components/stock-logo'
-import { Card, cx, Loading, Notice, Screen } from '@/components/ui'
+import { Card, Loading, Notice, Screen } from '@/components/ui'
 import { STOCK_CATEGORIES, type StockCategory } from '@/lib/categories'
 import { errorMessage } from '@/lib/client/api'
 import { useStocksQuery } from '@/lib/client/queries'
@@ -85,7 +86,7 @@ function BuyList() {
   return (
     <Screen title="Buy stocks" back="/">
       <label className="flex h-12 items-center gap-2.5 rounded-button border border-line bg-surface px-3.5 focus-within:border-orange focus-within:ring-4 focus-within:ring-orange-wash">
-        <Search className="size-[18px] shrink-0 text-steel" strokeWidth={1.75} />
+        <MagnifyingGlassIcon className="size-4.5 shrink-0 text-steel" />
         <span className="sr-only">Search stocks</span>
         <input
           type="search"
@@ -99,17 +100,18 @@ function BuyList() {
         />
       </label>
 
-      <div className="-mx-5 -mt-2 flex gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="scrollbar-none -mx-5 -mt-2 flex gap-2 overflow-x-auto px-5 pb-1 [&::-webkit-scrollbar]:hidden">
         {[{ id: 'all' as const, label: 'All' }, ...STOCK_CATEGORIES].map((option) => (
           <button
             key={option.id}
             type="button"
             onClick={() => chooseCategory(option.id)}
-            className={cx(
+            className={clsx(
               'h-10 shrink-0 rounded-link border px-4 font-sans text-[14px] font-medium whitespace-nowrap',
-              category === option.id
-                ? 'border-orange bg-orange-wash text-ink'
-                : 'border-line bg-surface text-stone',
+              {
+                'border-orange bg-orange-wash text-ink': category === option.id,
+                'border-line bg-surface text-stone': category !== option.id,
+              },
             )}
           >
             {option.label}
@@ -128,12 +130,11 @@ function BuyList() {
                   type="button"
                   aria-pressed={moverTab === option}
                   onClick={() => setMoverTab(option)}
-                  className={cx(
-                    'h-8 rounded-link px-3 font-sans text-[13px] font-medium',
-                    moverTab !== option && 'text-stone',
-                    moverTab === option && option === 'gainers' && 'bg-gain-wash text-gain',
-                    moverTab === option && option === 'losers' && 'bg-loss-wash text-loss',
-                  )}
+                  className={clsx('h-8 rounded-link px-3 font-sans text-[13px] font-medium', {
+                    'text-stone': moverTab !== option,
+                    'bg-gain-wash text-gain': moverTab === option && option === 'gainers',
+                    'bg-loss-wash text-loss': moverTab === option && option === 'losers',
+                  })}
                 >
                   {option === 'gainers' ? 'Gainers' : 'Losers'}
                 </button>
@@ -148,12 +149,12 @@ function BuyList() {
                 : 'Nothing is down today in this category.'}
             </p>
           ) : (
-            <ol className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <ol className="scrollbar-none -mx-5 flex gap-2 overflow-x-auto px-5 pb-1 [&::-webkit-scrollbar]:hidden">
               {movers[moverTab].map((stock, index) => (
                 <li key={stock.mint} className="shrink-0">
                   <a
                     href={tradeHref(stock.ticker)}
-                    className="flex w-[168px] flex-col gap-3.5 rounded-card border border-line bg-surface p-4 shadow-elevated"
+                    className="flex w-42 flex-col gap-3.5 rounded-card border border-line bg-surface p-4 shadow-elevated"
                   >
                     <div className="flex items-center justify-between">
                       <StockLogo iconUrl={stock.iconUrl} ticker={stock.ticker} size={40} />
@@ -196,7 +197,7 @@ function BuyList() {
             <a
               key={stock.mint}
               href={tradeHref(stock.ticker)}
-              className="flex h-[68px] items-center gap-3"
+              className="flex h-17 items-center gap-3"
             >
               <StockLogo iconUrl={stock.iconUrl} ticker={stock.ticker} />
               <div className="flex min-w-0 flex-1 flex-col">

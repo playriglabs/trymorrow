@@ -1,0 +1,40 @@
+---
+import FundScreen from '@/components/screens/fund-screen'
+import AppLayout from '@/layouts/app-layout.astro'
+import { formatUnlock } from '@/lib/funds'
+import { findStock } from '@/lib/server/catalog'
+import { db } from '@/lib/server/supabase'
+
+// Rendered on the server so a fund link shared in a family chat shows what it is
+const { id = '' } = Astro.params
+const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+
+const { data: fund } = isUuid
+  ? await db
+      .from('funds')
+      .select('name, status, beneficiary_name, unlock_at, allocations, creator_id')
+      .eq('id', id)
+      .maybeSingle()
+  : { data: null }
+
+const mints = Object.keys((fund?.allocations ?? {}) as Record<string, number>)
+const [{ data: creator }, stocks] = fund
+  ? await Promise.all([
+      db.from('users').select('name').eq('id', fund.creator_id).maybeSingle(),
+      Promise.all(mints.map((mint) => findStock(mint))),
+    ])
+  : [{ data: null }, []]
+
+const found = Boolean(fund && fund.status !== 'draft')
+if (!found) Astro.response.status = 404
+
+const name = fund?.name ?? `${fund?.beneficiary_name ?? 'A'}’s fund`
+const title = found ? `${name} · Morrow` : 'Fund not found · Morrow'
+const description = found
+  ? `${creator?.name ?? 'Someone'} started a fund for ${fund?.beneficiary_name}. Add to it, and it stays locked until ${formatUnlock(fund?.unlock_at ?? '')}.`
+  : 'This fund link doesn’t exist.'
+---
+
+<AppLayout title={title} description={description} image={stocks[0]?.iconUrl}>
+  <FundScreen client:only="react" fundId={id} />
+</AppLayout>

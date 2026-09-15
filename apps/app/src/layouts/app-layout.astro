@@ -41,5 +41,12 @@ const url = new URL(Astro.url.pathname, PUBLIC_APP_URL).href
     <main class="mx-auto flex min-h-dvh w-full max-w-107.5 flex-col">
       <slot />
     </main>
+    <script is:inline>
+      // The offline shell and phone notifications both live in the worker; a page that can't
+      // register one still works, it just has neither
+      if ('serviceWorker' in navigator) {
+        addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}))
+      }
+    </script>
   </body>
 </html>

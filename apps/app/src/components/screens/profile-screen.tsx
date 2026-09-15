@@ -1,4 +1,11 @@
-import { ChevronRight, CircleHelp, Copy, LogOut, Wallet } from 'lucide-react'
+import {
+  CaretRightIcon,
+  CopyIcon,
+  GiftIcon,
+  QuestionIcon,
+  SignOutIcon,
+  WalletIcon,
+} from '@phosphor-icons/react'
 import { useState } from 'react'
 import { AvatarPicker } from '@/components/avatar-picker'
 import { withProviders } from '@/components/providers'
@@ -16,7 +23,7 @@ function ProfilePage() {
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <div className="flex flex-1 flex-col gap-[22px] px-5 pt-4 pb-4">
+      <div className="flex flex-1 flex-col gap-5.5 px-5 pt-4 pb-4">
         <h1 className="flex h-11 items-center font-sans text-[22px] font-medium tracking-[-0.02em]">
           Profile
         </h1>
@@ -43,21 +50,26 @@ function ProfilePage() {
                 .then(() => setCopied(true))
             }
           >
-            <Copy className="size-4" strokeWidth={1.75} />
+            <CopyIcon className="size-4" />
             {copied ? 'Copied' : 'Copy'}
           </Button>
         </Card>
 
         <Card className="flex flex-col divide-y divide-line px-4">
-          <a href="/add-cash" className="flex h-[52px] items-center gap-3">
-            <Wallet className="size-5" strokeWidth={1.75} />
-            <span className="flex-1">Add cash</span>
-            <ChevronRight className="size-[18px] text-steel" strokeWidth={1.75} />
+          <a href="/ask" className="flex h-13 items-center gap-3">
+            <GiftIcon className="size-5" />
+            <span className="flex-1">Ask for a gift</span>
+            <CaretRightIcon className="size-4.5 text-steel" />
           </a>
-          <a href="mailto:help@morrow.fi" className="flex h-[52px] items-center gap-3">
-            <CircleHelp className="size-5" strokeWidth={1.75} />
+          <a href="/add-cash" className="flex h-13 items-center gap-3">
+            <WalletIcon className="size-5" />
+            <span className="flex-1">Add cash</span>
+            <CaretRightIcon className="size-4.5 text-steel" />
+          </a>
+          <a href="mailto:help@morrow.fi" className="flex h-13 items-center gap-3">
+            <QuestionIcon className="size-5" />
             <span className="flex-1">Help</span>
-            <ChevronRight className="size-[18px] text-steel" strokeWidth={1.75} />
+            <CaretRightIcon className="size-4.5 text-steel" />
           </a>
         </Card>
 
@@ -66,7 +78,7 @@ function ProfilePage() {
           size="sm"
           onClick={() => session.logout().then(() => location.replace('/login'))}
         >
-          <LogOut className="size-4" strokeWidth={1.75} />
+          <SignOutIcon className="size-4" />
           Sign out
         </Button>
       </div>

@@ -1,8 +1,9 @@
-import { Check, ChevronDown, ShieldCheck } from 'lucide-react'
+import { CaretDownIcon, CheckIcon, ShieldCheckIcon } from '@phosphor-icons/react'
+import clsx from 'clsx'
 import { type ReactNode, useEffect, useState } from 'react'
 import { AvatarPicker } from '@/components/avatar-picker'
 import { withProviders } from '@/components/providers'
-import { Button, cx, Label, Loading, Notice, Screen, TextInput } from '@/components/ui'
+import { Button, Label, Loading, Notice, Screen, TextInput } from '@/components/ui'
 import { errorMessage } from '@/lib/client/api'
 import {
   type ProfileUpdate,
@@ -43,7 +44,12 @@ function Steps({ current }: { current: 1 | 2 }) {
     <div className="flex items-center gap-3">
       <div className="grid w-full grid-cols-2 gap-1.5">
         <span className="h-1 rounded-full bg-orange" />
-        <span className={cx('h-1 rounded-full', current === 2 ? 'bg-orange' : 'bg-line')} />
+        <span
+          className={clsx('h-1 rounded-full', {
+            'bg-orange': current === 2,
+            'bg-line': current !== 2,
+          })}
+        />
       </div>
       <span className="shrink-0 text-[13px] text-stone">{current} of 2</span>
     </div>
@@ -68,12 +74,15 @@ function Checkbox({
         onChange={(e) => onChange(e.target.checked)}
       />
       <span
-        className={cx(
+        className={clsx(
           'flex size-6 shrink-0 items-center justify-center rounded-[7px] border peer-focus-visible:ring-4 peer-focus-visible:ring-orange-wash',
-          checked ? 'border-orange bg-orange text-white' : 'border-line bg-surface',
+          {
+            'border-orange bg-orange text-white': checked,
+            'border-line bg-surface': !checked,
+          },
         )}
       >
-        {checked && <Check className="size-4" strokeWidth={2.5} />}
+        {checked && <CheckIcon className="size-4" />}
       </span>
       <span className="text-[15px] leading-[1.45]">{children}</span>
     </label>
@@ -156,9 +165,8 @@ function Onboarding() {
                 </option>
               ))}
             </select>
-            <ChevronDown
+            <CaretDownIcon
               aria-hidden
-              strokeWidth={1.75}
               className="pointer-events-none absolute top-1/2 right-4 size-5 -translate-y-1/2 text-stone"
             />
           </div>
@@ -183,7 +191,7 @@ function Onboarding() {
             </Checkbox>
           </div>
         )}
-        <Notice icon={<ShieldCheck className="size-[18px] text-stone" strokeWidth={1.75} />}>
+        <Notice icon={<ShieldCheckIcon className="size-4.5 text-stone" />}>
           No ID or selfie needed. Your account and your money stay in your control.
         </Notice>
         {error && <p className="text-[13px] text-loss">{error}</p>}
@@ -254,12 +262,12 @@ function Onboarding() {
         )}
         {availability.data && (
           <p
-            className={cx(
-              'flex items-center gap-1.5 text-[13px]',
-              handleReady ? 'text-gain' : 'text-loss',
-            )}
+            className={clsx('flex items-center gap-1.5 text-[13px]', {
+              'text-gain': handleReady,
+              'text-loss': !handleReady,
+            })}
           >
-            {handleReady && <Check className="size-3.5" strokeWidth={2.5} />}
+            {handleReady && <CheckIcon className="size-3.5" />}
             {handleReady ? 'Available' : 'Taken. Try another.'}
           </p>
         )}

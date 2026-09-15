@@ -1,4 +1,4 @@
-import { AlertTriangle, Copy, Share2 } from 'lucide-react'
+import { CopyIcon, ShareIcon, WarningIcon } from '@phosphor-icons/react'
 import { useEffect, useRef, useState } from 'react'
 import { withProviders } from '@/components/providers'
 import { QrCode } from '@/components/qr-code'
@@ -37,10 +37,7 @@ function AddCash() {
 
   return (
     <Screen title="Add cash" back="/">
-      <Notice
-        tone="warning"
-        icon={<AlertTriangle className="size-4.5 text-loss" strokeWidth={1.75} />}
-      >
+      <Notice tone="warning" icon={<WarningIcon className="size-4.5 text-loss" />}>
         Send only <b className="font-medium">USDC</b> on the <b className="font-medium">Solana</b>{' '}
         network. Anything else, or another network, can be lost for good.
       </Notice>
@@ -58,7 +55,7 @@ function AddCash() {
             size="sm"
             onClick={() => navigator.clipboard.writeText(address).then(() => setCopied(true))}
           >
-            <Copy className="size-4" strokeWidth={1.75} />
+            <CopyIcon className="size-4" />
             {copied ? 'Copied' : 'Copy address'}
           </Button>
           <Button
@@ -66,8 +63,8 @@ function AddCash() {
             size="sm"
             onClick={() => navigator.share?.({ text: address }).catch(() => {})}
           >
-            <Share2 className="size-4" strokeWidth={1.75} />
-            Share
+            <ShareIcon className="size-4" />
+            ShareIcon
           </Button>
         </div>
       </Card>

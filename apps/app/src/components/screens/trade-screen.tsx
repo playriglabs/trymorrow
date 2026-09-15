@@ -1,11 +1,13 @@
-import { ShieldCheck, TriangleAlert } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { ShieldCheckIcon, WarningIcon } from '@phosphor-icons/react'
+import clsx from 'clsx'
+import { useEffect, useRef, useState } from 'react'
+import { match, P } from 'ts-pattern'
 import { PriceChart } from '@/components/price-chart'
 import { withProviders } from '@/components/providers'
 import { StockLogo } from '@/components/stock-logo'
 import { SuccessMark } from '@/components/success-mark'
 import { TradeShareCard } from '@/components/trade-share-card'
-import { Button, Card, cx, LinkButton, Loading, Notice, Screen } from '@/components/ui'
+import { Button, Card, LinkButton, Loading, Notice, Screen } from '@/components/ui'
 import { errorMessage } from '@/lib/client/api'
 import { useDebounced } from '@/lib/client/debounce'
 import { useStocksQuery, useTradeMutation, useTradeQuoteQuery } from '@/lib/client/queries'
@@ -57,14 +59,13 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
       : 0n
   const sellingTooMuch = side === 'sell' && sellPercent == null && sellRawFromUsd > ownedRaw
 
-  const amountRaw =
-    side === 'buy'
-      ? BigInt(Math.round(amountUsd * USDC_UNITS))
-      : sellPercent != null
-        ? (ownedRaw * BigInt(sellPercent)) / 100n
-        : sellRawFromUsd > ownedRaw
-          ? ownedRaw
-          : sellRawFromUsd
+  const amountRaw = match({ side, sellPercent, sellRawFromUsd })
+    .with({ side: 'buy' }, () => BigInt(Math.round(amountUsd * USDC_UNITS)))
+    .with(
+      { sellPercent: P.nonNullable },
+      ({ sellPercent: percent }) => (ownedRaw * BigInt(percent)) / 100n,
+    )
+    .otherwise(({ sellRawFromUsd: raw }) => (raw > ownedRaw ? ownedRaw : raw))
 
   const hasEnough =
     side === 'buy'
@@ -88,6 +89,16 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
     if (stocks.data && side === 'sell' && ownedRaw === 0n) setSide('buy')
   }, [stocks.data, side, ownedRaw])
 
+  // Arriving on ?side=sell means selling this position, so start at all of it. The balance
+  // only lands with the stocks query, hence the effect rather than an initial value.
+  const startedOnSell = useRef(initialSide !== 'sell')
+  useEffect(() => {
+    if (startedOnSell.current || !stock || ownedRaw === 0n) return
+    startedOnSell.current = true
+    setSellPercent(100)
+    setAmountText(stock.ownedValueUsd != null ? stock.ownedValueUsd.toFixed(2) : '')
+  }, [stock, ownedRaw])
+
   if (!session.ready || stocks.isPending) return <Loading />
 
   if (!stock) {
@@ -106,14 +117,19 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
     return (
       <Screen
         footer={
-          <>
+          <div
+            className={clsx('grid gap-2', {
+              'grid-cols-2': bought,
+              'grid-cols-1': !bought,
+            })}
+          >
             {bought && (
               <LinkButton href="/send" variant="soft" size="md">
                 Gift some
               </LinkButton>
             )}
             <LinkButton href="/">Done</LinkButton>
-          </>
+          </div>
         }
       >
         <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
@@ -151,7 +167,10 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
               mint={result.mint}
               name={result.name}
               ticker={result.ticker}
+              pricePerShareUsd={result.pricePerShareUsd}
+              shares={result.shares}
               changePct={stock.lowLiquidity ? null : stock.change24hPct}
+              handle={session.profile?.handle ?? null}
             />
           )}
         </div>
@@ -167,6 +186,24 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
     (buying ? deviation <= FAIR_PRICE_LIMIT_PCT : deviation >= -FAIR_PRICE_LIMIT_PCT)
 
   if (stage === 'review' && current) {
+    const priceNotice = match(deviation)
+      .with(null, () => null)
+      .when(
+        () => fair,
+        () => (
+          <Notice tone="success" icon={<ShieldCheckIcon className="size-4.5 text-gain" />}>
+            <span className="font-medium text-gain">Fair price check passed.</span> Before fees,
+            this price is within {FAIR_PRICE_LIMIT_PCT}% of the market price.
+          </Notice>
+        ),
+      )
+      .otherwise((value) => (
+        <Notice tone="warning" icon={<WarningIcon className="size-4.5 text-loss" />}>
+          This price is {Math.abs(value).toFixed(1)}% off the market, so we won’t place it. Try
+          again in a bit.
+        </Notice>
+      ))
+
     return (
       <Screen
         title="Review"
@@ -226,23 +263,7 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
           <Row label="Fees" value={`${current.feePct.toFixed(1)}%, already included`} />
         </Card>
 
-        {deviation == null ? null : fair ? (
-          <Notice
-            tone="success"
-            icon={<ShieldCheck className="size-[18px] text-gain" strokeWidth={1.75} />}
-          >
-            <span className="font-medium text-gain">Fair price check passed.</span> Before fees,
-            this price is within {FAIR_PRICE_LIMIT_PCT}% of the market price.
-          </Notice>
-        ) : (
-          <Notice
-            tone="warning"
-            icon={<TriangleAlert className="size-[18px] text-loss" strokeWidth={1.75} />}
-          >
-            This price is {Math.abs(deviation).toFixed(1)}% off the market, so we won’t place it.
-            Try again in a bit.
-          </Notice>
-        )}
+        {priceNotice}
       </Screen>
     )
   }
@@ -272,16 +293,24 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
     hint = { text: `You have about ${formatUsd(stock.ownedValueUsd)} to sell.`, tone: 'error' }
   }
 
-  const estimate =
-    amountRaw === 0n
-      ? ' '
-      : !settled || (quote.isFetching && !current)
-        ? 'Getting the price…'
-        : current
-          ? buying
-            ? `≈ ${formatShares(current.shares)} shares`
-            : `≈ ${formatShares(current.shares)} shares for about ${formatUsd(current.cashUsd)}`
-          : ' '
+  const estimate = match({
+    amountRaw,
+    loading: !settled || (quote.isFetching && !current),
+    current,
+    buying,
+  })
+    .with({ amountRaw: 0n }, () => ' ')
+    .with({ loading: true }, () => 'Getting the price…')
+    .with(
+      { current: P.nonNullable, buying: true },
+      ({ current: quote }) => `≈ ${formatShares(quote.shares)} shares`,
+    )
+    .with(
+      { current: P.nonNullable },
+      ({ current: quote }) =>
+        `≈ ${formatShares(quote.shares)} shares for about ${formatUsd(quote.cashUsd)}`,
+    )
+    .otherwise(() => ' ')
 
   return (
     <Screen
@@ -320,9 +349,12 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
             type="button"
             disabled={option === 'sell' && ownedRaw === 0n}
             onClick={() => switchSide(option)}
-            className={cx(
+            className={clsx(
               'h-10 rounded-link font-sans text-[15px] font-medium capitalize disabled:opacity-40',
-              side === option ? 'bg-orange-wash text-ink' : 'text-stone',
+              {
+                'bg-orange-wash text-ink': side === option,
+                'text-stone': side !== option,
+              },
             )}
           >
             {option}
@@ -335,7 +367,7 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
           htmlFor="trade-amount"
           className="flex max-w-full items-baseline justify-center font-sans text-[60px] leading-[1.05] font-medium tracking-[-0.02em] tabular-nums"
         >
-          <span className={cx(!amountText && 'text-steel')}>$</span>
+          <span className={clsx({ 'text-steel': !amountText })}>$</span>
           <span className="sr-only">
             {buying ? 'Amount to buy in dollars' : 'Amount to sell in dollars'}
           </span>
@@ -351,34 +383,59 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
               setAmountText(next)
               if (!buying) setSellPercent(null)
             }}
-            style={{ width: `${Math.max(1, amountText.length) + 0.3}ch` }}
-            className="min-w-[1ch] bg-transparent text-ink outline-none placeholder:text-steel"
+            style={{
+              // Width hugs the text: digits are 1ch (tabular), the dot ~0.32ch
+              width: `${
+                Math.max(
+                  1,
+                  [...amountText].reduce((w, c) => w + (c === '.' ? 0.32 : 1), 0),
+                ) + 0.1
+              }ch`,
+            }}
+            className="min-w-[1ch] bg-transparent text-center text-ink outline-none placeholder:text-steel"
           />
         </label>
         <span className="text-[14px] text-stone">{estimate}</span>
         {hint && (
-          <span className={cx('text-[13px]', hint.tone === 'error' ? 'text-loss' : 'text-stone')}>
+          <span
+            className={clsx('text-[13px]', {
+              'text-loss': hint.tone === 'error',
+              'text-stone': hint.tone !== 'error',
+            })}
+          >
             {hint.text}
           </span>
         )}
       </div>
 
-      <div className={cx('-mt-2 grid gap-2', buying ? 'grid-cols-4' : 'grid-cols-3')}>
+      <div
+        className={clsx('-mt-2 grid gap-2', {
+          'grid-cols-4': buying,
+          'grid-cols-3': !buying,
+        })}
+      >
         {presets.map((value) => {
           const selected = buying
             ? sellPercent == null && amountUsd === value
             : sellPercent === value
+          const label = match({ buying, value })
+            .with({ buying: true }, ({ value }) => `$${value}`)
+            .with({ value: 100 }, () => 'All')
+            .otherwise(({ value }) => `${value}%`)
           return (
             <button
               key={value}
               type="button"
-              onClick={() => (buying ? setAmountText(String(value)) : pickSellPercent(value))}
-              className={cx(
-                'h-11 rounded-button border font-sans text-[15px] font-medium',
-                selected ? 'border-orange bg-orange-wash' : 'border-line bg-surface',
-              )}
+              onClick={() => {
+                if (buying) setAmountText(String(value))
+                else pickSellPercent(value)
+              }}
+              className={clsx('h-11 rounded-button border font-sans text-[15px] font-medium', {
+                'border-orange bg-orange-wash': selected,
+                'border-line bg-surface': !selected,
+              })}
             >
-              {buying ? `$${value}` : value === 100 ? 'All' : `${value}%`}
+              {label}
             </button>
           )
         })}
@@ -388,7 +445,12 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
         <Card className="flex items-center gap-3 py-3.5 pr-3.5 pl-4">
           <div className="flex flex-1 flex-col">
             <span>Pay with cash</span>
-            <span className={cx('text-[13px]', cashRaw >= amountRaw ? 'text-stone' : 'text-loss')}>
+            <span
+              className={clsx('text-[13px]', {
+                'text-stone': cashRaw >= amountRaw,
+                'text-loss': cashRaw < amountRaw,
+              })}
+            >
               {formatUsd(stocks.data?.cashUsd ?? 0)} available
               {cashRaw >= amountRaw ? '' : ' · not enough'}
             </span>

@@ -1,8 +1,10 @@
 ---
 import AppLayout from '@/layouts/app-layout.astro'
+import { findStockByTicker } from '@/lib/server/catalog'
 import { avatarUrl, db } from '@/lib/server/supabase'
 
-// Public gift link: morrow.fi/maya
+// Public gift link: morrow.fi/maya, optionally carrying an ask from /ask:
+// morrow.fi/maya?stock=AAPLX&amount=25&note=Birthday
 const handle = (Astro.params.handle ?? '').toLowerCase()
 const valid = /^[a-z0-9_]{3,20}$/.test(handle)
 const { data: person } = valid
@@ -11,20 +13,46 @@ const { data: person } = valid
 if (!person) Astro.response.status = 404
 
 const name = person?.name ?? handle
+const firstName = name.split(' ')[0] ?? name
 const photo = avatarUrl(person?.avatar_path ?? null)
 const initials = name
   .split(/\s+/)
   .slice(0, 2)
   .map((part: string) => part[0]?.toUpperCase() ?? '')
   .join('')
+
+// The ask lives in the link, so there's nothing to store and nothing to abuse
+const askedTicker = Astro.url.searchParams.get('stock')
+const asked = person && askedTicker ? await findStockByTicker(askedTicker) : null
+const askedAmount = Number.parseFloat(Astro.url.searchParams.get('amount') ?? '')
+const amount = Number.isFinite(askedAmount) && askedAmount > 0 ? Math.min(askedAmount, 9999) : null
+const note = (Astro.url.searchParams.get('note') ?? '').trim().slice(0, 80)
+const money = amount == null ? null : `$${amount % 1 === 0 ? amount : amount.toFixed(2)}`
+
+const asking = Boolean(person && (asked || amount))
+const wish = [money, asked ? `of ${asked.name}` : null].filter(Boolean).join(' ')
+
+const sendParams = new URLSearchParams({ to: `@${handle}` })
+if (asked) sendParams.set('stock', asked.ticker)
+if (amount != null) sendParams.set('amount', String(amount))
 ---
 
 <AppLayout
-  title={person ? `Send ${name} a gift · Morrow` : 'Not found · Morrow'}
-  description={
-    person ? `Give ${name} a piece of a real company.` : 'No one has this gift link yet.'
+  title={
+    person
+      ? asking
+        ? `${firstName} would love ${wish} · Morrow`
+        : `Send ${name} a gift · Morrow`
+      : 'Not found · Morrow'
   }
-  image={photo ?? undefined}
+  description={
+    person
+      ? asking
+        ? `${firstName} is asking for ${wish} on Morrow.`
+        : `Give ${name} a piece of a real company.`
+      : 'No one has this gift link yet.'
+  }
+  image={asked?.iconUrl ?? photo ?? undefined}
 >
   <div class="flex flex-1 flex-col items-center justify-center gap-6 px-5 py-10 text-center">
     {person ? (
@@ -37,16 +65,29 @@ const initials = name
           </span>
         )}
         <div class="flex flex-col gap-1">
-          <h1 class="font-sans text-[30px] leading-[1.15] font-medium tracking-[-0.02em]">
-            {name}
+          <h1 class="font-sans text-[30px] leading-[1.15] font-medium tracking-[-0.02em] text-balance">
+            {asking ? `${firstName} would love ${wish}` : name}
           </h1>
           <p class="text-stone">@{person.handle}</p>
+          {note && <p class="text-stone">“{note}”</p>}
         </div>
+        {asked && (
+          <div class="flex items-center gap-3 rounded-card border border-line bg-surface px-4 py-3">
+            <img
+              src={asked.iconUrl}
+              alt=""
+              width="36"
+              height="36"
+              class="size-9 rounded-full border border-line object-cover"
+            />
+            <span class="text-left">${asked.ticker}</span>
+          </div>
+        )}
         <a
-          href={`/send?to=@${person.handle}`}
+          href={`/send?${sendParams.toString()}`}
           class="inline-flex h-14 w-full items-center justify-center rounded-button bg-orange px-5 font-sans text-[17px] font-medium text-white"
         >
-          Send {name.split(' ')[0]} a gift
+          {asking ? `Send it to ${firstName}` : `Send ${firstName} a gift`}
         </a>
       </>
     ) : (

@@ -1,27 +1,40 @@
-import { Bell, Gift, Plus, ShoppingBag } from 'lucide-react'
+import { BagIcon, BellIcon, GiftIcon, PaperPlaneTiltIcon, PlusIcon } from '@phosphor-icons/react'
+import clsx from 'clsx'
+import { FundCard } from '@/components/fund-card'
+import { InstallPrompt } from '@/components/install-prompt'
 import { withProviders } from '@/components/providers'
 import { StockLogo } from '@/components/stock-logo'
 import { TabBar } from '@/components/tab-bar'
-import { Avatar, Card, cx, LinkButton, Loading } from '@/components/ui'
-import { useGiftsQuery, usePortfolioQuery } from '@/lib/client/queries'
+import { Avatar, Card, LinkButton, Loading } from '@/components/ui'
+import { useAnimatedNumber } from '@/lib/client/animated-number'
+import {
+  useFundsQuery,
+  useGiftsQuery,
+  useNotificationsQuery,
+  usePortfolioQuery,
+} from '@/lib/client/queries'
 import { useSession } from '@/lib/client/session'
 import { formatShares, formatUsd } from '@/lib/format'
 import { giftAssetsLabel } from '@/lib/gifts'
 
 const STATUS_LABEL = { draft: 'Draft', pending: 'Waiting', claimed: 'Opened', refunded: 'Returned' }
 
-function Home() {
+function House() {
   const session = useSession()
   const enabled = session.ready
   const portfolio = usePortfolioQuery({ enabled })
   const received = useGiftsQuery('received', { enabled })
   const sent = useGiftsQuery('sent', { enabled })
+  const feed = useNotificationsQuery({ enabled })
+  const funds = useFundsQuery({ enabled })
+
+  const total = portfolio.data ? portfolio.data.cashUsd + portfolio.data.stocksUsd : null
+  const shownTotal = useAnimatedNumber(total)
 
   if (!session.ready || !session.profile) return <Loading />
 
   const toClaim = received.data?.filter((gift) => gift.status === 'pending') ?? []
   const stocks = portfolio.data?.holdings.filter((holding) => !holding.isCash) ?? []
-  const total = portfolio.data ? portfolio.data.cashUsd + portfolio.data.stocksUsd : null
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -32,9 +45,12 @@ function Home() {
             <a
               href="/notifications"
               aria-label="Notifications"
-              className="flex size-10 items-center justify-center rounded-full hover:bg-orange-wash"
+              className="relative flex size-10 items-center justify-center rounded-full hover:bg-orange-wash"
             >
-              <Bell className="size-[22px]" strokeWidth={1.75} />
+              <BellIcon className="size-5.5" />
+              {(feed.data?.unread ?? 0) > 0 && (
+                <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-orange" />
+              )}
             </a>
             <a href="/profile" aria-label="Profile">
               <Avatar name={session.profile.name} url={session.profile.avatarUrl} size={40} />
@@ -46,10 +62,10 @@ function Home() {
           <p className="text-[14px] text-stone">Your Morrow</p>
           <div className="flex items-center justify-between gap-3">
             <h1 className="font-sans text-[44px] leading-[1.05] font-medium tracking-[-0.02em]">
-              {portfolio.isPending ? '—' : formatUsd(total)}
+              {portfolio.isPending ? '—' : formatUsd(shownTotal)}
             </h1>
             <LinkButton href="/add-cash" variant="soft" size="sm">
-              <Plus className="size-4" strokeWidth={1.75} />
+              <PlusIcon className="size-4" />
               Add cash
             </LinkButton>
           </div>
@@ -63,12 +79,12 @@ function Home() {
 
         <div className="grid grid-cols-2 gap-2">
           <LinkButton href="/buy" variant="soft" size="md">
-            <ShoppingBag className="size-5" strokeWidth={1.75} />
+            <BagIcon className="size-5" />
             Buy stocks
           </LinkButton>
           <LinkButton href="/send" size="md">
-            <Gift className="size-5" strokeWidth={1.75} />
-            Send a gift
+            <GiftIcon className="size-5" />
+            Create a gift
           </LinkButton>
         </div>
 
@@ -95,6 +111,20 @@ function Home() {
           </section>
         )}
 
+        {(funds.data?.length ?? 0) > 0 && (
+          <section className="flex flex-col gap-3">
+            <div className="flex items-baseline justify-between">
+              <h2 className="font-sans text-lg font-medium tracking-[-0.02em]">Your funds</h2>
+              <a href="/funds" className="text-[14px] text-stone">
+                See all
+              </a>
+            </div>
+            {funds.data?.slice(0, 2).map((fund) => (
+              <FundCard key={fund.id} fund={fund} />
+            ))}
+          </section>
+        )}
+
         <section className="flex flex-col gap-3">
           <h2 className="font-sans text-lg font-medium tracking-[-0.02em]">Your stocks</h2>
           {stocks.length === 0 ? (
@@ -105,22 +135,48 @@ function Home() {
             </Card>
           ) : (
             <Card className="flex flex-col divide-y divide-line px-4">
-              {stocks.map((holding) => (
-                <a
-                  key={holding.mint}
-                  href={`/trade/${holding.ticker.toLowerCase()}`}
-                  className="flex items-center gap-3 py-3"
-                >
-                  <StockLogo iconUrl={holding.iconUrl} ticker={holding.ticker} size={40} />
-                  <div className="flex flex-1 flex-col">
-                    <span>{holding.name}</span>
-                    <span className="text-[13px] text-stone">
-                      {formatShares(holding.amount)} shares
-                    </span>
-                  </div>
-                  <span>{formatUsd(holding.valueUsd)}</span>
-                </a>
-              ))}
+              {stocks.map((holding) => {
+                const pnl =
+                  holding.costUsd != null && holding.valueUsd != null
+                    ? holding.valueUsd - holding.costUsd
+                    : null
+                const pnlPct =
+                  pnl != null && holding.costUsd && holding.costUsd > 0
+                    ? (pnl / holding.costUsd) * 100
+                    : null
+                return (
+                  <a
+                    key={holding.mint}
+                    href={`/trade/${holding.ticker.toLowerCase()}`}
+                    className="flex items-center gap-3 py-3"
+                  >
+                    <StockLogo iconUrl={holding.iconUrl} ticker={holding.ticker} size={40} />
+                    <div className="flex flex-1 flex-col">
+                      <span>{holding.name}</span>
+                      <span className="text-[13px] text-stone">
+                        {formatShares(holding.amount)} shares
+                      </span>
+                    </div>
+                    <div className="flex flex-col items-end">
+                      <span>{formatUsd(holding.valueUsd)}</span>
+                      {pnl != null && (
+                        <span
+                          // A flat +$0.00 is a non-event, not a gain: show it in stone
+                          className={clsx('text-[13px]', {
+                            'text-gain': pnl > 0,
+                            'text-loss': pnl < 0,
+                            'text-stone': pnl === 0,
+                          })}
+                        >
+                          {pnl > 0 ? '+' : ''}
+                          {formatUsd(pnl)}
+                          {pnlPct != null && ` (${pnlPct > 0 ? '+' : ''}${pnlPct.toFixed(0)}%)`}
+                        </span>
+                      )}
+                    </div>
+                  </a>
+                )
+              })}
             </Card>
           )}
         </section>
@@ -132,20 +188,21 @@ function Home() {
               {sent.data?.map((gift) => (
                 <a key={gift.id} href={`/gift/${gift.id}`} className="flex items-center gap-3 py-3">
                   <div className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate">
-                      {formatUsd(gift.usdValue)} of {giftAssetsLabel(gift.items)}
-                    </span>
+                    <div className="flex space-x-1 items-center">
+                      <PaperPlaneTiltIcon className="size-4 shrink-0" />
+                      <span className="truncate">
+                        {formatUsd(gift.usdValue)} of {giftAssetsLabel(gift.items)}
+                      </span>
+                    </div>
                     <span className="truncate text-[13px] text-stone">
                       To {gift.recipientLabel}
                     </span>
                   </div>
                   <span
-                    className={cx(
-                      'rounded-link px-2.5 text-[13px]',
-                      gift.status === 'claimed'
-                        ? 'bg-gain-wash text-gain'
-                        : 'bg-orange-wash text-ink',
-                    )}
+                    className={clsx('rounded-link px-2.5 text-[13px]', {
+                      'bg-gain-wash text-gain': gift.status === 'claimed',
+                      'bg-orange-wash text-ink': gift.status !== 'claimed',
+                    })}
                   >
                     {STATUS_LABEL[gift.status]}
                   </span>
@@ -154,10 +211,11 @@ function Home() {
             </Card>
           </section>
         )}
+        <InstallPrompt />
       </div>
       <TabBar active="/" />
     </div>
   )
 }
 
-export default withProviders(Home)
+export default withProviders(House)

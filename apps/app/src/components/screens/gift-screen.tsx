@@ -1,5 +1,6 @@
-import { Lock, UserRound } from 'lucide-react'
+import { LockIcon, UserCircleIcon } from '@phosphor-icons/react'
 import { useState } from 'react'
+import { match } from 'ts-pattern'
 import { EmailLogin } from '@/components/email-login'
 import { withProviders } from '@/components/providers'
 import { StockLogo } from '@/components/stock-logo'
@@ -15,17 +16,17 @@ import type { GiftView } from '@/lib/types'
 function GiftCard({ gift }: { gift: GiftView }) {
   const bundle = gift.items.length > 1
   return (
-    <div className="relative flex flex-col gap-[18px] overflow-hidden rounded-sheet bg-orange p-6 text-white">
-      <div
-        className="absolute -top-20 -right-20 size-[180px] rounded-full bg-[#ff8f33]"
-        aria-hidden
-      />
-      <div
-        className="absolute -top-[30px] -right-[30px] size-[90px] rounded-full bg-sun"
-        aria-hidden
-      />
+    <div className="relative flex flex-col gap-4.5 overflow-hidden rounded-sheet bg-orange p-6 text-white">
+      <div className="absolute -top-20 -right-20 size-45 rounded-full bg-[#ff8f33]" aria-hidden />
+      <div className="absolute -top-7.5 -right-7.5 size-22.5 rounded-full bg-sun" aria-hidden />
       <div className="relative flex items-center gap-2.5 text-ink">
-        <Avatar name={gift.sender.name} url={gift.sender.avatarUrl} size={40} />
+        <Avatar
+          name={gift.sender.name}
+          url={gift.sender.avatarUrl}
+          size={40}
+          className="bg-white"
+          alt={`${gift.sender.name} profile photo`}
+        />
         <span className="text-[15px] text-white">{gift.sender.name} sent you a gift</span>
       </div>
       <div className="relative flex flex-col gap-1">
@@ -81,6 +82,10 @@ function Gift({ giftId }: { giftId: string }) {
   const view = gift.data
   const assets = giftAssetsLabel(view.items)
   const bundle = view.items.length > 1
+  const heading = match({ viewer: view.viewer, bundle })
+    .with({ viewer: 'sender' }, () => `${view.recipientLabel} opened your gift`)
+    .with({ bundle: true }, () => `${assets} are yours`)
+    .otherwise(() => `${assets} is yours`)
 
   if (view.status === 'claimed' || opened) {
     return (
@@ -99,11 +104,7 @@ function Gift({ giftId }: { giftId: string }) {
           <SuccessMark />
           <div className="flex flex-col gap-1.5">
             <h1 className="font-sans text-[30px] leading-[1.15] font-medium tracking-[-0.02em] text-balance">
-              {view.viewer === 'sender'
-                ? `${view.recipientLabel} opened your gift`
-                : bundle
-                  ? `${assets} are yours`
-                  : `${assets} is yours`}
+              {heading}
             </h1>
             <p className="text-stone">
               {view.viewer === 'sender'
@@ -128,7 +129,7 @@ function Gift({ giftId }: { giftId: string }) {
     return (
       <Screen back="/" title="Your gift">
         <GiftCard gift={view} />
-        <Notice icon={<Lock className="size-[18px] text-stone" strokeWidth={1.75} />}>
+        <Notice icon={<LockIcon className="size-4.5 text-stone" />}>
           Waiting for {view.recipientLabel} to open it. If they don’t by{' '}
           {formatDate(view.expiresAt)}, it comes back to you.
         </Notice>
@@ -138,7 +139,7 @@ function Gift({ giftId }: { giftId: string }) {
 
   if (view.viewer === 'anonymous') {
     return (
-      <Screen>
+      <Screen title="Gift" back="/">
         <GiftCard gift={view} />
         <div className="flex flex-col gap-1.5">
           <h2 className="font-sans text-xl font-medium tracking-[-0.02em]">It’s yours to keep</h2>
@@ -156,6 +157,8 @@ function Gift({ giftId }: { giftId: string }) {
   if (view.viewer === 'other') {
     return (
       <Screen
+        title="Gift"
+        back="/"
         footer={
           <Button variant="soft" onClick={() => session.logout().then(() => location.reload())}>
             Switch account
@@ -163,7 +166,7 @@ function Gift({ giftId }: { giftId: string }) {
         }
       >
         <GiftCard gift={view} />
-        <Notice tone="warning" icon={<UserRound className="size-[18px]" strokeWidth={1.75} />}>
+        <Notice tone="warning" icon={<UserCircleIcon className="size-4.5" />}>
           This gift is for {view.recipientLabel}, and you’re signed in as{' '}
           {session.profile?.email ?? 'someone else'}. Switch to the right account to open it.
         </Notice>
@@ -173,6 +176,8 @@ function Gift({ giftId }: { giftId: string }) {
 
   return (
     <Screen
+      title="Gift"
+      back="/"
       footer={
         <>
           {claim.isError && (
@@ -182,7 +187,7 @@ function Gift({ giftId }: { giftId: string }) {
             loading={claim.isPending}
             onClick={() => claim.mutate(undefined, { onSuccess: () => setOpened(true) })}
           >
-            {bundle ? 'Open your gift' : `Open ${formatUsd(view.usdValue)} of ${assets}`}
+            {bundle ? 'Claim your gift' : `Claim ${formatUsd(view.usdValue)} of ${assets}`}
           </Button>
         </>
       }

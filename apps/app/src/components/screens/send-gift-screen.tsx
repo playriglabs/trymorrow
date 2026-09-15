@@ -1,5 +1,16 @@
-import { Check, Copy, Link2, Lock, Mail, Plus, Share2, X } from 'lucide-react'
+import {
+  CheckIcon,
+  CopyIcon,
+  EnvelopeIcon,
+  LinkIcon,
+  LockIcon,
+  PlusIcon,
+  ShareIcon,
+  XIcon,
+} from '@phosphor-icons/react'
+import clsx from 'clsx'
 import { useMemo, useState } from 'react'
+import { match, P } from 'ts-pattern'
 import { withProviders } from '@/components/providers'
 import { StockLogo } from '@/components/stock-logo'
 import { SuccessMark } from '@/components/success-mark'
@@ -7,7 +18,6 @@ import {
   Avatar,
   Button,
   Card,
-  cx,
   Label,
   LinkButton,
   Loading,
@@ -61,7 +71,7 @@ function RecipientHint({ resolution }: { resolution: RecipientResolution | undef
     case 'email':
       return (
         <p className="flex items-center gap-1.5 text-[13px] text-stone">
-          <Lock className="size-3.5" strokeWidth={2} />
+          <LockIcon className="size-3.5" />
           Only {resolution.email} can open this gift.
         </p>
       )
@@ -84,7 +94,7 @@ function RecipientChip({ recipient, onRemove }: { recipient: Recipient; onRemove
         <Avatar name={recipient.profile.name} url={recipient.profile.avatarUrl} size={28} />
       ) : (
         <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-orange-wash">
-          <Mail className="size-4 text-stone" strokeWidth={1.75} />
+          <EnvelopeIcon className="size-4 text-stone" />
         </span>
       )}
       <span className="truncate">{label}</span>
@@ -94,7 +104,7 @@ function RecipientChip({ recipient, onRemove }: { recipient: Recipient; onRemove
         aria-label={`Remove ${label}`}
         className="flex size-8 shrink-0 items-center justify-center rounded-full text-stone hover:bg-orange-wash"
       >
-        <X className="size-4" strokeWidth={2} />
+        <XIcon className="size-4" />
       </button>
     </span>
   )
@@ -107,7 +117,12 @@ function GiftLink({ url, label }: { url: string; label?: string }) {
     <div className="flex items-center gap-2 py-3">
       <div className="flex min-w-0 flex-1 flex-col text-left">
         {label && <span className="truncate text-[15px]">{label}</span>}
-        <span className={cx('truncate', label ? 'text-[13px] text-stone' : 'text-[15px]')}>
+        <span
+          className={clsx('truncate', {
+            'text-[13px] text-stone': Boolean(label),
+            'text-[15px]': !label,
+          })}
+        >
           {url.replace(/^https?:\/\//, '')}
         </span>
       </div>
@@ -119,11 +134,11 @@ function GiftLink({ url, label }: { url: string; label?: string }) {
           aria-label={`Share ${label}’s link`}
           onClick={() => navigator.share({ title: 'A gift for you', url }).catch(() => {})}
         >
-          <Share2 className="size-4" strokeWidth={1.75} />
+          <ShareIcon className="size-4" />
         </Button>
       )}
       <Button variant="soft" size="sm" onClick={copy}>
-        <Copy className="size-4" strokeWidth={1.75} />
+        <CopyIcon className="size-4" />
         {copied ? 'Copied' : 'Copy'}
       </Button>
     </div>
@@ -149,7 +164,7 @@ function GiftsReady({ result }: { result: SendGiftResult }) {
                   : navigator.clipboard.writeText(first.url).then(() => setCopied(true))
               }
             >
-              <Share2 className="size-5" strokeWidth={1.75} />
+              <ShareIcon className="size-5" />
               {copied ? 'Link copied' : 'Share gift link'}
             </Button>
             <LinkButton href="/" variant="ghost" size="sm">
@@ -183,7 +198,7 @@ function GiftsReady({ result }: { result: SendGiftResult }) {
             nothing moved for {result.failed === 1 ? 'it' : 'them'}. Send again to those people.
           </Notice>
         )}
-        <Notice icon={<Lock className="size-4.5 text-stone" strokeWidth={1.75} />}>
+        <Notice icon={<LockIcon className="size-4.5 text-stone" />}>
           {single
             ? `Only ${first.gift.recipientLabel} can open it.`
             : 'Each link opens only for the person it’s for.'}{' '}
@@ -196,9 +211,21 @@ function GiftsReady({ result }: { result: SendGiftResult }) {
 
 function SendGift() {
   const session = useSession()
+  // An ask link (/maya?stock=AAPLX&amount=25) lands here with the wish already filled in
+  const asked = useMemo(() => {
+    const params = new URLSearchParams(location.search)
+    const amount = Number.parseFloat(params.get('amount') ?? '')
+    return {
+      to: params.get('to') ?? '',
+      ticker: params.get('stock')?.toUpperCase() ?? null,
+      amount: Number.isFinite(amount) && amount >= MIN_GIFT_USD ? amount : null,
+    }
+  }, [])
   const [picked, setPicked] = useState<string[]>([])
-  const [amountText, setAmountText] = useState('25')
-  const [to, setTo] = useState(() => new URLSearchParams(location.search).get('to') ?? '')
+  const [amountText, setAmountText] = useState(() =>
+    asked.amount == null ? '25' : String(asked.amount),
+  )
+  const [to, setTo] = useState(asked.to)
   const [added, setAdded] = useState<Recipient[]>([])
   const [message, setMessage] = useState('')
   const [result, setResult] = useState<SendGiftResult | null>(null)
@@ -210,7 +237,12 @@ function SendGift() {
     [portfolio.data],
   )
   const chosen = holdings.filter((holding) => picked.includes(holding.mint))
-  const stocks = chosen.length > 0 ? chosen : holdings.slice(0, 1)
+  /** The asked-for stock only if it's one we can actually send: gifts come out of holdings */
+  const askedHolding = asked.ticker
+    ? holdings.find((holding) => holding.ticker.toUpperCase() === asked.ticker)
+    : undefined
+  const fallback = askedHolding ? [askedHolding] : holdings.slice(0, 1)
+  const stocks = chosen.length > 0 ? chosen : fallback
 
   const typedText = to.trim()
   const query = useDebounced(typedText)
@@ -268,50 +300,70 @@ function SendGift() {
   const perStock = usd / stocks.length
   const affordable = (value: number) =>
     stocks.every((stock) => (stock.valueUsd ?? 0) >= (value / stocks.length) * people)
+
   const [onlyStock] = stocks
   const onlyRecipient = recipients.length === 1 ? recipients[0] : undefined
-  const getsLabel =
-    recipients.length > 1
-      ? 'Each person gets'
-      : onlyRecipient?.kind === 'user'
-        ? `${onlyRecipient.profile.name.split(' ')[0]} gets`
-        : 'They get'
+  const getsLabel = match({ count: recipients.length, recipient: onlyRecipient })
+    .when(
+      ({ count }) => count > 1,
+      () => 'Each person gets',
+    )
+    .with(
+      { recipient: { kind: 'user' } },
+      ({ recipient }) => `${recipient.profile.name.split(' ')[0]} gets`,
+    )
+    .otherwise(() => 'They get')
 
   const shortStock =
     usd >= MIN_GIFT_USD
       ? stocks.find((stock) => (stock.valueUsd ?? 0) < perStock * people)
       : undefined
-  const amountHint =
-    usd > 0 && usd < MIN_GIFT_USD
-      ? `The minimum is ${formatUsd(MIN_GIFT_USD)}${recipients.length > 1 ? ' per person' : ''}.`
-      : shortStock
-        ? `Not enough ${shortStock.name}: you have ${formatUsd(shortStock.valueUsd)}, this needs ${formatUsd(perStock * people)}.`
-        : null
+  const amountHint = match({ usd, shortStock })
+    .when(
+      ({ usd: amount }) => amount > 0 && amount < MIN_GIFT_USD,
+      () =>
+        `The minimum is ${formatUsd(MIN_GIFT_USD)}${recipients.length > 1 ? ' per person' : ''}.`,
+    )
+    .with(
+      { shortStock: P.nonNullable },
+      ({ shortStock: stock }) =>
+        `Not enough ${stock.name}: you have ${formatUsd(stock.valueUsd)}, this needs ${formatUsd(perStock * people)}.`,
+    )
+    .otherwise(() => null)
 
   const feeUsd = fee.data?.feeUsd ?? 0
   const cashShort = Math.max(0, feeUsd - (portfolio.data?.cashUsd ?? 0))
   // Mirrors the server: cash first, otherwise shares of the stock with the most left after the gift
-  const feeStock =
-    cashShort > 0
-      ? stocks
+  const feeStock = match(cashShort)
+    .when(
+      (shortfall) => shortfall > 0,
+      () =>
+        stocks
           .map((stock) => ({ stock, left: (stock.valueUsd ?? 0) - perStock * people }))
           .filter((option) => option.left >= feeUsd)
-          .sort((a, b) => b.left - a.left)[0]?.stock
-      : undefined
+          .sort((a, b) => b.left - a.left)[0]?.stock,
+    )
+    .otherwise(() => undefined)
   const feeBlocked = cashShort > 0 && !feeStock
   const feeSettled = recipients.length === 0 || (fee.isSuccess && !fee.isPlaceholderData)
-  const feeLabel =
-    recipients.length === 0
-      ? 'Free'
-      : fee.data === undefined
-        ? fee.isError
-          ? '—'
-          : 'Checking…'
-        : feeUsd === 0
-          ? 'Free'
-          : feeStock
-            ? `${formatUsd(feeUsd)} in ${feeStock.name}`
-            : formatUsd(feeUsd)
+  const feeLabel = match({ recipients, feeData: fee.data, feeError: fee.isError, feeUsd, feeStock })
+    .when(
+      ({ recipients }) => recipients.length === 0,
+      () => 'Free',
+    )
+    .with({ feeData: undefined, feeError: true }, () => '—')
+    .with({ feeData: undefined }, () => 'Checking…')
+    .with({ feeUsd: 0 }, () => 'Free')
+    .with(
+      { feeStock: P.nonNullable },
+      ({ feeStock: stock }) => `${formatUsd(feeUsd)} in ${stock.name}`,
+    )
+    .otherwise(() => formatUsd(feeUsd))
+  const submitLabel = match({ pending: send.isPending, multiple: recipients.length > 1 })
+    .with({ pending: true, multiple: true }, () => 'Creating your gifts…')
+    .with({ pending: true }, () => 'Creating your gift…')
+    .with({ multiple: true }, () => `Create ${recipients.length} gift links`)
+    .otherwise(() => 'Create gift link')
 
   const sendGift = () => {
     const items = stocks.map((stock) => {
@@ -350,18 +402,22 @@ function SendGift() {
             loading={send.isPending}
             onClick={sendGift}
           >
-            <Link2 className="size-5" strokeWidth={1.75} />
-            {send.isPending
-              ? recipients.length > 1
-                ? 'Creating your gifts…'
-                : 'Creating your gift…'
-              : recipients.length > 1
-                ? `Create ${recipients.length} gift links`
-                : 'Create gift link'}
+            <LinkIcon className="size-5" />
+            {submitLabel}
           </Button>
         </>
       }
     >
+      {asked.ticker && !askedHolding && (
+        <Notice tone="warning">
+          They asked for {asked.ticker}, and you don’t own any yet.{' '}
+          <a href={`/trade/${asked.ticker.toLowerCase()}`} className="underline">
+            Buy some first
+          </a>
+          , or send one of yours below.
+        </Notice>
+      )}
+
       <div className="flex flex-col gap-2">
         <div className="flex items-baseline justify-between">
           <Label>Stocks</Label>
@@ -377,16 +433,17 @@ function SendGift() {
                 aria-pressed={selected}
                 disabled={!selected && stocks.length >= MAX_GIFT_STOCKS}
                 onClick={() => toggleStock(holding.mint)}
-                className={cx(
+                className={clsx(
                   'flex h-11 items-center gap-2 rounded-link border pr-4 pl-1.5 font-sans text-[15px] font-medium disabled:opacity-40',
-                  selected ? 'border-orange bg-orange-wash' : 'border-line bg-surface',
+                  {
+                    'border-orange bg-orange-wash': selected,
+                    'border-line bg-surface': !selected,
+                  },
                 )}
               >
                 <StockLogo iconUrl={holding.iconUrl} ticker={holding.ticker} size={30} />
                 {holding.name}
-                {selected && stocks.length > 1 && (
-                  <Check className="size-4 text-orange" strokeWidth={2.5} />
-                )}
+                {selected && stocks.length > 1 && <CheckIcon className="size-4 text-orange" />}
               </button>
             )
           })}
@@ -403,7 +460,7 @@ function SendGift() {
           htmlFor="gift-amount"
           className="flex max-w-full items-baseline justify-center font-sans text-[60px] leading-[1.05] font-medium tracking-[-0.02em] tabular-nums"
         >
-          <span className={cx(!amountText && 'text-steel')}>$</span>
+          <span className={clsx({ 'text-steel': !amountText })}>$</span>
           <span className="sr-only">
             {recipients.length > 1 ? 'Gift amount per person in dollars' : 'Gift amount in dollars'}
           </span>
@@ -423,7 +480,7 @@ function SendGift() {
                 Math.max(
                   1,
                   [...amountText].reduce((w, c) => w + (c === '.' ? 0.32 : 1), 0),
-                ) + 0.3
+                ) + 0.1
               }ch`,
             }}
             className="min-w-[1ch] bg-transparent text-center text-ink outline-none placeholder:text-steel"
@@ -445,9 +502,12 @@ function SendGift() {
             type="button"
             disabled={!affordable(value)}
             onClick={() => setAmountText(String(value))}
-            className={cx(
+            className={clsx(
               'h-11 rounded-button border font-sans text-[15px] font-medium disabled:opacity-40',
-              value === usd ? 'border-orange bg-orange-wash' : 'border-line bg-surface',
+              {
+                'border-orange bg-orange-wash': value === usd,
+                'border-line bg-surface': value !== usd,
+              },
             )}
           >
             ${value}
@@ -497,7 +557,7 @@ function SendGift() {
               disabled={!typed || typedDuplicate}
               onClick={addTyped}
             >
-              <Plus className="size-5" strokeWidth={1.75} />
+              <PlusIcon className="size-5" />
               Add
             </Button>
           </div>
