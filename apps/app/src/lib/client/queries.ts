@@ -3,9 +3,15 @@ import { useApi } from '@/lib/client/api'
 import { useSignRelayed } from '@/lib/client/sign'
 import type {
   ChartRange,
+  FundBuyOrder,
+  FundCardView,
+  FundFeeQuote,
+  FundPurpose,
+  FundView,
   GiftFeeQuote,
   GiftView,
   NotificationSettings,
+  NotificationView,
   Portfolio,
   PriceChart,
   Profile,
@@ -31,7 +37,14 @@ export const queryKeys = {
     ['gift-fee', [...recipients].sort().join(','), [...mints].sort().join(',')] as const,
   handle: (handle: string) => ['handle', handle] as const,
   stocks: () => ['stocks'] as const,
+  funds: () => ['funds'] as const,
+  fund: (fundId: string, viewerId?: string | null) =>
+    viewerId === undefined ? (['fund', fundId] as const) : (['fund', fundId, viewerId] as const),
+  fundFee: () => ['fund-fee'] as const,
+  fundContributionFee: (fundId: string, mints: string[]) =>
+    ['fund-contribution-fee', fundId, [...mints].sort().join(',')] as const,
   notifications: () => ['notifications'] as const,
+  notificationFeed: () => ['notification-feed'] as const,
   tradeQuote: ({ side, mint, amountRaw }: TradeQuoteParams) =>
     ['trade-quote', side, mint, amountRaw] as const,
 }
@@ -139,6 +152,230 @@ export function useNotificationSettingsQuery({ enabled = true }: Options = {}) {
   })
 }
 
+export type NotificationsResponse = {
+  notifications: NotificationView[]
+  /** Unread count, shown as a dot on the home bell */
+  unread: number
+}
+
+/** Newest feed events for the signed-in user */
+export function useNotificationsQuery({ enabled = true }: Options = {}) {
+  const api = useApi()
+  return useQuery({
+    queryKey: queryKeys.notificationFeed(),
+    enabled,
+    queryFn: () => api<NotificationsResponse>('/api/notifications'),
+  })
+}
+
+// Funds
+
+/** Funds this person started, funds held for them, and funds they have added to */
+export function useFundsQuery({ enabled = true }: Options = {}) {
+  const api = useApi()
+  return useQuery({
+    queryKey: queryKeys.funds(),
+    enabled,
+    queryFn: () => api<{ funds: FundCardView[] }>('/api/funds').then((data) => data.funds),
+  })
+}
+
+/** Keyed by viewer: the creator sees the fee they paid, everyone else doesn't */
+export function useFundQuery(
+  fundId: string,
+  viewerId: string | null,
+  { enabled = true }: Options = {},
+) {
+  const api = useApi()
+  return useQuery({
+    queryKey: queryKeys.fund(fundId, viewerId),
+    enabled,
+    queryFn: () => api<{ fund: FundView }>(`/api/funds/${fundId}`).then((data) => data.fund),
+  })
+}
+
+/** What opening a fund costs, before anything is created */
+export function useFundFeeQuery({ enabled = true }: Options = {}) {
+  const api = useApi()
+  return useQuery({
+    queryKey: queryKeys.fundFee(),
+    enabled,
+    staleTime: 60_000,
+    queryFn: () => api<FundFeeQuote>('/api/funds/quote', { method: 'POST' }),
+  })
+}
+
+/** What adding costs: free unless it opens the fund's first vault for one of these stocks */
+export function useFundContributionFeeQuery(
+  fundId: string,
+  mints: string[],
+  { enabled = true }: Options = {},
+) {
+  const api = useApi()
+  return useQuery({
+    queryKey: queryKeys.fundContributionFee(fundId, mints),
+    enabled,
+    staleTime: 60_000,
+    placeholderData: keepPreviousData,
+    queryFn: () =>
+      api<FundFeeQuote>(`/api/funds/${fundId}/quote`, { method: 'POST', body: { mints } }),
+  })
+}
+
+export type CreateFundInput = {
+  name?: string
+  beneficiaryName: string
+  /** Leave out and the creator holds it; with it, only that person can ever take it out */
+  beneficiaryEmail?: string
+  purpose: FundPurpose
+  goalUsd?: number
+  /** ISO date the lock ends */
+  unlockAt: string
+  allocations: { mint: string; percent: number }[]
+}
+
+/** Records the fund, adds the creator's signature, then opens it on-chain */
+export function useCreateFundMutation() {
+  const api = useApi()
+  const sign = useSignRelayed()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: CreateFundInput): Promise<FundView> => {
+      const created = await api<{ fund: FundView; transaction: string }>('/api/funds', {
+        method: 'POST',
+        body: input,
+      })
+      const { fund } = await api<{ fund: FundView }>(`/api/funds/${created.fund.id}/submit`, {
+        method: 'POST',
+        body: { transaction: await sign(created.transaction) },
+      })
+      return fund
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.funds() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.portfolio() })
+    },
+  })
+}
+
+export type AddToFundInput = {
+  /** Cash going in, USDC base units */
+  amountRaw: string
+  note?: string
+}
+
+/**
+ * Cash in, locked shares out: the server splits it by the fund's mix, Jupiter fills each buy into
+ * this person's own account, and one last transaction moves exactly what landed into the vaults.
+ */
+export function useAddToFundMutation(fundId: string) {
+  const api = useApi()
+  const sign = useSignRelayed()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ amountRaw, note }: AddToFundInput): Promise<FundView> => {
+      const { orders } = await api<{ orders: FundBuyOrder[]; feeUsd: number }>(
+        `/api/funds/${fundId}/buy`,
+        { method: 'POST', body: { amountRaw } },
+      )
+
+      const items: { mint: string; amountRaw: string; usdValue: number }[] = []
+      for (const order of orders) {
+        const filled = await api<{ signature: string; outputAmountRaw: string | null }>(
+          '/api/trades/submit',
+          {
+            method: 'POST',
+            body: { transaction: await sign(order.transaction), requestId: order.requestId },
+          },
+        )
+        items.push({
+          mint: order.mint,
+          amountRaw: filled.outputAmountRaw ?? order.minRaw,
+          usdValue: order.quote.cashUsd,
+        })
+      }
+
+      const built = await api<{ contributionId: string; transaction: string }>(
+        `/api/funds/${fundId}/contribute`,
+        { method: 'POST', body: { items, note } },
+      )
+      const { fund } = await api<{ fund: FundView }>(`/api/funds/${fundId}/submit`, {
+        method: 'POST',
+        body: {
+          transaction: await sign(built.transaction),
+          contributionId: built.contributionId,
+        },
+      })
+      return fund
+    },
+    onSuccess: (fund) => {
+      queryClient.setQueriesData({ queryKey: queryKeys.fund(fundId) }, fund)
+      queryClient.invalidateQueries({ queryKey: queryKeys.funds() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.portfolio() })
+    },
+  })
+}
+
+export type ContributeSharesInput = {
+  items: { mint: string; amountRaw: string; usdValue: number }[]
+  note?: string
+}
+
+/**
+ * Locks shares this person already owns, with no trade in between: nothing is bought, nothing is
+ * sold, the shares simply move from their account into the fund's vaults.
+ */
+export function useContributeSharesMutation(fundId: string) {
+  const api = useApi()
+  const sign = useSignRelayed()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ items, note }: ContributeSharesInput): Promise<FundView> => {
+      const built = await api<{ contributionId: string; transaction: string }>(
+        `/api/funds/${fundId}/contribute`,
+        { method: 'POST', body: { items, note } },
+      )
+      const { fund } = await api<{ fund: FundView }>(`/api/funds/${fundId}/submit`, {
+        method: 'POST',
+        body: {
+          transaction: await sign(built.transaction),
+          contributionId: built.contributionId,
+        },
+      })
+      return fund
+    },
+    onSuccess: (fund) => {
+      queryClient.setQueriesData({ queryKey: queryKeys.fund(fundId) }, fund)
+      queryClient.invalidateQueries({ queryKey: queryKeys.funds() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.portfolio() })
+    },
+  })
+}
+
+/** Only the person the fund is for can do this, and only once the unlock date has passed */
+export function useWithdrawFundMutation(fundId: string) {
+  const api = useApi()
+  const sign = useSignRelayed()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (): Promise<FundView> => {
+      const { transaction } = await api<{ transaction: string }>(`/api/funds/${fundId}/withdraw`, {
+        method: 'POST',
+      })
+      const { fund } = await api<{ fund: FundView }>(`/api/funds/${fundId}/submit`, {
+        method: 'POST',
+        body: { transaction: await sign(transaction) },
+      })
+      return fund
+    },
+    onSuccess: (fund) => {
+      queryClient.setQueriesData({ queryKey: queryKeys.fund(fundId) }, fund)
+      queryClient.invalidateQueries({ queryKey: queryKeys.funds() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.portfolio() })
+    },
+  })
+}
+
 // Mutations
 
 export function useSyncProfileMutation() {
@@ -186,11 +423,7 @@ export function useUploadAvatarMutation() {
   })
 }
 
-export type NotificationSettingsUpdate = {
-  giftReceived?: boolean
-  giftOpened?: boolean
-  giftReturned?: boolean
-}
+export type NotificationSettingsUpdate = Partial<NotificationSettings>
 
 /** Flip feels instant: cache updates on mutate, rolls back if the server refuses */
 export function useUpdateNotificationSettingsMutation() {
@@ -216,6 +449,42 @@ export function useUpdateNotificationSettingsMutation() {
       }
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.notifications() }),
+  })
+}
+
+/**
+ * Tells the server which browser to buzz. The subscription itself is created by the browser;
+ * this only records it, and the same call replaces an older one for the same install.
+ */
+export function usePushSubscriptionMutation() {
+  const api = useApi()
+  return useMutation({
+    mutationFn: (subscription: PushSubscriptionJSON | { endpoint: string }) =>
+      api<{ subscribed: boolean }>('/api/me/push', { method: 'POST', body: subscription }),
+  })
+}
+
+export function useRemovePushSubscriptionMutation() {
+  const api = useApi()
+  return useMutation({
+    mutationFn: (endpoint: string) =>
+      api<{ subscribed: boolean }>('/api/me/push', { method: 'DELETE', body: { endpoint } }),
+  })
+}
+
+/** Clears the badge: every event of the signed-in user becomes read */
+export function useMarkNotificationsReadMutation() {
+  const api = useApi()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => api<{ ok: true }>('/api/notifications/read', { method: 'POST' }),
+    onSuccess: () => {
+      queryClient.setQueriesData<NotificationsResponse>(
+        { queryKey: queryKeys.notificationFeed() },
+        (feed) => (feed ? { ...feed, unread: 0 } : feed),
+      )
+      queryClient.invalidateQueries({ queryKey: queryKeys.notificationFeed() })
+    },
   })
 }
 

@@ -13,8 +13,16 @@ export function Providers({ children }: { children: ReactNode }) {
       appId={PUBLIC_PRIVY_APP_ID}
       clientId={PUBLIC_PRIVY_CLIENT_ID}
       config={{
-        loginMethods: ['email', 'google', 'apple'],
-        appearance: { theme: 'light', accentColor: '#F66F00' },
+        loginMethods: ['email', 'google'],
+        appearance: {
+          theme: 'light',
+          accentColor: '#F66F00',
+          // Morrow only runs on Solana; EVM wallets can't hold anything we issue
+          walletChainType: 'solana-only',
+          // Keep the modal short: the big three named, plus any other installed
+          // Solana wallet (Glow, Ledger, ...) that wallet-standard detects
+          walletList: ['detected_solana_wallets', 'phantom', 'solflare', 'backpack'],
+        },
         embeddedWallets: {
           solana: { createOnLogin: 'users-without-wallets' },
           // Every signing prompt is our own UI; Privy's wallet modals would expose crypto terms

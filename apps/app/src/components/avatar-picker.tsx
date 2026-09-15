@@ -1,4 +1,4 @@
-import { Camera } from 'lucide-react'
+import { CameraIcon } from '@phosphor-icons/react'
 import { useRef, useState } from 'react'
 import Cropper, { type Area } from 'react-easy-crop'
 import { Avatar, Button } from '@/components/ui'
@@ -63,7 +63,7 @@ export function AvatarPicker({
           onClick={() => input.current?.click()}
           className="absolute -right-1 -bottom-1 flex size-10 items-center justify-center rounded-full border-[3px] border-cream bg-orange text-white"
         >
-          <Camera className="size-[18px]" strokeWidth={1.75} />
+          <CameraIcon className="size-4.5" />
         </button>
         <input
           ref={input}
@@ -79,8 +79,8 @@ export function AvatarPicker({
       </div>
 
       {source && (
-        <div className="fixed inset-0 z-50 mx-auto flex max-w-[430px] flex-col bg-ink text-cream">
-          <div className="grid h-[68px] grid-cols-[72px_1fr_72px] items-center px-2 pt-4">
+        <div className="fixed inset-0 z-50 mx-auto flex max-w-107.5 flex-col bg-ink text-cream">
+          <div className="grid h-17 grid-cols-[72px_1fr_72px] items-center px-2 pt-4">
             <button type="button" className="h-11 px-3 text-left" onClick={() => setSource(null)}>
               Cancel
             </button>

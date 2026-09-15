@@ -1,6 +1,7 @@
 import { useLoginWithEmail } from '@privy-io/react-auth'
+import clsx from 'clsx'
 import { useEffect, useRef, useState } from 'react'
-import { Button, cx, Label, TextInput } from '@/components/ui'
+import { Button, Label, TextInput } from '@/components/ui'
 
 const CODE_LENGTH = 6
 const RESEND_SECONDS = 45
@@ -106,9 +107,12 @@ export function EmailLogin({ intro }: { intro?: string }) {
           <span
             // biome-ignore lint/suspicious/noArrayIndexKey: fixed-length code slots
             key={index}
-            className={cx(
-              'flex h-[60px] items-center justify-center rounded-[14px] border bg-surface font-sans text-[26px] font-medium',
-              index === code.length ? 'border-orange ring-4 ring-orange-wash' : 'border-line',
+            className={clsx(
+              'flex h-15 items-center justify-center rounded-[14px] border bg-surface font-sans text-[26px] font-medium',
+              {
+                'border-orange ring-4 ring-orange-wash': index === code.length,
+                'border-line': index !== code.length,
+              },
             )}
           >
             {code[index] ?? ''}

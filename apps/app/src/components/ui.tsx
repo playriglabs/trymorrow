@@ -1,13 +1,11 @@
-import { ChevronLeft, Loader2 } from 'lucide-react'
+import { CaretLeftIcon, SpinnerIcon } from '@phosphor-icons/react'
+import clsx from 'clsx'
 import type {
   AnchorHTMLAttributes,
   ButtonHTMLAttributes,
   InputHTMLAttributes,
   ReactNode,
 } from 'react'
-
-export const cx = (...classes: (string | false | null | undefined)[]) =>
-  classes.filter(Boolean).join(' ')
 
 const variants = {
   filled: 'bg-orange text-white',
@@ -20,14 +18,14 @@ const variants = {
 
 const sizes = {
   lg: 'h-14 px-5 text-[17px]',
-  md: 'h-[52px] px-4 text-base',
+  md: 'h-13 px-4 text-base',
   sm: 'h-11 px-4 text-[15px]',
 } as const
 
 type ButtonStyle = { variant?: keyof typeof variants; size?: keyof typeof sizes }
 
 const buttonClass = ({ variant = 'filled', size = 'lg' }: ButtonStyle, className?: string) =>
-  cx(
+  clsx(
     'inline-flex items-center justify-center gap-2 rounded-button font-sans font-medium tracking-[-0.02em]',
     'transition-[filter,opacity] duration-150 hover:brightness-95 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink',
     'disabled:pointer-events-none disabled:opacity-50',
@@ -52,7 +50,7 @@ export function Button({
       disabled={disabled || loading}
       {...props}
     >
-      {loading && <Loader2 className="size-5 animate-spin" aria-hidden />}
+      {loading && <SpinnerIcon className="size-5 animate-spin" aria-hidden />}
       {children}
     </button>
   )
@@ -75,15 +73,15 @@ export function Switch({
       aria-checked={checked}
       aria-label={label}
       onClick={() => onChange(!checked)}
-      className={cx(
+      className={clsx(
         'relative h-7 w-12 shrink-0 rounded-full transition-colors duration-150 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink',
-        checked ? 'bg-orange' : 'bg-line',
+        { 'bg-orange': checked, 'bg-line': !checked },
       )}
     >
       <span
-        className={cx(
+        className={clsx(
           'absolute top-0.5 left-0.5 size-6 rounded-full bg-white transition-transform duration-150',
-          checked && 'translate-x-5',
+          { 'translate-x-5': checked },
         )}
       />
     </button>
@@ -117,7 +115,7 @@ export function Screen({
   return (
     <div className="flex min-h-dvh flex-1 flex-col">
       {hasHeader && (
-        <header className="sticky top-0 z-20 grid h-17 grid-cols-[44px_1fr_44px] items-center bg-cream px-3 pt-4 pb-2">
+        <header className="sticky top-0 z-20 grid h-13 grid-cols-[44px_1fr_44px] items-center border-b border-b-ink/10 bg-cream px-3 pt-1 pb-4">
           {back ? (
             <a
               href={back === true ? '#' : back}
@@ -130,7 +128,7 @@ export function Screen({
               aria-label="Back"
               className="flex size-11 items-center justify-center rounded-link"
             >
-              <ChevronLeft className="size-5.5" strokeWidth={1.75} />
+              <CaretLeftIcon className="size-5.5" />
             </a>
           ) : (
             <span />
@@ -153,7 +151,7 @@ export function Screen({
 
 export function Card({ className, children }: { className?: string; children: ReactNode }) {
   return (
-    <div className={cx('rounded-card border border-line bg-surface shadow-elevated', className)}>
+    <div className={clsx('rounded-card border border-line bg-surface shadow-elevated', className)}>
       {children}
     </div>
   )
@@ -170,7 +168,7 @@ export function Label({ children, htmlFor }: { children: ReactNode; htmlFor?: st
 export function TextInput({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
-      className={cx(
+      className={clsx(
         'h-14 w-full rounded-button border border-line bg-surface px-4 text-[17px] outline-none',
         'placeholder:text-steel focus:border-orange focus:ring-4 focus:ring-orange-wash',
         className,
@@ -195,7 +193,7 @@ export function Notice({
     success: 'bg-gain-wash text-ink',
   }
   return (
-    <div className={cx('flex items-start gap-2.5 rounded-button px-3.5 py-3', tones[tone])}>
+    <div className={clsx('flex items-start gap-2.5 rounded-button px-3.5 py-3', tones[tone])}>
       {icon && <span className="mt-0.5 shrink-0">{icon}</span>}
       <div className="text-[13px] leading-[1.45]">{children}</div>
     </div>
@@ -206,14 +204,25 @@ export function Avatar({
   name,
   url,
   size = 40,
+  className,
+  alt = '',
 }: {
   name: string | null | undefined
   url: string | null | undefined
   size?: number
+  className?: string
+  alt?: string
 }) {
   const style = { width: size, height: size, fontSize: Math.round(size * 0.35) }
   if (url) {
-    return <img src={url} alt="" style={style} className="shrink-0 rounded-full object-cover" />
+    return (
+      <img
+        src={url}
+        alt={alt}
+        style={style}
+        className={clsx('shrink-0 rounded-full object-cover', className)}
+      />
+    )
   }
   const letters = (name ?? '?')
     .split(/\s+/)
@@ -223,7 +232,12 @@ export function Avatar({
   return (
     <span
       style={style}
-      className="flex shrink-0 items-center justify-center rounded-full bg-orange-wash font-sans font-medium"
+      role="img"
+      aria-label={alt || `${name ?? 'Profile'} avatar`}
+      className={clsx(
+        'flex shrink-0 items-center justify-center rounded-full font-sans font-medium',
+        className ?? 'bg-orange-wash',
+      )}
     >
       {letters}
     </span>
@@ -244,7 +258,7 @@ export function Ticker({ ticker, size = 44 }: { ticker: string; size?: number })
 export function Loading() {
   return (
     <div className="flex flex-1 items-center justify-center">
-      <Loader2 className="size-7 animate-spin text-orange" aria-label="Loading" />
+      <SpinnerIcon className="size-7 animate-spin text-orange" aria-label="Loading" />
     </div>
   )
 }

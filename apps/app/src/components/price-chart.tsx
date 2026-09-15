@@ -1,7 +1,8 @@
+import clsx from 'clsx'
 import { type PointerEvent, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { match, P } from 'ts-pattern'
 import { ChangePill } from '@/components/change-pill'
 import { StockLogo } from '@/components/stock-logo'
-import { cx } from '@/components/ui'
 import { usePriceChartQuery } from '@/lib/client/queries'
 import { formatUsd } from '@/lib/format'
 import { CHART_RANGES, type ChartRange } from '@/lib/types'
@@ -133,71 +134,80 @@ export function PriceChart({
       </div>
 
       <div ref={frame} className="relative" style={{ height: HEIGHT }}>
-        {chart.isPending ? (
-          <div className="h-full animate-pulse rounded-card bg-orange-wash motion-reduce:animate-none" />
-        ) : chart.isError || !geometry ? (
-          <div className="flex h-full items-center justify-center rounded-card border border-line text-[13px] text-stone">
-            {chart.isError ? chart.error.message : 'Not enough trades to draw a chart yet.'}
-          </div>
-        ) : (
-          <svg
-            width={width}
-            height={HEIGHT}
-            viewBox={`0 0 ${width} ${HEIGHT}`}
-            className="block touch-pan-y overflow-visible"
-            role="img"
-            aria-label={`${name} ${RANGE_LABEL[range]}: from ${formatUsd(first)} to ${formatUsd(points.at(-1)?.price)}`}
-            onPointerMove={onPointer}
-            onPointerDown={onPointer}
-            onPointerLeave={() => setHover(null)}
-          >
-            <defs>
-              <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
-                <stop offset="0%" stopColor={color} stopOpacity={0.16} />
-                <stop offset="100%" stopColor={color} stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            {/* Where the range started, so the direction reads at a glance */}
-            <line
-              x1={0}
-              x2={width}
-              y1={geometry.startY}
-              y2={geometry.startY}
-              stroke="#AEACA4"
-              strokeWidth={1}
-              strokeDasharray="2 4"
-            />
-            <path d={geometry.area} fill={`url(#${gradientId})`} />
-            <path
-              d={geometry.line}
-              fill="none"
-              stroke={color}
-              strokeWidth={2}
-              strokeLinejoin="round"
-              strokeLinecap="round"
-            />
-            {hover != null && activeCoord && (
+        {match({ pending: chart.isPending, error: chart.isError, geometry })
+          .with({ pending: true }, () => (
+            <div className="h-full animate-pulse rounded-card bg-orange-wash motion-reduce:animate-none" />
+          ))
+          .with({ error: true }, () => (
+            <div className="flex h-full items-center justify-center rounded-card border border-line text-[13px] text-stone">
+              {chart.error?.message ?? 'Couldn’t load this chart.'}
+            </div>
+          ))
+          .with({ geometry: null }, () => (
+            <div className="flex h-full items-center justify-center rounded-card border border-line text-[13px] text-stone">
+              Not enough trades to draw a chart yet.
+            </div>
+          ))
+          .with({ geometry: P.nonNullable }, ({ geometry: shape }) => (
+            <svg
+              width={width}
+              height={HEIGHT}
+              viewBox={`0 0 ${width} ${HEIGHT}`}
+              className="block touch-pan-y overflow-visible"
+              role="img"
+              aria-label={`${name} ${RANGE_LABEL[range]}: from ${formatUsd(first)} to ${formatUsd(points.at(-1)?.price)}`}
+              onPointerMove={onPointer}
+              onPointerDown={onPointer}
+              onPointerLeave={() => setHover(null)}
+            >
+              <defs>
+                <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stopColor={color} stopOpacity={0.16} />
+                  <stop offset="100%" stopColor={color} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              {/* Where the range started, so the direction reads at a glance */}
               <line
-                x1={activeCoord[0]}
-                x2={activeCoord[0]}
-                y1={0}
-                y2={HEIGHT}
-                stroke="#7E6246"
+                x1={0}
+                x2={width}
+                y1={shape.startY}
+                y2={shape.startY}
+                stroke="#AEACA4"
                 strokeWidth={1}
+                strokeDasharray="2 4"
               />
-            )}
-            {activeCoord && (
-              <circle
-                cx={activeCoord[0]}
-                cy={activeCoord[1]}
-                r={5}
-                fill={color}
-                stroke="#FFF7E9"
+              <path d={shape.area} fill={`url(#${gradientId})`} />
+              <path
+                d={shape.line}
+                fill="none"
+                stroke={color}
                 strokeWidth={2}
+                strokeLinejoin="round"
+                strokeLinecap="round"
               />
-            )}
-          </svg>
-        )}
+              {hover != null && activeCoord && (
+                <line
+                  x1={activeCoord[0]}
+                  x2={activeCoord[0]}
+                  y1={0}
+                  y2={HEIGHT}
+                  stroke="#7E6246"
+                  strokeWidth={1}
+                />
+              )}
+              {activeCoord && (
+                <circle
+                  cx={activeCoord[0]}
+                  cy={activeCoord[1]}
+                  r={5}
+                  fill={color}
+                  stroke="#FFF7E9"
+                  strokeWidth={2}
+                />
+              )}
+            </svg>
+          ))
+          .otherwise(() => null)}
       </div>
 
       <div className="grid grid-cols-6 gap-1 rounded-link border border-line bg-surface p-1">
@@ -210,10 +220,10 @@ export function PriceChart({
               setRange(option)
               setHover(null)
             }}
-            className={cx(
-              'h-9 rounded-link font-sans text-[13px] font-medium',
-              range === option ? 'bg-orange-wash text-ink' : 'text-stone',
-            )}
+            className={clsx('h-9 rounded-link font-sans text-[13px] font-medium', {
+              'bg-orange-wash text-ink': range === option,
+              'text-stone': range !== option,
+            })}
           >
             {option}
           </button>
