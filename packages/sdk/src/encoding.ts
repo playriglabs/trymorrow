@@ -75,3 +75,27 @@ export function decodeGiftAccount(data: Uint8Array): GiftAccount {
     bump: data[168] ?? 0,
   }
 }
+
+export type FundAccount = {
+  creator: PublicKey
+  beneficiary: PublicKey
+  rentPayer: PublicKey
+  unlockAt: bigint
+  /** Vaults still open; the fund account can only be closed at zero */
+  vaults: number
+  bump: number
+}
+
+/** Decodes `Fund` account data (8-byte discriminator + fields in declaration order) */
+export function decodeFundAccount(data: Uint8Array): FundAccount {
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength)
+  const key = (offset: number) => new PublicKey(data.slice(offset, offset + 32))
+  return {
+    creator: key(8),
+    beneficiary: key(40),
+    rentPayer: key(72),
+    unlockAt: view.getBigInt64(104, true),
+    vaults: view.getUint16(112, true),
+    bump: data[130] ?? 0,
+  }
+}

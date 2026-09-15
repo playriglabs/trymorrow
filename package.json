@@ -11,6 +11,7 @@
     "dev:app": "pnpm --filter @morrow/app dev",
     "build": "pnpm --filter './apps/*' build",
     "build:program": "cd programs && anchor build --no-idl -- --tools-version v1.51 && anchor idl build -o target/idl/morrow.json",
+    "test:program": "pnpm --filter @morrow/sdk test:program",
     "generate": "pnpm --filter @morrow/landing generate",
     "typecheck": "pnpm -r typecheck",
     "lint": "biome check . && prettier --check .",

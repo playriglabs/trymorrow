@@ -2,7 +2,7 @@ import { ASSOCIATED_TOKEN_PROGRAM_ID, getAssociatedTokenAddressSync } from '@sol
 import { type PublicKey, SystemProgram, TransactionInstruction } from '@solana/web3.js'
 import type { Buffer } from 'buffer'
 import { ArgWriter, uuidToBytes } from './encoding'
-import { DISCRIMINATORS, findGiftAddress, MORROW_PROGRAM_ID } from './program'
+import { DISCRIMINATORS, findFundAddress, findGiftAddress, MORROW_PROGRAM_ID } from './program'
 
 type Meta = { pubkey: PublicKey; isSigner: boolean; isWritable: boolean }
 
@@ -115,5 +115,99 @@ export function refundGiftInstruction(p: RefundGiftParams): TransactionInstructi
       ...programs(p.tokenProgram),
     ],
     new ArgWriter(DISCRIMINATORS.refundGift, 0).done(),
+  )
+}
+
+export type CreateFundParams = {
+  /** Pays rent for the fund account and gets it back when the fund is closed (the relayer) */
+  payer: PublicKey
+  creator: PublicKey
+  /** The only account that can withdraw, and only after `unlockAt` */
+  beneficiary: PublicKey
+  fundId: string
+  unlockAt: Date
+}
+
+export function createFundInstruction(p: CreateFundParams): TransactionInstruction {
+  const fund = findFundAddress(p.creator, p.fundId)
+  const data = new ArgWriter(DISCRIMINATORS.createFund, 16 + 32 + 8)
+    .bytes(uuidToBytes(p.fundId))
+    .pubkey(p.beneficiary)
+    .i64(BigInt(Math.floor(p.unlockAt.getTime() / 1000)))
+    .done()
+
+  return instruction(
+    [signer(p.payer, true), signer(p.creator), writable(fund), readonly(SystemProgram.programId)],
+    data,
+  )
+}
+
+export type ContributeParams = {
+  /** Pays rent for a vault the first time the fund holds this stock */
+  payer: PublicKey
+  contributor: PublicKey
+  creator: PublicKey
+  mint: PublicKey
+  tokenProgram: PublicKey
+  fundId: string
+  amount: bigint
+}
+
+export function contributeInstruction(p: ContributeParams): TransactionInstruction {
+  const fund = findFundAddress(p.creator, p.fundId)
+  const data = new ArgWriter(DISCRIMINATORS.contribute, 8).u64(p.amount).done()
+
+  return instruction(
+    [
+      signer(p.payer, true),
+      signer(p.contributor),
+      writable(fund),
+      readonly(p.mint),
+      writable(ata(p.mint, p.contributor, p.tokenProgram)),
+      writable(ata(p.mint, fund, p.tokenProgram)),
+      ...programs(p.tokenProgram),
+    ],
+    data,
+  )
+}
+
+export type WithdrawParams = {
+  payer: PublicKey
+  beneficiary: PublicKey
+  creator: PublicKey
+  rentPayer: PublicKey
+  mint: PublicKey
+  tokenProgram: PublicKey
+  fundId: string
+}
+
+export function withdrawInstruction(p: WithdrawParams): TransactionInstruction {
+  const fund = findFundAddress(p.creator, p.fundId)
+  return instruction(
+    [
+      signer(p.payer, true),
+      signer(p.beneficiary),
+      writable(fund),
+      writable(p.rentPayer),
+      readonly(p.mint),
+      writable(ata(p.mint, fund, p.tokenProgram)),
+      writable(ata(p.mint, p.beneficiary, p.tokenProgram)),
+      ...programs(p.tokenProgram),
+    ],
+    new ArgWriter(DISCRIMINATORS.withdraw, 0).done(),
+  )
+}
+
+export type CloseFundParams = {
+  /** Signs and receives the rent back; only the account that paid it can close the fund */
+  rentPayer: PublicKey
+  creator: PublicKey
+  fundId: string
+}
+
+export function closeFundInstruction(p: CloseFundParams): TransactionInstruction {
+  return instruction(
+    [signer(p.rentPayer, true), writable(findFundAddress(p.creator, p.fundId))],
+    new ArgWriter(DISCRIMINATORS.closeFund, 0).done(),
   )
 }

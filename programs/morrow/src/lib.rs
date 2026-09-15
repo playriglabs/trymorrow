@@ -7,6 +7,10 @@ use anchor_spl::{
 declare_id!("AjwKavx3r4NJ9tgmjxv24mCpFLp2QMnKzcRC5J7vaupa");
 
 pub const GIFT_SEED: &[u8] = b"gift";
+pub const FUND_SEED: &[u8] = b"fund";
+
+/// Nobody should be able to lock money away for a lifetime by mistyping a year.
+pub const MAX_LOCK_SECONDS: i64 = 25 * 365 * 24 * 60 * 60;
 
 #[program]
 pub mod morrow {
@@ -120,6 +124,111 @@ pub mod morrow {
             sender,
             amount,
         });
+        Ok(())
+    }
+
+    /// Opens a pot for someone that nobody can touch until `unlock_at`, not even its creator.
+    /// It holds no money yet: a vault is opened per stock the first time someone adds that stock.
+    pub fn create_fund(
+        ctx: Context<CreateFund>,
+        fund_id: [u8; 16],
+        beneficiary: Pubkey,
+        unlock_at: i64,
+    ) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
+        require!(
+            unlock_at > now && unlock_at <= now + MAX_LOCK_SECONDS,
+            MorrowError::InvalidUnlock
+        );
+
+        let fund = &mut ctx.accounts.fund;
+        fund.creator = ctx.accounts.creator.key();
+        fund.beneficiary = beneficiary;
+        fund.rent_payer = ctx.accounts.payer.key();
+        fund.unlock_at = unlock_at;
+        fund.vaults = 0;
+        fund.fund_id = fund_id;
+        fund.bump = ctx.bumps.fund;
+
+        emit!(FundCreated {
+            fund: fund.key(),
+            creator: fund.creator,
+            beneficiary,
+            unlock_at,
+        });
+        Ok(())
+    }
+
+    /// Anyone can add shares of any stock to a fund; what goes in can only ever come out at unlock.
+    pub fn contribute(ctx: Context<Contribute>, amount: u64) -> Result<()> {
+        require!(amount > 0, MorrowError::ZeroAmount);
+
+        // A vault only exists while it holds something: `withdraw` closes it. An empty one here is
+        // one this instruction just opened, so the fund can count what is still open.
+        if ctx.accounts.vault.amount == 0 {
+            ctx.accounts.fund.vaults = ctx.accounts.fund.vaults.saturating_add(1);
+        }
+
+        token_interface::transfer_checked(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                TransferChecked {
+                    from: ctx.accounts.contributor_token.to_account_info(),
+                    mint: ctx.accounts.mint.to_account_info(),
+                    to: ctx.accounts.vault.to_account_info(),
+                    authority: ctx.accounts.contributor.to_account_info(),
+                },
+            ),
+            amount,
+            ctx.accounts.mint.decimals,
+        )?;
+
+        emit!(FundContribution {
+            fund: ctx.accounts.fund.key(),
+            contributor: ctx.accounts.contributor.key(),
+            mint: ctx.accounts.mint.key(),
+            amount,
+        });
+        Ok(())
+    }
+
+    /// After the unlock date the beneficiary takes one stock out, and the vault's rent goes back
+    /// to whoever paid it. One instruction per stock the fund holds.
+    pub fn withdraw(ctx: Context<Withdraw>) -> Result<()> {
+        let (creator, fund_id, bump, unlock_at) = {
+            let fund = &ctx.accounts.fund;
+            (fund.creator, fund.fund_id, fund.bump, fund.unlock_at)
+        };
+        require!(
+            Clock::get()?.unix_timestamp >= unlock_at,
+            MorrowError::StillLocked
+        );
+        let seeds: &[&[u8]] = &[FUND_SEED, creator.as_ref(), &fund_id, &[bump]];
+        let amount = ctx.accounts.vault.amount;
+
+        release_vault(
+            &ctx.accounts.token_program,
+            &ctx.accounts.mint,
+            &ctx.accounts.vault,
+            ctx.accounts.beneficiary_token.to_account_info(),
+            ctx.accounts.fund.to_account_info(),
+            ctx.accounts.rent_payer.to_account_info(),
+            seeds,
+        )?;
+        ctx.accounts.fund.vaults = ctx.accounts.fund.vaults.saturating_sub(1);
+
+        emit!(FundWithdrawn {
+            fund: ctx.accounts.fund.key(),
+            beneficiary: ctx.accounts.beneficiary.key(),
+            mint: ctx.accounts.mint.key(),
+            amount,
+        });
+        Ok(())
+    }
+
+    /// Once every vault is empty the fund account itself is closed and its rent comes back.
+    pub fn close_fund(ctx: Context<CloseFund>) -> Result<()> {
+        require!(ctx.accounts.fund.vaults == 0, MorrowError::FundNotEmpty);
         Ok(())
     }
 }
@@ -317,6 +426,146 @@ pub struct GiftRefunded {
     pub amount: u64,
 }
 
+#[derive(Accounts)]
+#[instruction(fund_id: [u8; 16])]
+pub struct CreateFund<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub creator: Signer<'info>,
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + Fund::INIT_SPACE,
+        seeds = [FUND_SEED, creator.key().as_ref(), fund_id.as_ref()],
+        bump,
+    )]
+    pub fund: Account<'info, Fund>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct Contribute<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub contributor: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [FUND_SEED, fund.creator.as_ref(), fund.fund_id.as_ref()],
+        bump = fund.bump,
+    )]
+    pub fund: Account<'info, Fund>,
+    #[account(mint::token_program = token_program)]
+    pub mint: InterfaceAccount<'info, Mint>,
+    #[account(
+        mut,
+        token::mint = mint,
+        token::authority = contributor,
+        token::token_program = token_program,
+    )]
+    pub contributor_token: InterfaceAccount<'info, TokenAccount>,
+    #[account(
+        init_if_needed,
+        payer = payer,
+        associated_token::mint = mint,
+        associated_token::authority = fund,
+        associated_token::token_program = token_program,
+    )]
+    pub vault: InterfaceAccount<'info, TokenAccount>,
+    pub token_program: Interface<'info, TokenInterface>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct Withdraw<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub beneficiary: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [FUND_SEED, fund.creator.as_ref(), fund.fund_id.as_ref()],
+        bump = fund.bump,
+        has_one = beneficiary @ MorrowError::WrongBeneficiary,
+        has_one = rent_payer,
+    )]
+    pub fund: Account<'info, Fund>,
+    /// CHECK: only receives lamports; pinned to `fund.rent_payer` by `has_one`.
+    #[account(mut)]
+    pub rent_payer: UncheckedAccount<'info>,
+    #[account(mint::token_program = token_program)]
+    pub mint: InterfaceAccount<'info, Mint>,
+    #[account(
+        mut,
+        associated_token::mint = mint,
+        associated_token::authority = fund,
+        associated_token::token_program = token_program,
+    )]
+    pub vault: InterfaceAccount<'info, TokenAccount>,
+    #[account(
+        init_if_needed,
+        payer = payer,
+        associated_token::mint = mint,
+        associated_token::authority = beneficiary,
+        associated_token::token_program = token_program,
+    )]
+    pub beneficiary_token: InterfaceAccount<'info, TokenAccount>,
+    pub token_program: Interface<'info, TokenInterface>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct CloseFund<'info> {
+    #[account(mut)]
+    pub rent_payer: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [FUND_SEED, fund.creator.as_ref(), fund.fund_id.as_ref()],
+        bump = fund.bump,
+        has_one = rent_payer,
+        close = rent_payer,
+    )]
+    pub fund: Account<'info, Fund>,
+}
+
+#[account]
+#[derive(InitSpace)]
+pub struct Fund {
+    pub creator: Pubkey,
+    /// The only account that can ever take the money out, and only after `unlock_at`
+    pub beneficiary: Pubkey,
+    pub rent_payer: Pubkey,
+    pub unlock_at: i64,
+    /// Vaults still open, so the fund account is only closed once nothing is left
+    pub vaults: u16,
+    pub fund_id: [u8; 16],
+    pub bump: u8,
+}
+
+#[event]
+pub struct FundCreated {
+    pub fund: Pubkey,
+    pub creator: Pubkey,
+    pub beneficiary: Pubkey,
+    pub unlock_at: i64,
+}
+
+#[event]
+pub struct FundContribution {
+    pub fund: Pubkey,
+    pub contributor: Pubkey,
+    pub mint: Pubkey,
+    pub amount: u64,
+}
+
+#[event]
+pub struct FundWithdrawn {
+    pub fund: Pubkey,
+    pub beneficiary: Pubkey,
+    pub mint: Pubkey,
+    pub amount: u64,
+}
+
 #[error_code]
 pub enum MorrowError {
     #[msg("Amount must be greater than zero")]
@@ -329,4 +578,12 @@ pub enum MorrowError {
     WrongRecipient,
     #[msg("Only the sender can take this gift back before it expires")]
     NotRefundable,
+    #[msg("Pick an unlock date in the future, within 25 years")]
+    InvalidUnlock,
+    #[msg("This fund is still locked")]
+    StillLocked,
+    #[msg("This fund is for a different account")]
+    WrongBeneficiary,
+    #[msg("This fund still holds shares")]
+    FundNotEmpty,
 }
