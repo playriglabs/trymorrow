@@ -1,0 +1,92 @@
+@import '@morrow/ui/styles.css';
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Success moment: the circle pops in, the check draws itself, a soft ring ripples out */
+@keyframes success-pop {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes success-ring {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.45;
+  }
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+
+@keyframes success-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    transform: translateY(12px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.success-pop {
+  animation: success-pop 460ms cubic-bezier(0.2, 0.9, 0.3, 1.25) both;
+}
+
+.success-ring {
+  animation: success-ring 900ms ease-out 380ms both;
+}
+
+.success-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: success-draw 360ms ease-out 300ms forwards;
+}
+
+.rise-in {
+  animation: rise-in 420ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .success-pop,
+  .success-ring,
+  .rise-in {
+    animation: none;
+  }
+
+  .success-ring {
+    opacity: 0;
+  }
+
+  .success-draw {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}

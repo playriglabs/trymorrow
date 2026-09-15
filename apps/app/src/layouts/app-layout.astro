@@ -1,0 +1,45 @@
+---
+import '@/styles/global.css'
+import { PUBLIC_APP_URL } from 'astro:env/client'
+
+type Props = {
+  title?: string
+  description?: string
+  image?: string
+}
+
+const {
+  title = 'Morrow',
+  description = 'Give stocks that grow. Send a piece of a real company to anyone.',
+  image,
+} = Astro.props
+const url = new URL(Astro.url.pathname, PUBLIC_APP_URL).href
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#fff7e9" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={url} />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Morrow" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={url} />
+    {image && <meta property="og:image" content={image} />}
+    <meta name="twitter:card" content={image ? 'summary_large_image' : 'summary'} />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+  </head>
+  <body class="min-h-dvh bg-cream text-ink">
+    <main class="mx-auto flex min-h-dvh w-full max-w-107.5 flex-col">
+      <slot />
+    </main>
+  </body>
+</html>
