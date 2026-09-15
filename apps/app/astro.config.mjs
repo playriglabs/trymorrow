@@ -24,6 +24,13 @@ export default defineConfig({
         access: 'public',
         optional: true,
       }),
+      // VAPID public key the browser needs to subscribe to push. Unset means no phone
+      // notifications: the feed still works, the app just never asks for permission.
+      PUBLIC_VAPID_PUBLIC_KEY: envField.string({
+        context: 'client',
+        access: 'public',
+        optional: true,
+      }),
       PRIVY_APP_SECRET: envField.string({ context: 'server', access: 'secret' }),
       SUPABASE_URL: envField.string({ context: 'server', access: 'secret' }),
       SUPABASE_SERVICE_ROLE_KEY: envField.string({ context: 'server', access: 'secret' }),
@@ -45,6 +52,10 @@ export default defineConfig({
         access: 'secret',
         optional: true,
       }),
+      // Private half of the VAPID pair, and the mailto: we identify ourselves with. Both
+      // needed to send a push; without them notifications stay in the feed.
+      VAPID_PRIVATE_KEY: envField.string({ context: 'server', access: 'secret', optional: true }),
+      VAPID_SUBJECT: envField.string({ context: 'server', access: 'secret', optional: true }),
       // Our trading fee in basis points; Jupiter allows 50-255 and keeps 20% of it
       TRADE_FEE_BPS: envField.number({
         context: 'server',
