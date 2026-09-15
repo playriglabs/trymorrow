@@ -1,0 +1,108 @@
+/* Design tokens — source of truth: DESIGN.md */
+
+@import 'tailwindcss';
+
+/* Scan shared components; each app's own files are detected automatically */
+@source './components';
+
+@font-face {
+  font-family: 'Pilat';
+  src: url('./fonts/Pilat-Book.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Aeonik';
+  src: url('./fonts/Aeonik.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@theme {
+  /* Only design-system colors are available */
+  --color-*: initial;
+
+  /* Core */
+  --color-orange: #f66f00;
+  --color-orange-wash: rgb(246 111 0 / 0.12);
+  --color-cream: #fff7e9;
+  --color-surface: #fffefb;
+  --color-white: #ffffff;
+  --color-ink: #1c1c1c;
+  --color-stone: #7e6246;
+  --color-steel: #aeaca4;
+  --color-line: #eadfce;
+  --color-sun: #fccc3c;
+
+  /* Data */
+  --color-gain: #16804a;
+  --color-gain-wash: #ddf0e4;
+  --color-loss: #c23b3b;
+  --color-loss-wash: #f7e0de;
+
+  /* Atmosphere (decorative only) */
+  --color-orb-violet: #8251fb;
+  --color-orb-orange: #ff4d00;
+  --color-orb-pink: #f50db4;
+  --color-orb-cyan: #2abdff;
+  --color-orb-teal: #00c3a0;
+  --color-orb-coral: #e01a2b;
+
+  /* Fonts */
+  --font-sans: 'Aeonik', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-body: 'Pilat', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /* Type scale */
+  --text-caption: 12px;
+  --text-caption--line-height: 1.33;
+  --text-body-sm: 14px;
+  --text-body-sm--line-height: 1.5;
+  --text-body: 16px;
+  --text-body--line-height: 1.55;
+  --text-description: 18px;
+  --text-description--line-height: 1.5;
+  --text-description--letter-spacing: -0.01em;
+  --text-subheading: 18px;
+  --text-subheading--line-height: 1.33;
+  --text-subheading--letter-spacing: -0.02em;
+  --text-heading-sm: 24px;
+  --text-heading-sm--line-height: 1.2;
+  --text-heading-sm--letter-spacing: -0.02em;
+  --text-heading: 36px;
+  --text-heading--line-height: 1.15;
+  --text-heading--letter-spacing: -0.02em;
+  --text-heading-lg: 52px;
+  --text-heading-lg--line-height: 1;
+  --text-heading-lg--letter-spacing: -0.02em;
+  --text-display: 64px;
+  --text-display--line-height: 0.96;
+  --text-display--letter-spacing: -0.02em;
+
+  /* Layout */
+  --container-page: 1200px;
+
+  /* Radius */
+  --radius-button: 16px;
+  --radius-card: 20px;
+  --radius-link: 32px;
+  --radius-sheet: 28px;
+
+  /* Elevation */
+  --shadow-elevated: 0 0 10px 0 rgb(76 40 6 / 0.04);
+}
+
+@layer base {
+  body {
+    @apply bg-cream font-body text-body text-ink antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-sans font-medium tracking-[-0.02em];
+  }
+}
