@@ -80,12 +80,17 @@ A fund is a long-term pot for someone ("Aisyah's college fund"): locked until a 
 - [x] **Trade history** stored in the DB (`trade_fills`, `pending_trades`), which gives a cost basis
   - [x] Real PnL on holdings (`pnl.ts` average cost, gifts included; no basis shown when the lots
         don't explain the whole balance)
-  - [ ] The "Just bought" share card still shows today's move; a fresh buy has no return yet, so
-        decide what it should say before changing it
+  - [x] The "Just bought" share card no longer shows a bare percentage. Today's move sits on a
+        cream receipt among labelled facts ("Bought at", "Shares", "Today's move"), so it reads as
+        the stock's move and not the buyer's return. `renderShareCard` is generic over eyebrow,
+        hero, subhero and rows, and the footer carries a code to the sharer's handle page
+  - [ ] The second moment: share from a holding with the real return as the hero ("+12.4%",
+        "Bought at" / "Now"). The template already takes it; needs an entry point on the holding
+        and an empty state for when `pnl.ts` has no basis
 - [x] **Ask a friend**: `/ask` builds a link (`morrow.fi/maya?stock=AAPLX&amount=25&note=…`). The ask
       lives in the link, so nothing is stored and there's nothing to abuse. The handle page renders
       it with an OG preview and `/send` opens prefilled, warning when the sender doesn't own it yet
-- [ ] **Gift share card and OG image** that match the trade share card
+- [x] **Gift share card and OG image** built on `renderShareCard`, which the trade card now shares
 - [ ] **Move Jupiter Ultra to Swap V2** (needs an API key). Parked 2026-09-15: Ultra is what carries
       gasless (JupiterZ), which the whole fee-with-fallback rule depends on, and Swap V2 has no
       gasless. Revisit with a key and a plan for the fee

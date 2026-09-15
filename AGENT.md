@@ -95,6 +95,12 @@ Server modules in `src/lib/server`:
 
 `/ask` builds a link to the asker's own handle page carrying the wish: `morrow.fi/maya?stock=AAPLX&amount=25&note=Birthday`. Nothing is stored, so there's no row to abuse and no cleanup. `[handle].astro` renders the ask with its own OG preview and points at `/send` with the same values; `send-gift-screen.tsx` preselects the stock only when the sender actually holds it, and says so when they don't.
 
+### Share cards
+
+`renderShareCard` (`lib/client/share-card.ts`) draws every shareable image on a canvas: eyebrow, hero, subhero, a cream receipt of labelled rows, and a footer with a code to the sharer's handle page. It shares its module grid with `qr-code.tsx` through `qr-layout.ts`, so both codes look the same.
+
+**Every number on a card needs a label that says whose it is.** A bare percentage on a "Just bought" card reads as the sharer's return, and a fresh buy has none, so today's move goes in a row called "Today's move" rather than a pill. Gain and loss only work on the cream receipt; they don't pass AA on the orange panel.
+
 ### Notifications
 
 Everything goes through `notify()`. It reads `notification_settings` (no row means the defaults, all on), inserts the feed rows, and pushes only the kinds someone can switch off — those are exactly the things that happened while they were away, so a person's own buys and sends never buzz. Push needs `PUBLIC_VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY`; without them the feed still works and the browser is never asked for permission. `public/sw.js` holds the push handlers and the offline shell, and ships from `/public` unbundled.
