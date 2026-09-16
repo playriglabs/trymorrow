@@ -250,13 +250,13 @@ export async function notifyContribution({
   mints: string[]
 }): Promise<void> {
   const stocks = await getStocks()
-  const names = mints.flatMap((mint) => {
+  const tickers = mints.flatMap((mint) => {
     const stock = stocks.find((entry) => entry.mint.toBase58() === mint)
-    return stock ? [stock.name] : []
+    return stock ? [stock.ticker] : []
   })
   const fundName = fund.name ?? `${fund.beneficiary_name}’s fund`
   const amount = formatUsd(usdValue)
-  const body = `${names.length > 0 ? `${names.join(', ')} · ` : ''}locked until ${new Date(
+  const body = `${tickers.length > 0 ? `${tickers.join(', ')} · ` : ''}locked until ${new Date(
     fund.unlock_at,
   ).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`
 

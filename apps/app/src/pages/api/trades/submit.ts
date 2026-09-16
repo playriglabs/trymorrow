@@ -57,7 +57,7 @@ async function recordFill(
   await db.from('notifications').insert({
     user_id: user.id,
     kind: buy ? 'trade_bought' : 'trade_sold',
-    title: `${buy ? 'You bought' : 'You sold'} ${stock.name}`,
+    title: `${buy ? 'You bought' : 'You sold'} ${stock.ticker}`,
     body: `${formatShares(shares)} shares · ${formatUsd(usd)}`,
   })
 }
