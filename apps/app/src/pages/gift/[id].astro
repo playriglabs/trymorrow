@@ -13,13 +13,14 @@ const { id = '' } = Astro.params
 const { data: gift, error: giftError } = isGiftId(id)
   ? await db
       .from('gifts')
-      .select('status, sender_id, recipient_id, gift_items (mint)')
+      .select('status, sender_id, recipient_id, code_hash, gift_items (mint)')
       .eq('id', id)
       .maybeSingle()
   : { data: null, error: null }
 if (giftError) throw giftError
 
 const found = Boolean(gift && gift.status !== 'draft')
+const codeCard = Boolean(gift?.code_hash)
 if (!found) Astro.response.status = 404
 const mints = ((found ? (gift?.gift_items ?? []) : []) as { mint: string }[]).map(
   (item) => item.mint,
@@ -56,7 +57,9 @@ const title = !found
       : `Gift claimed — Morrow`
     : gift?.status === 'refunded'
       ? `Gift returned to ${senderName} — Morrow`
-      : `${senderName} sent you a gift — Morrow`
+      : codeCard
+        ? `${senderName} sent a gift card — Morrow`
+        : `${senderName} sent you a gift — Morrow`
 
 const description = !found
   ? 'This gift link doesn’t exist.'
@@ -66,7 +69,9 @@ const description = !found
       : `This ${contents} gift has been opened and delivered on Morrow.`
     : gift?.status === 'refunded'
       ? `This ${contents} gift was returned to ${senderName} and can no longer be opened.`
-      : `${capitalizedContents}, waiting for you on Morrow. Only the person it’s for can open it.`
+      : codeCard
+        ? `${capitalizedContents} on a gift card, waiting on Morrow. Anyone with the code can redeem it.`
+        : `${capitalizedContents}, waiting for you on Morrow. Only the person it’s for can open it.`
 // The preview is a dynamically generated card with the gift's contents, sender and status
 const image = found ? new URL(`/og/gift/${id}.png`, PUBLIC_APP_URL).href : undefined
 ---

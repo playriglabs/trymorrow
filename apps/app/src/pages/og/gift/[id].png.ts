@@ -19,7 +19,7 @@ export const GET: APIRoute = async ({ params }) => {
   try {
     const { data: gift, error } = await db
       .from('gifts')
-      .select('status, sender_id, recipient_id, gift_items (mint, usd_value)')
+      .select('status, sender_id, recipient_id, code_hash, gift_items (mint, usd_value)')
       .eq('id', id)
       .maybeSingle()
     if (error) throw error
@@ -56,6 +56,7 @@ export const GET: APIRoute = async ({ params }) => {
       recipientName: recipient?.name ? short(recipient.name, 22) : null,
       status:
         gift.status === 'claimed' ? 'claimed' : gift.status === 'refunded' ? 'refunded' : 'pending',
+      codeCard: gift.code_hash != null,
       totalValue: total == null ? null : formatUsd(total),
       assets,
     })

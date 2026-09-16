@@ -5,6 +5,7 @@ import {
   GiftIcon,
   QuestionIcon,
   SignOutIcon,
+  TicketIcon,
   WalletIcon,
 } from '@phosphor-icons/react'
 import { useState } from 'react'
@@ -60,6 +61,11 @@ function ProfilePage() {
           <a href="/ask" className="flex h-13 items-center gap-3">
             <GiftIcon className="size-5" />
             <span className="flex-1">Ask for a gift</span>
+            <CaretRightIcon className="size-4.5 text-steel" />
+          </a>
+          <a href="/gift-cards" className="flex h-13 items-center gap-3">
+            <TicketIcon className="size-5" />
+            <span className="flex-1">Gift card</span>
             <CaretRightIcon className="size-4.5 text-steel" />
           </a>
           <a href="/add-cash" className="flex h-13 items-center gap-3">

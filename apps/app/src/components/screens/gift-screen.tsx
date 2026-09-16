@@ -67,7 +67,11 @@ function GiftCard({ gift }: { gift: GiftView }) {
           className="bg-white"
           alt={`${gift.sender.name} profile photo`}
         />
-        <span className="text-[15px] text-white">{gift.sender.name} sent you a gift</span>
+        <span className="text-[15px] text-white">
+          {gift.codeCard
+            ? `${gift.sender.name} made a gift card`
+            : `${gift.sender.name} sent you a gift`}
+        </span>
       </div>
       <div className="relative flex flex-col gap-1">
         <h1 className="font-sans text-[38px] leading-[1.08] font-medium tracking-[-0.02em]">
@@ -244,14 +248,36 @@ function Gift({ giftId }: { giftId: string }) {
       >
         <GiftCard gift={view} />
         <Notice icon={<LockIcon className="size-4.5 text-stone" />}>
-          Waiting for {view.recipientLabel} to open it. If they don’t by{' '}
-          {formatDate(view.expiresAt)}, it comes back to you.
+          {view.codeCard
+            ? `Anyone with the code can redeem it — share the code you saved. Not redeemed by ${formatDate(view.expiresAt)}? It comes back to you.`
+            : `Waiting for ${view.recipientLabel} to open it. If they don’t by ${formatDate(view.expiresAt)}, it comes back to you.`}
         </Notice>
       </Screen>
     )
   }
 
   if (view.viewer === 'anonymous') {
+    // A card isn't for a particular person, so there's nothing to prove here — the code is the lock
+    if (view.codeCard) {
+      return (
+        <Screen
+          title="Gift card"
+          back="/"
+          footer={<LinkButton href="/redeem">Redeem it with its code</LinkButton>}
+        >
+          <GiftCard gift={view} />
+          <div className="flex flex-col gap-1.5">
+            <h2 className="font-sans text-xl font-medium tracking-[-0.02em]">
+              Anyone with the code can keep it
+            </h2>
+            <p className="text-[15px] text-stone">
+              {view.sender.name} made this a gift card. Redeem its 16-character code before{' '}
+              {formatDate(view.expiresAt)} and what’s inside is yours.
+            </p>
+          </div>
+        </Screen>
+      )
+    }
     return (
       <Screen title="Gift" back="/">
         <GiftCard gift={view} />
@@ -269,6 +295,22 @@ function Gift({ giftId }: { giftId: string }) {
   }
 
   if (view.viewer === 'other') {
+    // A card doesn't belong to any one account, so being signed in as someone else changes nothing
+    if (view.codeCard) {
+      return (
+        <Screen
+          title="Gift card"
+          back="/"
+          footer={<LinkButton href="/redeem">Redeem it with its code</LinkButton>}
+        >
+          <GiftCard gift={view} />
+          <Notice icon={<LockIcon className="size-4.5 text-stone" />}>
+            {view.sender.name} made this a gift card. Redeem its 16-character code and what’s inside
+            goes to your account.
+          </Notice>
+        </Screen>
+      )
+    }
     return (
       <Screen
         title="Gift"

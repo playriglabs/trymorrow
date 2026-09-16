@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import { useApi } from '@/lib/client/api'
 import { useSignRelayed } from '@/lib/client/sign'
 import { HANDLE_PATTERN } from '@/lib/handles'
+import { normalizeCode } from '@/lib/redeem-code'
 import type {
   CashoutQuote,
   CashoutView,
@@ -42,6 +43,8 @@ export const queryKeys = {
   recipient: (query: string) => ['recipient', query] as const,
   giftFee: (recipients: string[], mints: string[]) =>
     ['gift-fee', [...recipients].sort().join(','), [...mints].sort().join(',')] as const,
+  giftCardFee: (mints: string[]) => ['gift-card-fee', [...mints].sort().join(',')] as const,
+  redeem: (code: string) => ['redeem', code] as const,
   handle: (handle: string) => ['handle', handle] as const,
   stocks: () => ['stocks'] as const,
   stockProfile: (mint: string) => ['stock-profile', mint] as const,
@@ -623,6 +626,103 @@ export function useRefundGiftMutation(giftId: string) {
       queryClient.setQueriesData({ queryKey: queryKeys.gift(giftId) }, gift)
       queryClient.invalidateQueries({ queryKey: queryKeys.portfolio() })
       queryClient.invalidateQueries({ queryKey: queryKeys.gifts() })
+    },
+  })
+}
+
+// Gift cards
+
+/**
+ * What a card costs before it's made. Whoever redeems it is assumed to hold nothing, so a card
+ * always carries the claimer's account setup at cost — it's never free, unlike a gift to someone
+ * who already holds its stocks.
+ */
+export function useGiftCardFeeQuery(mints: string[], { enabled = true }: Options = {}) {
+  const api = useApi()
+  return useQuery({
+    queryKey: queryKeys.giftCardFee(mints),
+    enabled: enabled && mints.length > 0,
+    staleTime: 60_000,
+    placeholderData: keepPreviousData,
+    queryFn: () => api<GiftFeeQuote>('/api/gift-cards/quote', { method: 'POST', body: { mints } }),
+  })
+}
+
+/** What a code unlocks, while its owner decides. The code never travels before it's 16 clean symbols */
+export function useRedeemLookupQuery(code: string, { enabled = true }: Options = {}) {
+  const api = useApi()
+  const normalized = normalizeCode(code)
+  return useQuery({
+    queryKey: queryKeys.redeem(normalized),
+    enabled: enabled && normalized.length === 16,
+    retry: false,
+    staleTime: Infinity,
+    queryFn: () =>
+      api<{ gift: GiftView }>('/api/redeem', { method: 'POST', body: { code: normalized } }).then(
+        (data) => data.gift,
+      ),
+  })
+}
+
+export type CreateGiftCardInput = {
+  items: {
+    mint: string
+    /** Raw base units as a string (bigint-safe) */
+    amountRaw: string
+    usdValue: number
+  }[]
+  message?: string
+}
+
+export type CreateGiftCardResult = { gift: GiftView; code: string }
+
+/** Records the card, signs its lock, broadcasts it — and hands back the one and only copy of the code */
+export function useCreateGiftCardMutation() {
+  const api = useApi()
+  const sign = useSignRelayed()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: CreateGiftCardInput): Promise<CreateGiftCardResult> => {
+      const created = await api<{ gift: GiftView; code: string; transaction: string }>(
+        '/api/gift-cards',
+        { method: 'POST', body: input },
+      )
+      const { gift } = await api<{ gift: GiftView }>(`/api/gifts/${created.gift.id}/submit`, {
+        method: 'POST',
+        body: { transaction: await sign(created.transaction) },
+      })
+      // The code can't be fetched again, so it rides through onSuccess with the gift
+      return { gift, code: created.code }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.portfolio() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.gifts() })
+    },
+  })
+}
+
+/** Redeems a card with its code; whoever signs in and presents the code keeps what's inside */
+export function useClaimGiftCardMutation(giftId: string) {
+  const api = useApi()
+  const sign = useSignRelayed()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ code }: { code: string }): Promise<GiftView> => {
+      const { transaction } = await api<{ transaction: string }>(`/api/gifts/${giftId}/claim`, {
+        method: 'POST',
+        body: { code },
+      })
+      const { gift } = await api<{ gift: GiftView }>(`/api/gifts/${giftId}/submit`, {
+        method: 'POST',
+        body: { transaction: await sign(transaction) },
+      })
+      return gift
+    },
+    onSuccess: (gift) => {
+      queryClient.setQueriesData({ queryKey: queryKeys.gift(giftId) }, gift)
+      queryClient.invalidateQueries({ queryKey: queryKeys.portfolio() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.gifts() })
+      queryClient.invalidateQueries({ queryKey: ['redeem'] })
     },
   })
 }

@@ -26,6 +26,8 @@ export type GiftOgCard = {
   senderName: string
   recipientName: string | null
   status: 'pending' | 'claimed' | 'refunded'
+  /** A code card waits for its code, not for one particular person */
+  codeCard?: boolean
   totalValue: string | null
   assets: OgAsset[]
 }
@@ -267,8 +269,14 @@ export async function giftOgImage(card: GiftOgCard): Promise<Response> {
       ? { label: 'Opened', copy: 'This gift has been opened' }
       : card.status === 'refunded'
         ? { label: 'Returned', copy: 'This gift was returned' }
-        : { label: null, copy: 'Only the person it’s for can open it' }
-  const recipient = card.recipientName ? `for ${card.recipientName}` : 'for someone special'
+        : card.codeCard
+          ? { label: null, copy: 'Anyone with the code can redeem it' }
+          : { label: null, copy: 'Only the person it’s for can open it' }
+  const recipient = card.recipientName
+    ? `for ${card.recipientName}`
+    : card.codeCard
+      ? 'for whoever holds the code'
+      : 'for someone special'
   const hero = card.totalValue ?? 'Stocks and cash'
   // Keep longer amounts inside the existing gift column as the amount gains prominence.
   const heroSize = card.totalValue ? Math.min(72, (72 * 520) / textWidth(hero, 72)) : 47
