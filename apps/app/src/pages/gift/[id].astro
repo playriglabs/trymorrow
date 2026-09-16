@@ -1,4 +1,5 @@
 ---
+import { PUBLIC_APP_URL } from 'astro:env/client'
 import GiftScreen from '@/components/screens/gift-screen'
 import AppLayout from '@/layouts/app-layout.astro'
 import { giftContentsLabel } from '@/lib/gifts'
@@ -36,7 +37,6 @@ if (senderError) throw senderError
 if (recipientError) throw recipientError
 
 const assets = foundAssets.flatMap((asset) => (asset ? [asset] : []))
-const stocks = assets.filter((asset) => !asset.isCash)
 
 const found = Boolean(gift && gift.status !== 'draft')
 if (!found) Astro.response.status = 404
@@ -65,10 +65,10 @@ const description = !found
     : gift?.status === 'refunded'
       ? `This ${contents} gift was returned to ${senderName} and can no longer be opened.`
       : `${capitalizedContents}, waiting for you on Morrow. Only the person it’s for can open it.`
-// Cash has no logo of its own, so a mixed gift leans on its first stock and a cash-only one falls back
-const image = stocks[0]?.iconUrl ?? undefined
+// The preview is a dynamically generated card with the gift's contents, sender and status
+const image = found ? new URL(`/og/gift/${id}.png`, PUBLIC_APP_URL).href : undefined
 ---
 
-<AppLayout title={title} description={description} image={found ? image : undefined}>
+<AppLayout title={title} description={description} image={image}>
   <GiftScreen client:only="react" giftId={id} />
 </AppLayout>
