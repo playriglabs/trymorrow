@@ -26,16 +26,19 @@ import {
 } from '@/lib/client/queries'
 import { useSession } from '@/lib/client/session'
 import { formatDate, formatUsd, formatUsdWhole } from '@/lib/format'
-import { formatUnlock, MAX_FUND_HOLDINGS, purposeLabel, timeToGo } from '@/lib/funds'
+import {
+  FUND_MIN_SPLIT_USD,
+  formatUnlock,
+  MAX_FUND_HOLDINGS,
+  purposeLabel,
+  timeToGo,
+} from '@/lib/funds'
 import { MAX_NOTE } from '@/lib/notes'
 import type { FundView, Holding } from '@/lib/types'
 
 const PRESETS = [10, 25, 50, 100]
 
 const AMOUNT_PATTERN = /^\d{0,7}(\.\d{0,2})?$/
-
-/** Jupiter needs a real amount per stock in the mix to fill each buy at a sane price */
-const MIN_PER_STOCK_USD = 1
 
 function Progress({ fund }: { fund: FundView }) {
   if (fund.goalUsd == null) return null
@@ -122,7 +125,10 @@ function AddSheet({ fund, onClose }: { fund: FundView; onClose: () => void }) {
   const openStockSlots = Math.max(0, MAX_FUND_HOLDINGS - fund.holdings.length)
   const tooManyStocks = fund.holdings.length + newStocks > MAX_FUND_HOLDINGS
 
-  const minimum = MIN_PER_STOCK_USD * Math.max(1, fund.allocations.length) * 2
+  const minimum = Math.max(
+    FUND_MIN_SPLIT_USD,
+    ...fund.allocations.map((allocation) => (FUND_MIN_SPLIT_USD * 100) / allocation.percent),
+  )
   const cashTooSmall = usd < minimum
   const cashShort = usd + feeUsd > cashUsd
   const feeShort = mode === 'shares' && feeUsd > cashUsd
@@ -197,7 +203,7 @@ function AddSheet({ fund, onClose }: { fund: FundView; onClose: () => void }) {
   if (done != null) {
     return (
       <div className="modal-backdrop-in fixed inset-0 z-30 flex items-end justify-center bg-ink/30">
-        <div className="modal-sheet-in flex w-full max-w-107.5 flex-col items-center gap-5 rounded-t-sheet bg-cream px-5 pt-8 pb-[max(28px,env(safe-area-inset-bottom))] text-center">
+        <div className="modal-sheet-in flex w-full max-w-107.5 flex-col items-center gap-5 rounded-t-sheet bg-cream px-4 pt-8 pb-[max(28px,env(safe-area-inset-bottom))] text-center">
           <SuccessMark />
           <div className="flex flex-col gap-1.5">
             <h2 className="font-sans text-[24px] leading-[1.15] font-medium tracking-[-0.02em]">
@@ -497,7 +503,7 @@ function AddSheet({ fund, onClose }: { fund: FundView; onClose: () => void }) {
             <span className="text-stone">Fee</span>
             <span>{feeLabel}</span>
           </div>
-          {feeUsd > 0 && !fee.isFetching && (
+          {feeUsd > 0 && (
             <p className="-mt-2 text-[13px] leading-[1.45] text-stone">
               This is the first time the fund holds {stockReference}, so it pays for the account
               that keeps {accountReference}, at cost.
@@ -534,7 +540,7 @@ function AddSheet({ fund, onClose }: { fund: FundView; onClose: () => void }) {
           {error && <p className="text-[13px] text-loss">{errorMessage(error)}</p>}
         </div>
 
-        <div className="flex shrink-0 flex-col gap-2.5 border-t border-line bg-cream px-5 pt-3 pb-[max(20px,env(safe-area-inset-bottom))]">
+        <div className="flex shrink-0 flex-col gap-2.5 border-t border-line bg-cream px-5 pt-5 pb-[max(20px,env(safe-area-inset-bottom))]">
           <Button disabled={addDisabled} loading={pending} onClick={submit}>
             {submitLabel}
           </Button>
@@ -730,7 +736,7 @@ function Fund({ fundId }: { fundId: string }) {
             <Card className="px-4">
               <div className="flex max-h-75 flex-col divide-y divide-line overflow-y-auto overscroll-contain">
                 {view.contributions.map((entry) => (
-                  <div key={entry.id} className="flex items-start gap-3 py-3">
+                  <div key={entry.id} className="flex items-center gap-3 py-3">
                     <Avatar name={entry.name} url={entry.avatarUrl} size={36} />
                     <div className="flex min-w-0 flex-1 flex-col">
                       <span className="truncate">{entry.name}</span>

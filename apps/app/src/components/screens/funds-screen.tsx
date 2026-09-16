@@ -1,9 +1,9 @@
-import { PlusIcon } from '@phosphor-icons/react'
+import { PiggyBankIcon, PlusIcon } from '@phosphor-icons/react'
 import { match } from 'ts-pattern'
 import { FundCard } from '@/components/fund-card'
 import { withProviders } from '@/components/providers'
 import { TabBar } from '@/components/tab-bar'
-import { Card, LinkButton, Loading } from '@/components/ui'
+import { LinkButton, Loading } from '@/components/ui'
 import { useFundsQuery } from '@/lib/client/queries'
 import { useSession } from '@/lib/client/session'
 
@@ -26,16 +26,20 @@ function Funds() {
       ),
     )
     .otherwise(() => (
-      <Card className="flex flex-col gap-3 p-5">
-        <h2 className="font-sans text-lg font-medium">No funds yet</h2>
-        <p className="text-[15px] leading-[1.45] text-stone">
-          A fund is money set aside for someone, locked until a date you choose. Share the link and
-          the whole family can add to it.
-        </p>
-        <LinkButton href="/funds/new" variant="soft" size="md">
-          Start a fund
-        </LinkButton>
-      </Card>
+      <div className="flex flex-1 items-center justify-center py-12">
+        <div className="flex w-full max-w-sm flex-col items-center gap-3 text-center">
+          <span className="flex size-20 items-center justify-center rounded-full bg-orange-wash">
+            <PiggyBankIcon className="size-10 text-orange" weight="duotone" />
+          </span>
+          <h2 className="mt-2 font-sans text-2xl font-medium tracking-[-0.02em]">No funds yet</h2>
+          <p className="text-[15px] leading-[1.45] text-stone">
+            Set money aside for someone you love and let the whole family add to it.
+          </p>
+          <LinkButton href="/funds/new" size="md" className="mt-2 w-full">
+            Start a fund
+          </LinkButton>
+        </div>
+      </div>
     ))
 
   return (

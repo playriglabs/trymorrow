@@ -3,6 +3,9 @@ import type { FundPurpose } from '@/lib/types'
 /** How many stocks the fund's mix buys with cash */
 export const MAX_FUND_STOCKS = 3
 
+/** Jupiter needs at least this much in each stock split to return a reliable buy route. */
+export const FUND_MIN_SPLIT_USD = 5
+
 /**
  * Anyone can also put in shares they already hold, so a fund ends up with more stocks than its
  * mix. Each one is a vault holding rent for years, and a withdrawal has to stay signable, so the

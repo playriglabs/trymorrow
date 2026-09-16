@@ -1,6 +1,7 @@
 import { PublicKey } from '@solana/web3.js'
 import { z } from 'astro/zod'
 import { formatUsd } from '@/lib/format'
+import { FUND_MIN_SPLIT_USD } from '@/lib/funds'
 import { findStock } from '@/lib/server/catalog'
 import { cashBalance, contributionFee } from '@/lib/server/fees'
 import { allocationMints, fundAddress, getFund } from '@/lib/server/funds'
@@ -15,7 +16,7 @@ const schema = z.object({
 })
 
 /** Below this a split is too small for Jupiter to fill at a sane price */
-const MIN_SPLIT_RAW = 500_000n
+const MIN_SPLIT_RAW = BigInt(FUND_MIN_SPLIT_USD * 1_000_000)
 
 /**
  * Splits cash by the fund's mix and returns one gasless Jupiter order per stock. The shares land
@@ -49,8 +50,12 @@ export const POST = route(async ({ params, request }) => {
   )
   splits[largest] = (splits[largest] ?? 0n) + (amount - splits.reduce((sum, raw) => sum + raw, 0n))
   if (splits.some((raw) => raw < MIN_SPLIT_RAW)) {
+    const minimumRaw = Object.values(fund.allocations).reduce((max, percent) => {
+      const needed = (MIN_SPLIT_RAW * 100n + BigInt(percent) - 1n) / BigInt(percent)
+      return needed > max ? needed : max
+    }, 0n)
     throw badRequest(
-      `Add at least ${formatUsd((Number(MIN_SPLIT_RAW) / 1_000_000) * mints.length * 2)} so every stock in the mix gets a real share.`,
+      `Add at least ${formatUsd(Number(minimumRaw) / 1_000_000)} so every stock in the mix gets a real share.`,
     )
   }
 
@@ -69,13 +74,25 @@ export const POST = route(async ({ params, request }) => {
 
   const orders: FundBuyOrder[] = []
   for (const [index, mint] of mints.entries()) {
-    const { order, view } = await quoteTrade('buy', mint, splits[index] ?? 0n, wallet)
+    const ticker = assets[index]?.ticker ?? 'one of these stocks'
+    const { order, view } = await quoteTrade('buy', mint, splits[index] ?? 0n, wallet).catch(
+      (error) => {
+        if (error instanceof HttpError && error.code === 'no_route') {
+          throw new HttpError(
+            422,
+            'no_route',
+            `We couldn’t get a price for ${ticker}. Try again in a moment.`,
+          )
+        }
+        throw error
+      },
+    )
     assertFairPrice(view)
     if (!order.transaction) {
       throw new HttpError(
         422,
         'no_route',
-        'We couldn’t get a price for one of these stocks. Try again in a moment.',
+        `We couldn’t get a transaction for ${ticker}. Try again in a moment.`,
       )
     }
     assertTradeTransaction(order.transaction, wallet, { gasless: order.gasless })

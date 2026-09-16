@@ -1,4 +1,4 @@
-import { CheckIcon, CopyIcon, LockIcon, ShareIcon, WarningIcon } from '@phosphor-icons/react'
+import { CheckIcon, CopyIcon, LockIcon, ShareIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { useMemo, useState } from 'react'
 import { match } from 'ts-pattern'
@@ -120,6 +120,7 @@ function CreateFund() {
   const [goalText, setGoalText] = useState('')
   const [month, setMonth] = useState(() => monthValue(yearsFromNow(DEFAULT_YEARS)))
   const [custom, setCustom] = useState<string[] | null>(null)
+  const [pickerOpen, setPickerOpen] = useState(false)
   const [created, setCreated] = useState<FundView | null>(null)
 
   const stocks = useStocksQuery({ enabled: session.ready })
@@ -371,50 +372,34 @@ function CreateFund() {
               {custom === null && <CheckIcon className="size-4 text-orange" />}
             </span>
             <span className="text-[13px] text-stone">
-              {STEADY_MIX.map(
-                ({ ticker, percent }) => `${byTicker.get(ticker)?.name ?? ticker} ${percent}%`,
-              ).join(' · ')}
+              {STEADY_MIX.map(({ ticker, percent }) => `${ticker} ${percent}%`).join(' · ')}
             </span>
           </button>
         )}
-        <div className="flex flex-wrap gap-2">
-          {listings.slice(0, 12).map((stock) => {
-            const selected = allocations.some((item) => item.mint === stock.mint)
-            return (
-              <button
+        <div className="flex flex-wrap items-center gap-2">
+          {allocations.map((allocation) => {
+            const stock = stockOf(allocation.mint)
+            return stock ? (
+              <span
                 key={stock.mint}
-                type="button"
-                aria-pressed={selected}
-                disabled={!selected && (custom?.length ?? 0) >= MAX_FUND_STOCKS}
-                onClick={() => toggleStock(stock.mint)}
-                className={clsx(
-                  'flex h-11 items-center gap-2 rounded-link border pr-4 pl-1.5 font-sans text-[15px] font-medium disabled:opacity-40',
-                  {
-                    'border-orange bg-orange-wash': selected && custom !== null,
-                    'border-line bg-surface': !selected || custom === null,
-                  },
-                )}
+                className="flex h-10 items-center gap-2 rounded-link border border-orange bg-orange-wash pr-3 pl-1.5 font-sans text-[14px] font-medium"
               >
-                <StockLogo iconUrl={stock.iconUrl} ticker={stock.ticker} size={30} />
-                {stock.name}
-                {ownedMints.has(stock.mint) && (
-                  <span className="text-[12px] text-stone">yours</span>
-                )}
-              </button>
-            )
+                <StockLogo iconUrl={stock.iconUrl} ticker={stock.ticker} size={28} />
+                {stock.ticker}
+              </span>
+            ) : null
           })}
-          {listings.length > 12 && (
-            <a
-              href="/buy"
-              className="flex h-11 items-center rounded-link border border-line bg-surface px-4 font-sans text-[15px] font-medium text-stone"
-            >
-              Show all {listings.length}
-            </a>
-          )}
+          <button
+            type="button"
+            onClick={() => setPickerOpen(true)}
+            className="flex h-10 items-center rounded-link border border-line bg-surface px-3 font-sans text-[14px] font-medium text-stone"
+          >
+            {custom ? 'Change stocks' : 'Customize mix'}
+          </button>
         </div>
         <p className="text-[13px] text-stone">
           {custom
-            ? `Split evenly: ${allocations.map((item) => `${stockOf(item.mint)?.name ?? ''} ${item.percent}%`).join(' · ')}`
+            ? `Split evenly: ${allocations.map((item) => `${stockOf(item.mint)?.ticker ?? ''} ${item.percent}%`).join(' · ')}`
             : `Every dollar added buys this mix. Pick up to ${MAX_FUND_STOCKS} of your own instead.`}
         </p>
       </div>
@@ -444,6 +429,81 @@ function CreateFund() {
         Stocks go up and down, and a fund locked for years can be worth less than what went in. The
         company behind these shares can also pause them. Only put in what you can leave alone.
       </Notice>
+
+      {pickerOpen && (
+        <div className="fixed inset-0 z-40 flex items-end bg-ink/35" role="presentation">
+          <button
+            type="button"
+            aria-label="Close stock picker"
+            className="absolute inset-0 cursor-default"
+            onClick={() => setPickerOpen(false)}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="fund-stock-picker-title"
+            className="relative flex max-h-[82dvh] w-full flex-col gap-4 overflow-hidden rounded-t-sheet bg-cream px-5 pt-5 pb-[max(20px,env(safe-area-inset-bottom))] shadow-elevated"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 id="fund-stock-picker-title" className="font-sans text-xl font-medium">
+                  Choose stocks
+                </h2>
+                <p className="text-[13px] text-stone">Pick up to {MAX_FUND_STOCKS}</p>
+              </div>
+              <button
+                type="button"
+                aria-label="Close stock picker"
+                onClick={() => setPickerOpen(false)}
+                className="flex size-10 items-center justify-center rounded-full hover:bg-orange-wash"
+              >
+                <XIcon className="size-5" />
+              </button>
+            </div>
+            <div className="flex min-h-0 flex-col overflow-y-auto rounded-card border border-line bg-surface">
+              {listings.map((stock) => {
+                const selected = allocations.some((item) => item.mint === stock.mint)
+                return (
+                  <button
+                    key={stock.mint}
+                    type="button"
+                    aria-pressed={selected}
+                    disabled={!selected && (custom?.length ?? 0) >= MAX_FUND_STOCKS}
+                    onClick={() => toggleStock(stock.mint)}
+                    className={clsx(
+                      'flex min-h-18 items-center gap-3 border-b border-line px-4 py-3 text-left font-sans text-[15px] font-medium last:border-b-0 disabled:opacity-40',
+                      {
+                        'bg-orange-wash': selected,
+                      },
+                    )}
+                  >
+                    <StockLogo iconUrl={stock.iconUrl} ticker={stock.ticker} size={40} />
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className="truncate">{stock.ticker}</span>
+                      <span className="text-[13px] text-stone">
+                        {ownedMints.has(stock.mint) ? 'You own this' : stock.name}
+                      </span>
+                    </span>
+                    <span
+                      className={clsx(
+                        'flex size-8 shrink-0 items-center justify-center rounded-full border',
+                        selected ? 'border-orange bg-orange text-white' : 'border-line bg-surface',
+                      )}
+                    >
+                      {selected && <CheckIcon className="size-4" weight="bold" />}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+            <div className="sticky bottom-0 -mx-5 -mb-[max(20px,env(safe-area-inset-bottom))] border-t border-line bg-cream px-5 pt-5 pb-[max(20px,env(safe-area-inset-bottom))]">
+              <Button className="w-full" size="md" onClick={() => setPickerOpen(false)}>
+                Done
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </Screen>
   )
 }
