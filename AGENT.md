@@ -91,6 +91,7 @@ Server modules in `src/lib/server`:
 4. `submit` re-reads the transaction and only broadcasts if it's exactly one expected action per gift item, all the same kind, and the only token instruction is the recorded fee transfer. Keep that check strict when adding features.
 5. Claim is the same shape: `POST /api/gifts/[id]/claim` builds it, `submit` verifies and sends. Take-back mirrors it: `POST /api/gifts/[id]/refund` builds `refund_gift` with the sender as authority, `submit` verifies and sends, no notification (the sender is watching it happen).
 6. `GET /api/cron/refund-gifts` (daily on Vercel, `Authorization: Bearer CRON_SECRET`) refunds expired gifts and deletes stale drafts. A gift closed on-chain but still pending in the DB is reconciled by reading its last on-chain transaction (`claimed` or `refunded`); the cron also scans up to 200 not-yet-expired pending gifts per run for the same problem.
+7. Cash gifts ride this same flow. `findGiftAsset` (`catalog.ts`) resolves the USDC mint the way `findStock` resolves xStocks — every gift route, the views and the refund cron go through it, so a cash item is `gift_items` row with the USDC mint, nothing more (no `kind` column). Cash left after the gifts pays the fee first; any shortfall comes out of the cash locked for the recipients, so sending the whole balance still works. Cash is never a share-paid-fee candidate. `pnpm test:gifts` runs the gift flow on a throwaway validator with a plain SPL cash stand-in and fails if the biggest gift (2 stocks + cash + cash fee, measured 1,139 bytes) ever exceeds the byte limit.
 
 ### Cash out flow
 
@@ -102,7 +103,7 @@ The address must be on-curve and either unused or system-owned, so a pasted cash
 
 ### Ask a friend
 
-`/ask` builds a link to the asker's own handle page carrying the wish: `trymorrow.money/maya?stock=AAPLX&amount=25&note=Birthday`. Nothing is stored, so there's no row to abuse and no cleanup. `[handle].astro` renders the ask with its own OG preview and points at `/send` with the same values; `send-gift-screen.tsx` preselects the stock only when the sender actually holds it, and says so when they don't.
+`/ask` builds a link to the asker's own handle page carrying the wish: `app.trymorrow.money/maya?stock=AAPLX&amount=25&note=Birthday`. Nothing is stored, so there's no row to abuse and no cleanup. `[handle].astro` renders the ask with its own OG preview and points at `/send` with the same values; `send-gift-screen.tsx` preselects the stock only when the sender actually holds it, and says so when they don't.
 
 ### Share cards
 
@@ -118,7 +119,7 @@ Everything goes through `notify()`. It reads `notification_settings` (no row mea
 
 - Rent locked in a gift account and its vault comes back to the relayer on claim or refund. It's working capital, not a cost.
 - Opening a share account the recipient doesn't have yet (Token-2022 ATA, 179 bytes for xStocks) never comes back. The sender pays that plus network fees, at cost with 15% SOL price headroom. Gifts of stocks the recipient already holds are free.
-- The fee is paid in cash first, otherwise in shares of the gift's stock with the most left over, always on top of the gift. The client mirrors this in `send-gift-screen.tsx`; the server is authoritative.
+- The fee is paid from cash left after the gift first. When the gift contains cash and that balance is short, the unpaid part is deducted from the cash each recipient gets; the full fee transfer remains in the transaction, so the sender never spends more than their balance. If reducing cash would empty a gift, shares can pay on top instead. Without a cash gift, the existing cash-then-shares rule applies. The client mirrors this in `send-gift-screen.tsx`; the server is authoritative.
 - Trading fee: Jupiter referral fee only when the order stays gasless. JupiterZ (RFQ) can't carry integrator fees; if the fee order isn't gasless, fall back to fee-free and pause the fee for that pair for 10 minutes.
 - A fund locks rent for years: the relayer pays it, and the creator pays what the fund account costs while the contributor pays for each new vault plus the account the beneficiary will need at unlock. `withdraw` closes the vaults and `close_fund` (daily cron) closes the fund, so the SOL comes home.
 - Cashing out is free when the destination already has a cash account (the network fee is well under a cent). When it doesn't, the relayer opens one and that rent never comes back, so it's charged at cost — taken out of the amount, not added on top, so "All" always works.
