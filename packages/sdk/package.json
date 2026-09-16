@@ -8,7 +8,8 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test:program": "node --import ./tests/ts-resolve.mjs tests/funds.ts"
+    "test:program": "node --import ./tests/ts-resolve.mjs tests/funds.ts",
+    "test:gifts": "node --import ./tests/ts-resolve.mjs tests/gifts.ts"
   },
   "dependencies": {
     "@solana/spl-token": "0.4.15",

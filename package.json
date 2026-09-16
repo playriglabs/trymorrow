@@ -16,7 +16,8 @@
     "typecheck": "pnpm -r typecheck",
     "lint": "biome check . && prettier --check .",
     "format": "biome check --write . && prettier --write .",
-    "prepare": "lefthook install"
+    "prepare": "lefthook install",
+    "test:gifts": "pnpm --filter @morrow/sdk test:gifts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.13",
