@@ -84,10 +84,10 @@ A fund is a long-term pot for someone ("Aisyah's college fund"): locked until a 
         cream receipt among labelled facts ("Bought at", "Shares", "Today's move"), so it reads as
         the stock's move and not the buyer's return. `renderShareCard` is generic over eyebrow,
         hero, subhero and rows, and the footer carries a code to the sharer's handle page
-  - [ ] The second moment: share from a holding with the real return as the hero ("+12.4%",
+  - [x] The second moment: share from a holding with the real return as the hero ("+12.4%",
         "Bought at" / "Now"). The template already takes it; needs an entry point on the holding
         and an empty state for when `pnl.ts` has no basis
-- [x] **Ask a friend**: `/ask` builds a link (`trymorrow.money/maya?stock=AAPLX&amount=25&note=…`). The ask
+- [x] **Ask a friend**: `/ask` builds a link (`app.trymorrow.money/maya?stock=AAPLX&amount=25&note=…`). The ask
       lives in the link, so nothing is stored and there's nothing to abuse. The handle page renders
       it with an OG preview and `/send` opens prefilled, warning when the sender doesn't own it yet
 - [x] **Gift share card and OG image** built on `renderShareCard`, which the trade card now shares
@@ -103,3 +103,121 @@ A fund is a long-term pot for someone ("Aisyah's college fund"): locked until a 
       `public/sw.js` with an `/offline` page, and web push. Gifts now write feed events at all
       (sent, received, opened, returned) and anything that happened while you were away also goes
       to the phone. Needs `PUBLIC_VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` set in Vercel
+
+## P3 — growth and earning roadmap (proposed for review)
+
+The product loop to strengthen is: someone asks or creates an occasion, another person sends a
+gift, the recipient opens it, both people see it grow, then either person starts the next gift.
+Daily opens are not the goal. More useful gift relationships, repeat occasions and long-term
+contributions are.
+
+### Scorecard
+
+- **North star:** gifts opened and still held 30 days later, measured weekly
+- **Acquisition:** shared-link visits that become a first funded gift; new senders per recipient
+- **Activation:** gift-open rate and median time from send to open
+- **Retention:** recipients who return in 30 days; senders who send again within 90 days
+- **Funds:** contributors per fund, repeat contributions and progress toward the goal
+- **Earn:** eligible balance opted in, net reward delivered and retention versus non-Earn users
+- **Guardrails:** failed money movements, unresolved balances, user losses, support contacts per
+  funded user and every fee disclosed before signing
+
+Instrument these events and establish a baseline before judging a feature. Keep amounts private by
+default in analytics and anything shared outside the app.
+
+### Phase 1 — make asking and sending repeatable
+
+- [ ] **Persistent wishlist:** save several wanted stocks, an optional target amount and purpose;
+      show it on the handle page and let a sender fill a gift from it in one tap
+- [ ] **Occasions:** save birthdays, graduations and other dates against a person or wishlist, with
+      reminders at useful intervals and a direct path to a prefilled gift
+- [ ] **Recipient-aware suggestions:** prefer wishlist items, avoid suggesting a stock the person
+      already has when that is known, and always offer a simple diversified choice
+- [ ] **Gift reminders:** tell the sender when a gift is unopened, let them resend its existing link,
+      and warn clearly before the 30-day return date
+- [ ] **First-gift incentive experiment:** test a fee credit, not points or a cash promise; cap its
+      cost and measure incremental completed gifts rather than link clicks
+
+**Exit:** more shared-link visitors complete a gift and more gifts are opened, without increasing
+failed transactions or support contacts.
+
+### Phase 2 — make a gift worth returning to
+
+- [ ] **Gift journey:** keep the original message, starting value, current value and change since
+      the gift was opened in one durable view
+- [ ] **Thank-you flow:** after opening, send a lightweight thank-you card back to the giver and
+      bring them to the gift's current journey
+- [ ] **Growth updates:** optional, infrequent milestones for meaningful value changes; never send
+      noisy daily price alerts or imply that gains are guaranteed
+- [ ] **Private-by-default milestone cards:** share growth, time held or fund progress with the
+      amount hidden unless the user explicitly includes it
+- [ ] **Continue the loop:** from a claimed gift, offer `Add more` and `Give something like this`
+      with the stock and amount prefilled but editable
+
+**Exit:** claimed-gift recipients return within 30 days and either hold, add or give, while push
+opt-outs stay within the agreed guardrail.
+
+### Phase 3 — turn occasions into long-term habits
+
+- [ ] **Monthly fund reminder:** ship the non-custodial version first: a reminder plus a one-tap
+      prefilled contribution that the contributor still signs
+- [ ] **Recurring contribution discovery:** compare capped token delegation with Jupiter Recurring;
+      require revocation, a per-period spending cap, pause controls and a visible next-run date
+- [ ] **Group gift 2.0:** add a contribution deadline, organizer updates, message wall, contributor
+      invites and progress milestones to family funds
+- [ ] **Family circle:** reuse people and occasions across wishlists and funds; do not expose one
+      person's balances or holdings to another
+- [ ] **Smart amount guidance:** recommend a contribution from the remaining goal and time, never
+      from pressure, leaderboards or public comparisons
+
+**Exit:** funds gain more than one contributor and receive a second contribution without weakening
+the requirement that every money movement is authorized by its owner.
+
+### Phase 4 — Morrow Earn
+
+Start discovery alongside Phase 1. Do not ship deposits until the legal, liquidity and failure-mode
+gates below pass. Earn stays opt-in; ordinary gifts, holdings and funds must continue to work without
+it.
+
+Market reference, not a product promise: on 2026-09-14 xStocks announced partner-operated vaults
+for SPYx, QQQx and NVDAx with variable rewards up to 2% net, rewards accruing in the deposited
+xStock and a three-day deallocation period. Use the live partner terms and contracts during
+discovery; do not hard-code those assets, rates or timing.
+
+- [ ] **Eligibility and legal gate:** confirm where Morrow may surface xStocks and DeFi yield,
+      whether the no-KYC model can remain, the disclosures required and how restricted users are
+      blocked before a quote or transaction is built
+- [ ] **Provider diligence:** evaluate a partner-operated, non-custodial vault rather than writing a
+      leveraged strategy; record contracts, audits, curator powers, fees, oracle/bridge exposure,
+      supported xStocks, capacity, withdrawal queue and emergency procedure
+- [ ] **Accounting prototype:** prove Token-2022 scaled balances, dividend rebases, vault shares,
+      deposits, rewards, partial withdrawals and cost basis reconcile without trusting the database
+- [ ] **Fund Earn pilot:** offer Earn only for supported allocations in newly created long-term funds;
+      keep unsupported shares in the existing fund vault and show the two balances plainly
+- [ ] **Claimed-holding Earn:** after a gift is opened, let the owner allocate supported shares to
+      Earn and request withdrawal; never enroll a pending gift automatically
+- [ ] **Idle-cash Earn:** consider only after the stock pilot works; preserve enough ready cash for
+      trades and fees, and never describe variable yield as savings interest or guaranteed return
+- [ ] **Transparent earnings view:** separate market change, dividend-related balance changes, gross
+      Earn rewards, provider fees and Morrow's fee
+- [ ] **Revenue experiment:** test a disclosed performance fee or provider revenue share charged
+      only on rewards; do not take principal, stock appreciation or hidden spread
+
+**Earn launch gates:** an independent contract review, end-to-end mainnet tests with small balances,
+withdrawal and provider-pause drills, per-user and global deposit caps, monitoring and an incident
+runbook. The UI must show variable rate, possible loss, withdrawal timing and total fees before the
+user signs.
+
+**Exit:** the pilot delivers positive net rewards after all fees, withdrawals reconcile, no user
+funds are lost or stranded, and eligible users retain better than the comparable non-Earn cohort.
+
+### Later, only if the core loop earns it
+
+- [ ] Round-up contributions after recurring authorization is proven safe and understandable
+- [ ] Sponsored gift boosts with a fixed campaign budget and clear sponsor labeling
+- [ ] Portfolio health guidance that explains concentration without personalized investment advice
+- [ ] Broader Earn assets only after each asset passes the same liquidity and risk gates
+
+Do not prioritize a public wealth leaderboard, daily streak, generic social feed, chat or points
+without a redeemable benefit. They can create activity without making gifts or long-term saving more
+useful.
