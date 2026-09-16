@@ -1,97 +1,166 @@
-import { DownloadSimpleIcon, ShareIcon, XIcon } from '@phosphor-icons/react'
-import { useEffect, useState } from 'react'
-import { Button, Card } from '@/components/ui'
+import { ShareIcon, XIcon } from '@phosphor-icons/react'
+import { useEffect, useRef, useState } from 'react'
 
-/** Chrome and Edge hand us the prompt; Safari never does, so iOS gets the manual steps */
-type InstallEvent = Event & { prompt: () => Promise<void> }
+type InstallEvent = Event & {
+  prompt: () => Promise<void>
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
+}
 
-const DISMISSED = 'morrow.install.dismissed'
+declare global {
+  interface Window {
+    __morrowInstallPrompt?: InstallEvent
+    __morrowInstalled?: boolean
+  }
+}
 
+const DISMISSED = 'morrow.install.banner.dismissed-until'
 const isStandalone = () =>
   window.matchMedia('(display-mode: standalone)').matches ||
-  // iOS Safari's own flag, which predates display-mode
-  (navigator as { standalone?: boolean }).standalone === true
+  (navigator as Navigator & { standalone?: boolean }).standalone === true
+const isIos = () =>
+  /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+  (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
 
-const isIos = () => /iphone|ipad|ipod/i.test(navigator.userAgent)
-
-/** Offers to put Morrow on the home screen, once, and never again after a no */
 export function InstallPrompt() {
-  const [event, setEvent] = useState<InstallEvent | null>(null)
-  const [showSteps, setShowSteps] = useState(false)
   const [hidden, setHidden] = useState(true)
+  const [installing, setInstalling] = useState(false)
+  const [ios, setIos] = useState(false)
+  const dialog = useRef<HTMLDialogElement>(null)
 
   useEffect(() => {
-    if (isStandalone()) return
+    if (isStandalone() || window.__morrowInstalled) return
     try {
-      if (localStorage.getItem(DISMISSED)) return
+      if (Number(localStorage.getItem(DISMISSED)) > Date.now()) return
     } catch {
-      // A browser with storage blocked just gets asked again next time
+      // Installation still works when browser storage is unavailable.
     }
-
-    if (isIos()) {
-      setShowSteps(true)
-      setHidden(false)
-      return
+    setIos(isIos())
+    setHidden(false)
+    const onInstalled = () => {
+      setHidden(true)
+      dialog.current?.close()
     }
-
-    const onPrompt = (browserEvent: Event) => {
-      browserEvent.preventDefault()
-      setEvent(browserEvent as InstallEvent)
-      setHidden(false)
+    const displayMode = window.matchMedia('(display-mode: standalone)')
+    const onDisplayMode = () => {
+      if (isStandalone()) onInstalled()
     }
-    addEventListener('beforeinstallprompt', onPrompt)
-    addEventListener('appinstalled', () => setHidden(true))
-    return () => removeEventListener('beforeinstallprompt', onPrompt)
+    addEventListener('appinstalled', onInstalled)
+    displayMode.addEventListener('change', onDisplayMode)
+    return () => {
+      removeEventListener('appinstalled', onInstalled)
+      displayMode.removeEventListener('change', onDisplayMode)
+    }
   }, [])
 
-  if (hidden) return null
-
-  const dismiss = () => {
-    setHidden(true)
+  const install = async () => {
+    const event = window.__morrowInstallPrompt
+    if (!event) {
+      dialog.current?.showModal()
+      return
+    }
+    // A browser prompt is single-use and must open directly from this button click.
+    delete window.__morrowInstallPrompt
+    setInstalling(true)
     try {
-      localStorage.setItem(DISMISSED, '1')
+      await event.prompt()
+      if ((await event.userChoice).outcome === 'accepted') setHidden(true)
     } catch {
-      // Nothing to remember it with; the card comes back next visit
+      dialog.current?.showModal()
+    } finally {
+      setInstalling(false)
     }
   }
 
+  if (hidden) return null
+
   return (
-    <Card className="flex items-start gap-3 py-3.5 pr-3 pl-4">
-      <DownloadSimpleIcon className="mt-0.5 size-5 shrink-0" />
-      <div className="flex min-w-0 flex-1 flex-col gap-2">
-        <div className="flex flex-col">
-          <span>Keep Morrow on your home screen</span>
-          <span className="text-[13px] text-stone">
-            {showSteps ? (
-              <>
-                Tap <ShareIcon className="-mt-0.5 inline size-3.5" /> then “Add to Home Screen”.
-              </>
-            ) : (
-              'Opens full screen, and gifts arrive faster.'
-            )}
-          </span>
-        </div>
-        {!showSteps && event && (
-          <Button
-            variant="soft"
-            size="sm"
-            onClick={() => {
-              event.prompt().catch(() => {})
-              dismiss()
-            }}
-          >
-            Add to home screen
-          </Button>
-        )}
-      </div>
-      <button
-        type="button"
-        onClick={dismiss}
-        aria-label="Not now"
-        className="flex size-8 shrink-0 items-center justify-center rounded-full text-stone hover:bg-orange-wash"
+    <>
+      <div aria-hidden="true" className="h-[calc(68px+env(safe-area-inset-top))] shrink-0" />
+      <aside
+        aria-label="Install Morrow"
+        className="fixed inset-x-0 top-0 z-50 mx-auto flex w-full max-w-107.5 items-center gap-3 bg-white px-3 pt-[calc(12px+env(safe-area-inset-top))] pb-3 font-body"
       >
-        <XIcon className="size-4" />
-      </button>
-    </Card>
+        <button
+          type="button"
+          aria-label="Dismiss install banner"
+          className="flex size-11 shrink-0 items-center justify-center rounded-full text-stone hover:bg-cream"
+          onClick={() => {
+            setHidden(true)
+            try {
+              localStorage.setItem(DISMISSED, String(Date.now() + 7 * 24 * 60 * 60 * 1000))
+            } catch {
+              // Dismiss for this page even if it cannot be remembered.
+            }
+          }}
+        >
+          <XIcon className="size-5" />
+        </button>
+        <img
+          src="/trymorrow-logo-rounded.png"
+          alt=""
+          width={44}
+          height={44}
+          className="size-11 shrink-0 rounded-xl"
+        />
+        <div className="min-w-0 flex-1">
+          <p className="font-sans text-lg font-medium">Morrow</p>
+          <p className="truncate text-xs text-stone">Stocks. Cash. Gifts.</p>
+        </div>
+        <button
+          type="button"
+          disabled={installing}
+          onClick={install}
+          className="min-h-11 shrink-0 rounded-full bg-cream px-4 text-[15px] text-ink disabled:opacity-50"
+        >
+          {installing ? 'Installing…' : 'Install app'}
+        </button>
+      </aside>
+      <dialog
+        ref={dialog}
+        aria-labelledby="install-title"
+        className="fixed inset-0 m-auto w-[calc(100%-2rem)] max-w-96 rounded-[28px] bg-white p-6 text-ink backdrop:bg-black/40"
+      >
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 id="install-title" className="font-sans text-xl font-medium">
+            Install Morrow
+          </h2>
+          <button
+            type="button"
+            aria-label="Close install instructions"
+            onClick={() => dialog.current?.close()}
+            className="flex size-11 items-center justify-center rounded-full hover:bg-cream"
+          >
+            <XIcon className="size-5" />
+          </button>
+        </div>
+        {ios ? (
+          <div className="flex flex-col gap-3 text-sm">
+            <p>In Safari, open this page and:</p>
+            <ol className="list-inside list-decimal space-y-3">
+              <li>
+                Tap <ShareIcon className="inline size-4" aria-label="Share" /> Share in the browser
+                menu.
+              </li>
+              <li>Choose “Add to Home Screen”.</li>
+              <li>Keep “Open as Web App” on if shown, then tap “Add”.</li>
+            </ol>
+            <p className="text-stone">
+              Don’t see it? Scroll down in the Share menu or enable it under “Edit Actions”.
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3 text-sm">
+            <p>
+              Open your browser’s menu and choose “Install app” or “Add to Home screen”. On desktop,
+              look for an install icon in the address bar.
+            </p>
+            <p className="text-stone">
+              If it isn’t available, open Morrow in Chrome outside private browsing. Your browser
+              needs to confirm installation.
+            </p>
+          </div>
+        )}
+      </dialog>
+    </>
   )
 }

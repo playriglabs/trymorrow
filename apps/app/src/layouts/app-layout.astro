@@ -1,19 +1,63 @@
 ---
 import '@/styles/global.css'
 import { PUBLIC_APP_URL } from 'astro:env/client'
+import { InstallPrompt } from '@/components/install-prompt'
 
 type Props = {
   title?: string
   description?: string
   image?: string
+  imageAlt?: string
+  imageWidth?: number
+  imageHeight?: number
+  robots?: string
 }
 
 const {
-  title = 'Morrow Money',
-  description = 'Give stocks and cash that grow. Send a cash or a piece of a real company to anyone.',
+  title = 'Morrow — Gift stocks and cash',
+  description = 'Give a piece of a real company or send cash with Morrow. Share a gift with someone you care about, or start a fund for their future.',
   image,
+  imageAlt = 'Morrow — gift stocks and cash',
+  imageWidth,
+  imageHeight,
+  robots = 'index, follow, max-image-preview:large',
 } = Astro.props
 const url = new URL(Astro.url.pathname, PUBLIC_APP_URL).href
+const siteUrl = new URL('/', PUBLIC_APP_URL).href
+const imageUrl = new URL(image || '/og-image.png', siteUrl).href
+const width = imageWidth ?? (!image ? 1731 : undefined)
+const height = imageHeight ?? (!image ? 909 : undefined)
+const structuredData = JSON.stringify({
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'Organization',
+      '@id': `${siteUrl}#organization`,
+      name: 'Morrow',
+      url: siteUrl,
+      logo: new URL('/trymorrow-logo-rounded.png', siteUrl).href,
+      sameAs: ['https://x.com/trymorrow', 'https://www.linkedin.com/company/trymorrow'],
+    },
+    {
+      '@type': 'WebSite',
+      '@id': `${siteUrl}#website`,
+      name: 'Morrow',
+      url: siteUrl,
+      inLanguage: 'en',
+      publisher: { '@id': `${siteUrl}#organization` },
+    },
+    {
+      '@type': 'WebPage',
+      '@id': `${url}#webpage`,
+      url,
+      name: title,
+      description,
+      inLanguage: 'en',
+      isPartOf: { '@id': `${siteUrl}#website` },
+      primaryImageOfPage: { '@type': 'ImageObject', url: imageUrl },
+    },
+  ],
+}).replace(/</g, '\\u003c')
 ---
 
 <!doctype html>
@@ -24,25 +68,48 @@ const url = new URL(Astro.url.pathname, PUBLIC_APP_URL).href
     <meta name="theme-color" content="#fff7e9" />
     <title>{title}</title>
     <meta name="description" content={description} />
+    <meta name="robots" content={robots} />
+    <meta name="application-name" content="Morrow" />
     <link rel="canonical" href={url} />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Morrow" />
+    <meta property="og:locale" content="en_US" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={url} />
-    {image && <meta property="og:image" content={image} />}
-    {image && <meta property="og:image:width" content="1200" />}
-    {image && <meta property="og:image:height" content="630" />}
-    {image && <meta name="twitter:image" content={image} />}
-    <meta name="twitter:card" content={image ? 'summary_large_image' : 'summary'} />
+    <meta property="og:image" content={imageUrl} />
+    <meta property="og:image:alt" content={imageAlt} />
+    {width && <meta property="og:image:width" content={String(width)} />}
+    {height && <meta property="og:image:height" content={String(height)} />}
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@trymorrow" />
+    <meta name="twitter:creator" content="@trymorrow" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={imageUrl} />
+    <meta name="twitter:image:alt" content={imageAlt} />
+    <script type="application/ld+json" is:inline set:html={structuredData}></script>
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/favicon.svg?v=2" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/trymorrow-logo-rounded.png?v=5" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Morrow" />
+    <script is:inline>
+      // Capture the single-use event before any React island has hydrated.
+      addEventListener('beforeinstallprompt', (event) => {
+        event.preventDefault()
+        window.__morrowInstallPrompt = event
+      })
+      addEventListener('appinstalled', () => {
+        window.__morrowInstalled = true
+        delete window.__morrowInstallPrompt
+      })
+    </script>
   </head>
   <body class="min-h-dvh bg-cream text-ink">
     <main class="mx-auto flex min-h-dvh w-full max-w-107.5 flex-col">
+      <InstallPrompt client:only="react" />
       <slot />
     </main>
     <script is:inline>

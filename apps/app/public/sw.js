@@ -1,7 +1,7 @@
 // Morrow's service worker: an offline shell, and phone notifications.
 // Plain JS on purpose — it ships as-is from /public and never goes through the bundler.
 
-const VERSION = 'v1'
+const VERSION = 'v2'
 const SHELL = `morrow-shell-${VERSION}`
 const ASSETS = `morrow-assets-${VERSION}`
 const OFFLINE = '/offline'

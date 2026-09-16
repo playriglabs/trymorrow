@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { FundCard } from '@/components/fund-card'
 import { GiftRow } from '@/components/gift-row'
 import { byValue, HoldingRow } from '@/components/holding-row'
-import { InstallPrompt } from '@/components/install-prompt'
 import { withProviders } from '@/components/providers'
 import { CashLogo, StockLogo } from '@/components/stock-logo'
 import { TabBar } from '@/components/tab-bar'
@@ -276,7 +275,6 @@ function House() {
             </Card>
           </section>
         )}
-        <InstallPrompt />
       </div>
       <TabBar active="/" />
     </div>

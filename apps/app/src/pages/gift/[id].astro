@@ -19,27 +19,29 @@ const { data: gift, error: giftError } = isGiftId(id)
   : { data: null, error: null }
 if (giftError) throw giftError
 
-const mints = ((gift?.gift_items ?? []) as { mint: string }[]).map((item) => item.mint)
+const found = Boolean(gift && gift.status !== 'draft')
+if (!found) Astro.response.status = 404
+const mints = ((found ? (gift?.gift_items ?? []) : []) as { mint: string }[]).map(
+  (item) => item.mint,
+)
 const [
   { data: sender, error: senderError },
   { data: recipient, error: recipientError },
   foundAssets,
-] = gift
-  ? await Promise.all([
-      db.from('users').select('name').eq('id', gift.sender_id).maybeSingle(),
-      gift.recipient_id
-        ? db.from('users').select('name').eq('id', gift.recipient_id).maybeSingle()
-        : Promise.resolve({ data: null, error: null }),
-      Promise.all(mints.map((mint) => findGiftAsset(mint))),
-    ])
-  : [{ data: null, error: null }, { data: null, error: null }, []]
+] =
+  found && gift
+    ? await Promise.all([
+        db.from('users').select('name').eq('id', gift.sender_id).maybeSingle(),
+        gift.recipient_id
+          ? db.from('users').select('name').eq('id', gift.recipient_id).maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+        Promise.all(mints.map((mint) => findGiftAsset(mint))),
+      ])
+    : [{ data: null, error: null }, { data: null, error: null }, []]
 if (senderError) throw senderError
 if (recipientError) throw recipientError
 
 const assets = foundAssets.flatMap((asset) => (asset ? [asset] : []))
-
-const found = Boolean(gift && gift.status !== 'draft')
-if (!found) Astro.response.status = 404
 
 const senderName = sender?.name ?? 'Someone'
 const recipientName = recipient?.name ?? null
@@ -69,6 +71,14 @@ const description = !found
 const image = found ? new URL(`/og/gift/${id}.png`, PUBLIC_APP_URL).href : undefined
 ---
 
-<AppLayout title={title} description={description} image={image}>
+<AppLayout
+  title={title}
+  description={description}
+  image={image}
+  imageAlt={found ? `Gift card from ${senderName} showing ${contents}` : undefined}
+  imageWidth={found ? 1200 : undefined}
+  imageHeight={found ? 630 : undefined}
+  robots="noindex, follow"
+>
   <GiftScreen client:only="react" giftId={id} />
 </AppLayout>

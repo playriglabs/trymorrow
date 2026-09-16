@@ -1,0 +1,14 @@
+**/node_modules/**
+**/test-ledger/**
+**/target/**
+**/.anchor/**
+**/.env
+**/.env.*
+**/.vercel/**
+**/dist/**
+**/.astro/**
+**/.nuxt/**
+**/.output/**
+**/.nitro/**
+programs/**
+.git/**

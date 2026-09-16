@@ -5,6 +5,10 @@ packages:
 # Fail fast on Node older than package.json "engines" (Nuxt 4 breaks on Node 20)
 engineStrict: true
 
+# Vercel's function loader cannot require ESM-only uuid from rpc-websockets' CJS entry.
+overrides:
+  'rpc-websockets@9.3.9>uuid': 11.1.0
+
 onlyBuiltDependencies:
   - '@parcel/watcher'
   - esbuild

@@ -16,7 +16,7 @@
     "typecheck": "pnpm -r typecheck",
     "lint": "biome check . && prettier --check .",
     "format": "biome check --write . && prettier --write .",
-    "prepare": "lefthook install",
+    "prepare": "test ! -e .git || lefthook install",
     "test:gifts": "pnpm --filter @morrow/sdk test:gifts"
   },
   "devDependencies": {
