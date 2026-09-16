@@ -11,14 +11,14 @@ export default defineNuxtConfig({
 
   // Override in production with NUXT_SITE_URL
   site: {
-    url: 'https://trymorrow.money',
+    url: 'https://app.trymorrow.money',
     name: 'Morrow',
   },
 
   app: {
     head: {
       htmlAttrs: { lang: 'en' },
-      titleTemplate: '%s · Morrow',
+      titleTemplate: '%s — Morrow',
       meta: [{ name: 'theme-color', content: '#fff7e9' }],
     },
   },

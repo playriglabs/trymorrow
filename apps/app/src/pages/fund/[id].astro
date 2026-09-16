@@ -29,7 +29,7 @@ const found = Boolean(fund && fund.status !== 'draft')
 if (!found) Astro.response.status = 404
 
 const name = fund?.name ?? `${fund?.beneficiary_name ?? 'A'}’s fund`
-const title = found ? `${name} · Morrow` : 'Fund not found · Morrow'
+const title = found ? `${name} — Morrow` : 'Fund not found — Morrow'
 const description = found
   ? `${creator?.name ?? 'Someone'} started a fund for ${fund?.beneficiary_name}. Add to it, and it stays locked until ${formatUnlock(fund?.unlock_at ?? '')}.`
   : 'This fund link doesn’t exist.'

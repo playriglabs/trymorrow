@@ -1,4 +1,4 @@
--- Handles are the whole gift link (trymorrow.money/maya), so they cap at 10 characters instead of 20.
+-- Handles are the whole gift link (app.trymorrow.money/maya), so they cap at 10 characters instead of 20.
 -- Every existing handle was 6-8 characters when this was written, so no row is orphaned.
 -- Safe to re-run: the old check is found by its definition rather than a guessed name, and
 -- re-running simply finds nothing left to drop.

@@ -1,5 +1,5 @@
 /**
- * A handle is the whole gift link (trymorrow.money/maya), so it has to be short enough to say out
+ * A handle is the whole gift link (app.trymorrow.money/maya), so it has to be short enough to say out
  * loud and type on a phone. The browser, the API and the database all check this same shape.
  */
 export const MIN_HANDLE = 3

@@ -17,7 +17,7 @@ useSeoMeta({
 })
 
 useHead({
-  // Home page shows the bare title, not "%s · Morrow"
+  // Home page shows the bare title, not "%s — Morrow"
   titleTemplate: '%s',
   link: [{ rel: 'canonical', href: canonicalUrl }],
 })

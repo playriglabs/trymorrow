@@ -1,4 +1,4 @@
-import { CaretDownIcon, CheckIcon, ShieldCheckIcon } from '@phosphor-icons/react'
+import { CaretDownIcon, CheckIcon, ShieldCheckIcon, XIcon } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { type ReactNode, useEffect, useState } from 'react'
 import { AvatarPicker } from '@/components/avatar-picker'
@@ -39,6 +39,11 @@ const COUNTRIES = [
   ['US', 'United States'],
   ['ZZ', 'Somewhere else'],
 ] as const
+
+const flagEmoji = (code: string) =>
+  code === 'ZZ'
+    ? '🌐'
+    : String.fromCodePoint(...code.split('').map((letter) => 127397 + letter.charCodeAt(0)))
 
 function Steps({ current }: { current: 1 | 2 }) {
   return (
@@ -95,6 +100,7 @@ function Onboarding() {
   const update = useUpdateProfileMutation()
   const [step, setStep] = useState<1 | 2>(1)
   const [country, setCountry] = useState('ID')
+  const [countryPickerOpen, setCountryPickerOpen] = useState(false)
   const [notUs, setNotUs] = useState(false)
   const [terms, setTerms] = useState(false)
   const [name, setName] = useState('')
@@ -153,24 +159,18 @@ function Onboarding() {
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="country">Where do you live?</Label>
-          <div className="relative">
-            <select
-              id="country"
-              value={country}
-              onChange={(event) => setCountry(event.target.value)}
-              className="h-14 w-full cursor-pointer appearance-none rounded-button border border-line bg-surface pr-12 pl-4 text-[17px] outline-none focus:border-orange focus:ring-4 focus:ring-orange-wash"
-            >
-              {COUNTRIES.map(([code, label]) => (
-                <option key={code} value={code}>
-                  {label}
-                </option>
-              ))}
-            </select>
-            <CaretDownIcon
-              aria-hidden
-              className="pointer-events-none absolute top-1/2 right-4 size-5 -translate-y-1/2 text-stone"
-            />
-          </div>
+          <button
+            type="button"
+            id="country"
+            onClick={() => setCountryPickerOpen(true)}
+            className="flex h-14 w-full items-center gap-3 rounded-button border border-line bg-surface px-4 text-left text-[17px] outline-none focus:border-orange focus:ring-4 focus:ring-orange-wash"
+          >
+            <span aria-hidden>{flagEmoji(country)}</span>
+            <span className="flex-1">
+              {COUNTRIES.find(([code]) => code === country)?.[1] ?? 'Choose a country'}
+            </span>
+            <CaretDownIcon aria-hidden className="size-5 text-stone" />
+          </button>
         </div>
         {blocked ? (
           <Notice tone="warning">Morrow isn’t available in the United States yet.</Notice>
@@ -196,6 +196,65 @@ function Onboarding() {
           No ID or selfie needed. Your account and your money stay in your control.
         </Notice>
         {error && <p className="text-[13px] text-loss">{error}</p>}
+        {countryPickerOpen && (
+          <div
+            className="modal-backdrop-in fixed inset-0 z-40 flex items-end bg-ink/35"
+            role="presentation"
+          >
+            <button
+              type="button"
+              aria-label="Close country picker"
+              className="absolute inset-0 cursor-default"
+              onClick={() => setCountryPickerOpen(false)}
+            />
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="country-picker-title"
+              className="modal-sheet-in relative flex max-h-[82dvh] w-full flex-col gap-4 overflow-hidden rounded-t-sheet bg-cream px-5 pt-5 pb-[max(20px,env(safe-area-inset-bottom))] shadow-elevated"
+            >
+              <div className="flex items-center justify-between">
+                <h2 id="country-picker-title" className="font-sans text-xl font-medium">
+                  Where do you live?
+                </h2>
+                <button
+                  type="button"
+                  aria-label="Close country picker"
+                  onClick={() => setCountryPickerOpen(false)}
+                  className="flex size-10 items-center justify-center rounded-full hover:bg-orange-wash"
+                >
+                  <XIcon className="size-5" />
+                </button>
+              </div>
+              <div className="flex min-h-0 flex-col overflow-y-auto rounded-card border border-line bg-surface">
+                {COUNTRIES.map(([code, label]) => {
+                  const selected = country === code
+                  return (
+                    <button
+                      key={code}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => {
+                        setCountry(code)
+                        setCountryPickerOpen(false)
+                      }}
+                      className={clsx(
+                        'flex min-h-14 items-center gap-3 border-b border-line px-4 py-2 text-left last:border-b-0',
+                        { 'bg-orange-wash': selected },
+                      )}
+                    >
+                      <span className="text-2xl" aria-hidden>
+                        {flagEmoji(code)}
+                      </span>
+                      <span className="flex-1 text-[16px]">{label}</span>
+                      {selected && <CheckIcon className="size-5 text-orange" weight="bold" />}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        )}
       </Screen>
     )
   }
@@ -246,7 +305,7 @@ function Onboarding() {
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="handle">Your gift link</Label>
         <div className="flex h-14 items-center rounded-button border border-line bg-surface px-4 text-[17px] focus-within:border-orange focus-within:ring-4 focus-within:ring-orange-wash">
-          <span className="text-stone">trymorrow.money/</span>
+          <span className="text-stone">app.trymorrow.money/</span>
           <input
             id="handle"
             className="min-w-0 flex-1 bg-transparent outline-none"

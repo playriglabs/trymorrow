@@ -7,7 +7,7 @@ const stock = await findStockByTicker(decodeURIComponent(Astro.params.ticker ?? 
 if (!stock) return Astro.redirect('/stocks')
 ---
 
-<AppLayout title={`Your ${stock.name} shares · Morrow`} image={stock.iconUrl}>
+<AppLayout title={`Your ${stock.name} shares — Morrow`} image={stock.iconUrl}>
   <HoldingScreen
     client:only="react"
     mint={stock.mint.toBase58()}

@@ -9,6 +9,6 @@ if (!stock) return Astro.redirect('/buy')
 const side = Astro.url.searchParams.get('side') === 'sell' ? 'sell' : 'buy'
 ---
 
-<AppLayout title={`${stock.name} · Morrow`} image={stock.iconUrl}>
+<AppLayout title={`${stock.name} — Morrow`} image={stock.iconUrl}>
   <TradeScreen client:only="react" ticker={stock.ticker} side={side} />
 </AppLayout>

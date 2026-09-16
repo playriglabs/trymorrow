@@ -14,7 +14,7 @@ export type RecipientTarget = {
   wallet: string | null
 }
 
-/** Accepts `maya@example.com`, `@maya`, `maya`, or a pasted `trymorrow.money/maya` link */
+/** Accepts `maya@example.com`, `@maya`, `maya`, or a pasted `app.trymorrow.money/maya` link */
 export function parseRecipient(query: string): { email: string } | { handle: string } | null {
   const value = query.trim().toLowerCase()
   if (EMAIL_PATTERN.test(value)) return { email: value }
