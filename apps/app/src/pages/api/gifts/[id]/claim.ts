@@ -1,12 +1,12 @@
 import { type ClaimGiftParams, claimGiftInstruction } from '@morrow/sdk'
 import { PublicKey } from '@solana/web3.js'
-import { findStock } from '@/lib/server/catalog'
+import { findGiftAsset } from '@/lib/server/catalog'
 import { getGift } from '@/lib/server/gifts'
 import { badRequest, forbidden, json, route } from '@/lib/server/http'
 import { buildRelayedTransaction, relayer } from '@/lib/server/solana'
 import { requireUser, requireWallet } from '@/lib/server/users'
 
-/** Returns one transaction that claims every stock in the gift, only to the account it's locked to */
+/** Returns one transaction that claims everything in the gift, only to the account it's locked to */
 export const POST = route(async ({ params, request }) => {
   const [gift, viewer] = await Promise.all([getGift(params.id), requireUser(request)])
   if (gift.status !== 'pending')
@@ -19,7 +19,7 @@ export const POST = route(async ({ params, request }) => {
 
   const claims: ClaimGiftParams[] = []
   for (const item of gift.gift_items) {
-    const asset = await findStock(item.mint)
+    const asset = await findGiftAsset(item.mint)
     if (!asset) throw badRequest('This gift can’t be opened right now.')
     claims.push({
       payer: relayer().publicKey,

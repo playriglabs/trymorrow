@@ -1,18 +1,20 @@
 import {
+  CaretRightIcon,
   CheckIcon,
   CopyIcon,
   EnvelopeIcon,
   LinkIcon,
   LockIcon,
+  MagnifyingGlassIcon,
   PlusIcon,
   ShareIcon,
   XIcon,
 } from '@phosphor-icons/react'
 import clsx from 'clsx'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { match, P } from 'ts-pattern'
 import { withProviders } from '@/components/providers'
-import { StockLogo } from '@/components/stock-logo'
+import { CashLogo, StockLogo } from '@/components/stock-logo'
 import { SuccessMark } from '@/components/success-mark'
 import {
   Avatar,
@@ -35,11 +37,13 @@ import {
   useSendGiftMutation,
 } from '@/lib/client/queries'
 import { useSession } from '@/lib/client/session'
+import { cashGiftFeeDeductions } from '@/lib/fee-deductions'
 import { formatShares, formatUsd } from '@/lib/format'
-import { giftAssetsLabel, MAX_GIFT_RECIPIENTS, MAX_GIFT_STOCKS } from '@/lib/gifts'
-import type { RecipientResolution } from '@/lib/types'
+import { giftAmountLabel, MAX_GIFT_RECIPIENTS, MAX_GIFT_STOCKS } from '@/lib/gifts'
+import type { Holding, RecipientResolution } from '@/lib/types'
 
 const PRESETS = [10, 25, 50, 100]
+const MAX_PRESET = Math.max(...PRESETS)
 
 /** Dollars with up to two decimals, same as trading */
 const AMOUNT_PATTERN = /^\d{0,7}(\.\d{0,2})?$/
@@ -54,6 +58,23 @@ const recipientQuery = (recipient: Recipient) =>
   recipient.kind === 'user' ? `@${recipient.profile.handle}` : recipient.email
 
 const canShare = () => typeof navigator.share === 'function'
+
+/** Mirrors the server's base-unit plan so the cash preview is exact before the user signs. */
+function cashGiftFeeDeductionsUsd(
+  feesUsd: number[],
+  cashAfterGiftsUsd: number,
+  cashPerGiftUsd: number,
+): number[] | null {
+  const unit = 1_000_000
+  const fees = feesUsd.map((fee) => BigInt(Math.round(fee * unit)))
+  const cashAfterGifts = BigInt(Math.max(0, Math.round(cashAfterGiftsUsd * unit)))
+  const cashPerGift = BigInt(Math.max(0, Math.round(cashPerGiftUsd * unit)))
+  return (
+    cashGiftFeeDeductions(fees, cashAfterGifts, cashPerGift)?.map(
+      (deduction) => Number(deduction) / unit,
+    ) ?? null
+  )
+}
 
 function RecipientHint({ resolution }: { resolution: RecipientResolution | undefined }) {
   if (!resolution) return null
@@ -107,6 +128,184 @@ function RecipientChip({ recipient, onRemove }: { recipient: Recipient; onRemove
         <XIcon className="size-4" />
       </button>
     </span>
+  )
+}
+
+function AssetPickerSheet({
+  holdings,
+  selected,
+  onSave,
+  onClose,
+}: {
+  holdings: Holding[]
+  selected: string[]
+  onSave: (mints: string[]) => void
+  onClose: () => void
+}) {
+  const [draft, setDraft] = useState(selected)
+  const [search, setSearch] = useState('')
+
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [onClose])
+
+  const query = search.trim().toLocaleLowerCase()
+  const ordered = [...holdings].sort(
+    (a, b) => Number(selected.includes(b.mint)) - Number(selected.includes(a.mint)),
+  )
+  const visible = query
+    ? ordered.filter((holding) =>
+        `${holding.name} ${holding.ticker}`.toLocaleLowerCase().includes(query),
+      )
+    : ordered
+  const full = draft.length >= MAX_GIFT_STOCKS
+
+  const toggle = (mint: string) => {
+    if (draft.includes(mint)) {
+      if (draft.length > 1) setDraft(draft.filter((value) => value !== mint))
+      return
+    }
+    if (!full) setDraft([...draft, mint])
+  }
+
+  return (
+    <div className="modal-backdrop-in fixed inset-0 z-30 flex items-end justify-center bg-ink/30">
+      <button
+        type="button"
+        aria-label="Close asset picker"
+        className="absolute inset-0 cursor-default"
+        onClick={onClose}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="asset-picker-title"
+        className="modal-sheet-in relative flex max-h-[calc(100dvh-16px)] w-full max-w-107.5 flex-col overflow-hidden rounded-t-sheet bg-cream"
+      >
+        <div className="flex shrink-0 items-center justify-between px-5 pt-4 pb-3">
+          <div className="flex flex-col gap-0.5">
+            <h2
+              id="asset-picker-title"
+              className="font-sans text-xl font-medium tracking-[-0.02em]"
+            >
+              Choose what to send
+            </h2>
+            <p className="text-[13px] text-stone">
+              {draft.length} of {MAX_GIFT_STOCKS} selected
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="flex size-11 items-center justify-center rounded-full text-stone hover:bg-orange-wash focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+          >
+            <XIcon className="size-5" />
+          </button>
+        </div>
+
+        {holdings.length > 5 && (
+          <div className="mx-5 mb-3 flex h-11 shrink-0 items-center gap-2.5 rounded-button border border-line bg-surface px-3.5 focus-within:border-orange focus-within:ring-4 focus-within:ring-orange-wash">
+            <MagnifyingGlassIcon className="size-4.5 shrink-0 text-stone" />
+            <input
+              type="search"
+              aria-label="Search your stocks and cash"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search your stocks"
+              className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-steel"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                aria-label="Clear search"
+                className="flex size-8 shrink-0 items-center justify-center rounded-full text-stone"
+              >
+                <XIcon className="size-4" />
+              </button>
+            )}
+          </div>
+        )}
+
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5">
+          <Card className="overflow-hidden">
+            <div className="flex flex-col divide-y divide-line">
+              {visible.map((holding) => {
+                const isSelected = draft.includes(holding.mint)
+                const unavailable = full && !isSelected
+                return (
+                  <button
+                    type="button"
+                    key={holding.mint}
+                    aria-pressed={isSelected}
+                    aria-disabled={unavailable}
+                    onClick={() => toggle(holding.mint)}
+                    className={clsx(
+                      'flex min-h-16 w-full items-center gap-3 px-4 py-2.5 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ink',
+                      {
+                        'bg-orange-wash': isSelected,
+                        'opacity-45': unavailable,
+                      },
+                    )}
+                  >
+                    {holding.isCash ? (
+                      <CashLogo size={36} />
+                    ) : (
+                      <StockLogo iconUrl={holding.iconUrl} ticker={holding.ticker} size={36} />
+                    )}
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className="truncate">{holding.name}</span>
+                      <span className="text-[13px] text-stone">
+                        {formatUsd(holding.valueUsd)} available
+                      </span>
+                    </span>
+                    <span
+                      className={clsx(
+                        'flex size-6 shrink-0 items-center justify-center rounded-full border',
+                        {
+                          'border-orange bg-orange text-white': isSelected,
+                          'border-line bg-surface': !isSelected,
+                        },
+                      )}
+                    >
+                      {isSelected && <CheckIcon className="size-4" weight="bold" />}
+                    </span>
+                  </button>
+                )
+              })}
+              {visible.length === 0 && (
+                <p className="px-4 py-6 text-center text-[14px] text-stone">
+                  Nothing by that name.
+                </p>
+              )}
+            </div>
+          </Card>
+          <p className="px-1 pt-2 text-[13px] text-stone">
+            {full
+              ? `Maximum ${MAX_GIFT_STOCKS} selected. Remove one to choose another.`
+              : draft.length === 1
+                ? 'Keep at least one selected.'
+                : 'The gift is split evenly between your selections.'}
+          </p>
+        </div>
+
+        <div className="shrink-0 bg-cream px-5 pt-4 pb-[max(28px,env(safe-area-inset-bottom))]">
+          <Button className="w-full" onClick={() => onSave(draft)}>
+            Use {draft.length} {draft.length === 1 ? 'asset' : 'assets'}
+          </Button>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -183,7 +382,7 @@ function GiftsReady({ result }: { result: SendGiftResult }) {
             {single ? 'Your gift is ready' : `${links.length} gifts are ready`}
           </h1>
           <p className="text-stone text-balance">
-            {formatUsd(first.gift.usdValue)} of {giftAssetsLabel(first.gift.items)}{' '}
+            {giftAmountLabel(first.gift.usdValue, first.gift.items)}{' '}
             {single ? `for ${first.gift.recipientLabel}` : 'for each person'}
           </p>
         </div>
@@ -211,37 +410,53 @@ function GiftsReady({ result }: { result: SendGiftResult }) {
 
 function SendGift() {
   const session = useSession()
-  // An ask link (/maya?stock=AAPLX&amount=25) lands here with the wish already filled in
+  // An ask link (/maya?stock=AAPLX&amount=25 or ?cash=25) lands here with the wish already filled in
   const asked = useMemo(() => {
     const params = new URLSearchParams(location.search)
     const amount = Number.parseFloat(params.get('amount') ?? '')
+    const cash = Number.parseFloat(params.get('cash') ?? '')
     return {
       to: params.get('to') ?? '',
       ticker: params.get('stock')?.toUpperCase() ?? null,
       amount: Number.isFinite(amount) && amount >= MIN_GIFT_USD ? amount : null,
+      cash: Number.isFinite(cash) && cash >= MIN_GIFT_USD ? cash : null,
     }
   }, [])
   const [picked, setPicked] = useState<string[]>([])
   const [amountText, setAmountText] = useState(() =>
-    asked.amount == null ? '25' : String(asked.amount),
+    asked.amount != null ? String(asked.amount) : asked.cash != null ? String(asked.cash) : '25',
   )
   const [to, setTo] = useState(asked.to)
   const [added, setAdded] = useState<Recipient[]>([])
   const [message, setMessage] = useState('')
+  const [assetPickerOpen, setAssetPickerOpen] = useState(false)
   const [result, setResult] = useState<SendGiftResult | null>(null)
   const usd = Number.parseFloat(amountText) || 0
 
   const portfolio = usePortfolioQuery({ enabled: session.ready })
   const holdings = useMemo(
-    () => portfolio.data?.holdings.filter((h) => !h.isCash && h.amount > 0 && h.priceUsd) ?? [],
+    () => portfolio.data?.holdings.filter((h) => h.amount > 0 && h.priceUsd) ?? [],
     [portfolio.data],
   )
+  /** Cash rides in the same picker, and the default pick stays a stock */
+  const cashHolding = holdings.find((holding) => holding.isCash)
+  const stockHoldings = holdings.filter((holding) => !holding.isCash)
+  const giftHoldings = cashHolding ? [cashHolding, ...stockHoldings] : stockHoldings
   const chosen = holdings.filter((holding) => picked.includes(holding.mint))
-  /** The asked-for stock only if it's one we can actually send: gifts come out of holdings */
+  /** The asked-for stock or cash, only if it's something we can actually send: gifts come out of holdings */
   const askedHolding = asked.ticker
-    ? holdings.find((holding) => holding.ticker.toUpperCase() === asked.ticker)
+    ? stockHoldings.find((holding) => holding.ticker.toUpperCase() === asked.ticker)
     : undefined
-  const fallback = askedHolding ? [askedHolding] : holdings.slice(0, 1)
+  const askedCash = asked.cash != null && cashHolding ? cashHolding : undefined
+  const fallback = askedHolding
+    ? [askedHolding]
+    : askedCash
+      ? [askedCash]
+      : stockHoldings[0]
+        ? [stockHoldings[0]]
+        : cashHolding
+          ? [cashHolding]
+          : []
   const stocks = chosen.length > 0 ? chosen : fallback
 
   const typedText = to.trim()
@@ -261,15 +476,6 @@ function SendGift() {
     { enabled: session.ready },
   )
 
-  const toggleStock = (mint: string) => {
-    const current = stocks.map((stock) => stock.mint)
-    if (current.includes(mint)) {
-      if (current.length > 1) setPicked(current.filter((value) => value !== mint))
-    } else if (current.length < MAX_GIFT_STOCKS) {
-      setPicked([...current, mint])
-    }
-  }
-
   const addTyped = () => {
     if (!typed || typedDuplicate || full) return
     setAdded([...added, typed])
@@ -284,13 +490,18 @@ function SendGift() {
     return (
       <Screen title="Send a gift" back="/">
         <Card className="flex flex-col gap-3 p-5">
-          <h2 className="font-sans text-lg font-medium">You don’t have stocks to gift yet</h2>
+          <h2 className="font-sans text-lg font-medium">You don’t have anything to gift yet</h2>
           <p className="text-[15px] text-stone">
-            Gifts are made from stocks you own. Buy one first, then come back here.
+            Gifts are made from stocks or cash you own. Add one first, then come back here.
           </p>
-          <LinkButton href="/buy" variant="soft" size="md">
-            Buy stocks
-          </LinkButton>
+          <div className="flex flex-wrap gap-2">
+            <LinkButton href="/buy" variant="soft" size="md">
+              Buy stocks
+            </LinkButton>
+            <LinkButton href="/add-cash" variant="ghost" size="md">
+              Add cash
+            </LinkButton>
+          </div>
         </Card>
       </Screen>
     )
@@ -300,6 +511,9 @@ function SendGift() {
   const perStock = usd / stocks.length
   const affordable = (value: number) =>
     stocks.every((stock) => (stock.valueUsd ?? 0) >= (value / stocks.length) * people)
+  const maxGiftUsd = Math.min(
+    ...stocks.map((stock) => ((stock.valueUsd ?? 0) / people) * stocks.length),
+  )
 
   const [onlyStock] = stocks
   const onlyRecipient = recipients.length === 1 ? recipients[0] : undefined
@@ -327,26 +541,42 @@ function SendGift() {
     .with(
       { shortStock: P.nonNullable },
       ({ shortStock: stock }) =>
-        `Not enough ${stock.name}: you have ${formatUsd(stock.valueUsd)}, this needs ${formatUsd(perStock * people)}.`,
+        `Not enough ${stock.isCash ? 'cash' : stock.name}: you have ${formatUsd(stock.valueUsd)}, this needs ${formatUsd(perStock * people)}.`,
     )
     .otherwise(() => null)
 
   const feeUsd = fee.data?.feeUsd ?? 0
-  const cashShort = Math.max(0, feeUsd - (portfolio.data?.cashUsd ?? 0))
-  // Mirrors the server: cash first, otherwise shares of the stock with the most left after the gift
-  const feeStock = match(cashShort)
+  // Mirrors the server: use cash left after the gifts, then reduce the cash gift by any shortfall.
+  // Shares only pay when no cash is selected or reducing it would empty a recipient's gift.
+  const cashGiftedUsd = stocks.some((stock) => stock.isCash) ? perStock * people : 0
+  const cashLeftUsd = Math.max(0, (portfolio.data?.cashUsd ?? 0) - cashGiftedUsd)
+  const cashDeductions =
+    stocks.some((stock) => stock.isCash) && fee.data
+      ? cashGiftFeeDeductionsUsd(fee.data.feesUsd, cashLeftUsd, perStock)
+      : null
+  const feeFromGiftUsd = cashDeductions?.reduce((sum, value) => sum + value, 0) ?? 0
+  const cashShort = Math.max(0, feeUsd - cashLeftUsd)
+  const feeStock = match({ cashShort, cashDeductions })
     .when(
-      (shortfall) => shortfall > 0,
+      ({ cashShort: shortfall, cashDeductions }) => shortfall > 0 && cashDeductions === null,
       () =>
         stocks
+          .filter((stock) => !stock.isCash)
           .map((stock) => ({ stock, left: (stock.valueUsd ?? 0) - perStock * people }))
           .filter((option) => option.left >= feeUsd)
           .sort((a, b) => b.left - a.left)[0]?.stock,
     )
     .otherwise(() => undefined)
-  const feeBlocked = cashShort > 0 && !feeStock
+  const feeBlocked = cashShort > 0 && cashDeductions === null && !feeStock
   const feeSettled = recipients.length === 0 || (fee.isSuccess && !fee.isPlaceholderData)
-  const feeLabel = match({ recipients, feeData: fee.data, feeError: fee.isError, feeUsd, feeStock })
+  const feeLabel = match({
+    recipients,
+    feeData: fee.data,
+    feeError: fee.isError,
+    feeUsd,
+    feeStock,
+    feeFromGiftUsd,
+  })
     .when(
       ({ recipients }) => recipients.length === 0,
       () => 'Free',
@@ -358,7 +588,22 @@ function SendGift() {
       { feeStock: P.nonNullable },
       ({ feeStock: stock }) => `${formatUsd(feeUsd)} in ${stock.name}`,
     )
+    .when(
+      ({ feeFromGiftUsd: fromGift }) => fromGift > 0,
+      ({ feeUsd: total, feeFromGiftUsd: fromGift }) =>
+        `${formatUsd(total)} · ${formatUsd(fromGift)} from gift`,
+    )
     .otherwise(() => formatUsd(feeUsd))
+  const cashReceivedUsd = (cashDeductions ?? Array.from({ length: people }, () => 0)).map(
+    (deduction) => Math.max(0, perStock - deduction),
+  )
+  const cashReceivedMin = Math.min(...cashReceivedUsd)
+  const cashReceivedMax = Math.max(...cashReceivedUsd)
+  const cashReceivedLabel =
+    cashReceivedMin === cashReceivedMax
+      ? `${formatUsd(cashReceivedMin)} in cash`
+      : `${formatUsd(cashReceivedMin)}–${formatUsd(cashReceivedMax)} in cash after fees`
+  const totalSentUsd = usd * people + feeUsd - feeFromGiftUsd
   const submitLabel = match({ pending: send.isPending, multiple: recipients.length > 1 })
     .with({ pending: true, multiple: true }, () => 'Creating your gifts…')
     .with({ pending: true }, () => 'Creating your gift…')
@@ -417,41 +662,56 @@ function SendGift() {
           , or send one of yours below.
         </Notice>
       )}
+      {asked.cash != null && !askedCash && (
+        <Notice tone="warning">
+          They asked for cash, and you don’t have any yet.{' '}
+          <a href="/add-cash" className="underline">
+            Add cash
+          </a>{' '}
+          first, or send one of your stocks below.
+        </Notice>
+      )}
 
       <div className="flex flex-col gap-2">
         <div className="flex items-baseline justify-between">
-          <Label>Stocks</Label>
-          <span className="text-[13px] text-stone">Pick up to {MAX_GIFT_STOCKS}</span>
+          <Label>What to send</Label>
+          <button
+            type="button"
+            onClick={() => setAssetPickerOpen(true)}
+            className="min-h-11 -my-3 flex items-center font-sans text-[13px] font-medium text-stone hover:text-ink"
+          >
+            Change
+          </button>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {holdings.map((holding) => {
-            const selected = stocks.some((stock) => stock.mint === holding.mint)
-            return (
-              <button
+        <button
+          type="button"
+          onClick={() => setAssetPickerOpen(true)}
+          aria-label={`Change what to send. ${stocks.length} selected.`}
+          className="flex min-h-16 w-full items-center gap-3 rounded-card border border-line bg-surface px-3.5 py-3 text-left shadow-elevated focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+        >
+          <span className="flex min-w-0 flex-1 flex-wrap gap-2">
+            {stocks.map((holding) => (
+              <span
                 key={holding.mint}
-                type="button"
-                aria-pressed={selected}
-                disabled={!selected && stocks.length >= MAX_GIFT_STOCKS}
-                onClick={() => toggleStock(holding.mint)}
-                className={clsx(
-                  'flex h-11 items-center gap-2 rounded-link border pr-4 pl-1.5 font-sans text-[15px] font-medium disabled:opacity-40',
-                  {
-                    'border-orange bg-orange-wash': selected,
-                    'border-line bg-surface': !selected,
-                  },
-                )}
+                className="flex h-9 min-w-0 items-center gap-2 rounded-link bg-orange-wash pr-3 pl-1.5 font-sans text-[14px] font-medium"
               >
-                <StockLogo iconUrl={holding.iconUrl} ticker={holding.ticker} size={30} />
-                {holding.name}
-                {selected && stocks.length > 1 && <CheckIcon className="size-4 text-orange" />}
-              </button>
-            )
-          })}
-        </div>
+                {holding.isCash ? (
+                  <CashLogo size={26} />
+                ) : (
+                  <StockLogo iconUrl={holding.iconUrl} ticker={holding.ticker} size={26} />
+                )}
+                <span className="max-w-37 truncate">${holding.ticker}</span>
+              </span>
+            ))}
+          </span>
+          <CaretRightIcon className="size-5 shrink-0 text-stone" />
+        </button>
         <p className="text-[13px] text-stone">
-          {stocks.length === 1 && onlyStock
-            ? `${formatUsd(onlyStock.priceUsd)} a share · you have ${formatUsd(onlyStock.valueUsd)}`
-            : `Split evenly: ${formatUsd(perStock)} of each stock`}
+          {stocks.length === 1 && onlyStock?.isCash
+            ? `${formatUsd(onlyStock.valueUsd)} available in cash`
+            : stocks.length === 1 && onlyStock
+              ? `${formatUsd(onlyStock.priceUsd)} a share · ${formatUsd(onlyStock.valueUsd)} available`
+              : `${stocks.length} assets · ${formatUsd(perStock)} in each`}
         </p>
       </div>
 
@@ -487,9 +747,13 @@ function SendGift() {
           />
         </label>
         <span className="text-[14px] text-stone">
-          {stocks.length === 1 && onlyStock?.priceUsd
-            ? `≈ ${formatShares(usd / onlyStock.priceUsd)} shares`
-            : `in ${stocks.length} stocks`}
+          {stocks.length === 1 && onlyStock?.isCash
+            ? 'in cash'
+            : stocks.length === 1 && onlyStock?.priceUsd
+              ? `≈ ${formatShares(usd / onlyStock.priceUsd)} shares`
+              : stocks.some((stock) => stock.isCash)
+                ? `in ${stocks.length - 1} ${stocks.length - 1 === 1 ? 'stock' : 'stocks'} and cash`
+                : `in ${stocks.length} stocks`}
           {recipients.length > 1 && ' for each person'}
         </span>
         {amountHint && <span className="text-center text-[13px] text-loss">{amountHint}</span>}
@@ -514,6 +778,12 @@ function SendGift() {
           </button>
         ))}
       </div>
+      {maxGiftUsd < MAX_PRESET && !amountHint && (
+        <p className="-mt-3 text-center text-[13px] text-stone">
+          Up to {formatUsd(maxGiftUsd)}
+          {recipients.length > 1 ? ' per person' : ''} with this selection.
+        </p>
+      )}
 
       <div className="flex flex-col gap-2">
         <div className="flex items-baseline justify-between">
@@ -593,7 +863,9 @@ function SendGift() {
           <span className="flex flex-col items-end text-right">
             {stocks.map((stock) => (
               <span key={stock.mint}>
-                {formatShares(perStock / (stock.priceUsd ?? 1))} {stock.name} shares
+                {stock.isCash
+                  ? cashReceivedLabel
+                  : `${formatShares(perStock / (stock.priceUsd ?? 1))} ${stock.name} shares`}
               </span>
             ))}
           </span>
@@ -611,19 +883,25 @@ function SendGift() {
         <div className="h-px bg-line" />
         <div className="flex justify-between">
           <span className="text-stone">You send</span>
-          <span>{formatUsd(usd * people)}</span>
+          <span>{formatUsd(totalSentUsd)}</span>
         </div>
         {feeUsd > 0 && (
           <p className="text-[13px] leading-[1.45] text-stone">
-            The fee sets up {stocks.length > 1 ? 'these stocks' : 'this stock'} in{' '}
-            {recipients.length > 1 ? 'their accounts' : 'their account'}, at cost. Gifting a stock
-            someone already owns is free.
+            {stocks.every((stock) => stock.isCash)
+              ? 'The fee opens a cash account for them, at cost. Sending cash to someone who already has one is free.'
+              : `The fee sets up ${stocks.length > 1 ? 'these stocks' : 'this stock'} in ${recipients.length > 1 ? 'their accounts' : 'their account'}, at cost. Gifting a stock someone already owns is free.`}
           </p>
         )}
         {feeStock && (
           <p className="text-[13px] leading-[1.45] text-stone">
             Not enough cash, so the fee is paid with {formatUsd(feeUsd)} of your {feeStock.name}{' '}
             shares, on top of the gift.
+          </p>
+        )}
+        {feeFromGiftUsd > 0 && (
+          <p className="text-[13px] leading-[1.45] text-stone">
+            {formatUsd(feeFromGiftUsd)} comes out of the cash gift because there isn’t enough cash
+            left after sending. Your total stays within {formatUsd(usd * people)}.
           </p>
         )}
         {feeBlocked && (
@@ -636,6 +914,18 @@ function SendGift() {
         )}
         {fee.isError && <p className="text-[13px] text-loss">{errorMessage(fee.error)}</p>}
       </div>
+
+      {assetPickerOpen && (
+        <AssetPickerSheet
+          holdings={giftHoldings}
+          selected={stocks.map((stock) => stock.mint)}
+          onClose={() => setAssetPickerOpen(false)}
+          onSave={(mints) => {
+            setPicked(mints)
+            setAssetPickerOpen(false)
+          }}
+        />
+      )}
     </Screen>
   )
 }

@@ -45,7 +45,7 @@ const FUND_ACCOUNT_SIZE = 8 + 123
 type GiftAsset = { mint: PublicKey; tokenProgram: PublicKey }
 
 export type GiftFee = {
-  /** Share accounts the recipient doesn't have yet */
+  /** Share or cash accounts the recipient doesn't have yet */
   newAccounts: number
   /** Cash (USDC base units) */
   raw: bigint
@@ -85,7 +85,7 @@ const REQUIRED_ACCOUNT_EXTENSIONS = new Map<ExtensionType, ExtensionType>([
   [ExtensionType.PausableConfig, ExtensionType.PausableAccount],
 ])
 
-/** Rent for someone's account of this stock, sized for the mint's Token-2022 extensions */
+/** Rent for someone's account of this stock or cash, sized for the mint's Token-2022 extensions */
 async function shareAccountRent(asset: GiftAsset): Promise<number> {
   const key = asset.mint.toBase58()
   const cached = rentByMint.get(key)
@@ -304,6 +304,9 @@ type FeeCandidate = {
  * How the sender pays: cash when they have enough, otherwise shares of the gift's stock with the
  * most value left over after the gift. Shares are on top of the gift, so recipients always get
  * the full amount. Null when neither covers it.
+ *
+ * `cash` is what's left after the gift itself; a cash gift takes its amount out first. Cash is
+ * never a share candidate — paying the fee "in cash on top" is just the cash path.
  */
 export function planFeePayment(
   fees: GiftFee[],
@@ -315,6 +318,9 @@ export function planFeePayment(
 
   const options = candidates.flatMap((candidate) => {
     const { asset, balance, gifted, priceUsd } = candidate
+    // Cash only ever lands here through a caller's mistake, and would record it as its own
+    // share-paid fee mint; the cash check above is the only way cash should pay
+    if (asset.tokenProgram.equals(TOKEN_PROGRAM)) return []
     if (!priceUsd) return []
     const unit = 10 ** asset.decimals
     const raws = fees.map((fee) =>

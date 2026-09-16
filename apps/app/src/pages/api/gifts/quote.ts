@@ -1,6 +1,6 @@
 import { z } from 'astro/zod'
 import { MAX_GIFT_RECIPIENTS, MAX_GIFT_STOCKS } from '@/lib/gifts'
-import { findStock } from '@/lib/server/catalog'
+import { findGiftAsset } from '@/lib/server/catalog'
 import { giftFees } from '@/lib/server/fees'
 import { badRequest, json, readBody, route } from '@/lib/server/http'
 import { enforceRateLimit } from '@/lib/server/rate-limit'
@@ -21,8 +21,8 @@ export const POST = route(async ({ request }) => {
 
   const assets = await Promise.all(
     body.mints.map(async (mint) => {
-      const asset = await findStock(mint)
-      if (!asset) throw badRequest('Pick a stock to gift.')
+      const asset = await findGiftAsset(mint)
+      if (!asset) throw badRequest('Pick a stock or cash to gift.')
       return asset
     }),
   )
@@ -36,6 +36,7 @@ export const POST = route(async ({ request }) => {
 
   const quote: GiftFeeQuote = {
     feeUsd: Number(fees.reduce((sum, fee) => sum + fee.raw, 0n)) / 1_000_000,
+    feesUsd: fees.map((fee) => Number(fee.raw) / 1_000_000),
     newAccounts: fees.reduce((sum, fee) => sum + fee.newAccounts, 0),
   }
   return json(quote)

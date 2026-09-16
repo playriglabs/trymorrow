@@ -1,8 +1,9 @@
-import { EnvelopeIcon, WalletIcon } from '@phosphor-icons/react'
+import { CurrencyDollarIcon, EnvelopeIcon, WalletIcon } from '@phosphor-icons/react'
 import { useLoginWithOAuth, usePrivy } from '@privy-io/react-auth'
 import { useEffect, useState } from 'react'
 import { EmailLogin } from '@/components/email-login'
 import { withProviders } from '@/components/providers'
+import { StockLogo } from '@/components/stock-logo'
 import { Button, Loading, Screen } from '@/components/ui'
 import { useSyncProfileMutation } from '@/lib/client/queries'
 import { useEnsureWallet } from '@/lib/client/wallet'
@@ -63,9 +64,11 @@ function Login() {
         <div className="absolute -bottom-15 left-1/2 size-42.5 -translate-x-1/2 rounded-full bg-cream" />
         <div className="absolute top-7 left-6 flex w-42.5 -rotate-6 flex-col gap-2 rounded-[18px] bg-surface p-3.5 shadow-[0_8px_24px_rgb(76_40_6/0.18)]">
           <div className="flex items-center gap-2">
-            <span className="flex size-7.5 items-center justify-center rounded-[9px] bg-orange font-sans text-[9px] font-medium text-white">
-              NVDA
-            </span>
+            <StockLogo
+              iconUrl="https://xstocks-metadata.backed.fi/logos/tokens/NVDAx.png"
+              ticker="NVDA"
+              size={30}
+            />
             <span className="text-[12px] text-stone">From Dina</span>
           </div>
           <span className="font-sans text-xl leading-[1.1] font-medium tracking-[-0.02em]">
@@ -79,14 +82,26 @@ function Login() {
           </span>
           <span className="text-[12px]">$1,912 of $5,000</span>
         </div>
+        <div className="absolute bottom-5 left-5 flex w-42.5 rotate-[4deg] flex-col gap-2 rounded-[18px] bg-surface p-3.5 shadow-[0_8px_24px_rgb(76_40_6/0.18)]">
+          <div className="flex items-center gap-2">
+            <span className="flex size-7.5 items-center justify-center rounded-[9px] bg-orange-wash">
+              <CurrencyDollarIcon weight="bold" className="size-5" />
+            </span>
+            <span className="text-[12px] text-stone">From Kyy</span>
+          </div>
+          <span className="font-sans text-xl leading-[1.1] font-medium tracking-[-0.02em]">
+            $10 in cash
+          </span>
+        </div>
       </div>
 
       <div className="flex flex-1 flex-col gap-2.5 px-5 pt-7">
         <h1 className="font-sans text-[36px] leading-[1.08] font-medium tracking-[-0.02em] text-balance">
-          Give stocks that grow.
+          Give stocks and cash that grow.
         </h1>
         <p className="text-stone">
-          Send a piece of a real company to anyone, and build a fund the whole family can add to.
+          Send a cash and piece of a real company to anyone, and build a fund the whole family can
+          add to.
         </p>
       </div>
 
@@ -103,6 +118,7 @@ function Login() {
             loading={oauth.status === 'loading'}
             onClick={() => startOAuth('google')}
           >
+            <img src="/google-logo.svg" alt="" className="size-5" />
             Google
           </Button>
           {/* Privy's modal lists Solana wallets and signs a SIWS message to log in */}

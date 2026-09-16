@@ -1,9 +1,10 @@
 import { createGiftInstruction } from '@morrow/sdk'
 import { PublicKey } from '@solana/web3.js'
 import { z } from 'astro/zod'
+import { cashGiftFeeDeductions } from '@/lib/fee-deductions'
 import { formatUsd } from '@/lib/format'
 import { MAX_GIFT_RECIPIENTS, MAX_GIFT_STOCKS } from '@/lib/gifts'
-import { findStock } from '@/lib/server/catalog'
+import { findGiftAsset } from '@/lib/server/catalog'
 import {
   cashBalance,
   ensureTreasuryAccount,
@@ -68,12 +69,12 @@ export const POST = route(async ({ request }) => {
   const payer = relayer().publicKey
 
   if (new Set(body.items.map((item) => item.mint)).size !== body.items.length) {
-    throw badRequest('Pick each stock only once.')
+    throw badRequest('Pick each one only once.')
   }
   const items = await Promise.all(
     body.items.map(async (item) => {
-      const asset = await findStock(item.mint)
-      if (!asset) throw badRequest('Pick a stock to gift.')
+      const asset = await findGiftAsset(item.mint)
+      if (!asset) throw badRequest('Pick a stock or cash to gift.')
       return { ...item, asset, amount: BigInt(item.amountRaw) }
     }),
   )
@@ -87,40 +88,67 @@ export const POST = route(async ({ request }) => {
 
   const [balances, cash] = await Promise.all([
     Promise.all(items.map((item) => tokenBalance(senderWallet, item.asset.mint))),
-    totalFee > 0n ? cashBalance(senderWallet) : Promise.resolve(0n),
+    totalFee > 0n || items.some((item) => item.asset.isCash)
+      ? cashBalance(senderWallet)
+      : Promise.resolve(0n),
   ])
   items.forEach((item, index) => {
     if ((balances[index] ?? 0n) < item.amount * BigInt(recipients.length)) {
       throw badRequest(
-        `You don’t have enough ${item.asset.name} shares for this gift.`,
+        item.asset.isCash
+          ? 'You don’t have enough cash for this gift.'
+          : `You don’t have enough ${item.asset.name} shares for this gift.`,
         'insufficient',
       )
     }
   })
-  // Cash first; when it's short, shares of one of the gift's stocks, on top of the gift
-  const prices = cash < totalFee ? await getPrices(items.map((item) => item.mint)) : {}
-  const plan = planFeePayment(
-    fees,
-    cash,
-    items.map((item, index) => ({
-      asset: item.asset,
-      balance: balances[index] ?? 0n,
-      gifted: item.amount * BigInt(recipients.length),
-      priceUsd: prices[item.mint],
-    })),
-  )
+  // Cash left after the gifts pays first. If that is short, reduce the cash inside each gift by the
+  // unpaid part, so sending "All" still works. Shares only pay when there is no cash gift, or the
+  // cash gift is too small to leave every recipient with a positive amount.
+  const cashItem = items.find((item) => item.asset.isCash)
+  const cashLeft = cash - (cashItem ? cashItem.amount * BigInt(recipients.length) : 0n)
+  const cashDeductions = cashItem
+    ? cashGiftFeeDeductions(
+        fees.map((fee) => fee.raw),
+        cashLeft,
+        cashItem.amount,
+      )
+    : null
+  const prices =
+    cashLeft < totalFee && cashDeductions === null
+      ? await getPrices(items.filter((item) => !item.asset.isCash).map((item) => item.mint))
+      : {}
+  const plan = cashDeductions
+    ? { asset: null, raws: fees.map((fee) => fee.raw) }
+    : planFeePayment(
+        fees,
+        cashLeft,
+        items.flatMap((item, index) =>
+          item.asset.isCash
+            ? []
+            : [
+                {
+                  asset: item.asset,
+                  balance: balances[index] ?? 0n,
+                  gifted: item.amount * BigInt(recipients.length),
+                  priceUsd: prices[item.mint],
+                },
+              ],
+        ),
+      )
   if (!plan) {
     throw badRequest(
-      `Add ${formatUsd(Number(totalFee - cash) / 1_000_000)} cash to cover the gift fee.`,
+      `Add ${formatUsd(Number(totalFee - cashLeft) / 1_000_000)} cash to cover the gift fee.`,
       'insufficient_cash',
     )
   }
   if (totalFee > 0n) await ensureTreasuryAccount(plan.asset ?? undefined)
 
   const expiresAt = new Date(Date.now() + GIFT_LIFETIME_DAYS * 24 * 60 * 60 * 1000)
-  const drafts = recipients.map((recipient, index) => {
+  const drafts = recipients.map((recipient, recipientIndex) => {
     if (!recipient.wallet) throw new Error('Recipient wallet missing after resolving')
-    const fee = plan.raws[index] ?? 0n
+    const fee = plan.raws[recipientIndex] ?? 0n
+    const cashDeduction = cashDeductions?.[recipientIndex] ?? 0n
     return {
       gift: {
         id: crypto.randomUUID(),
@@ -134,10 +162,19 @@ export const POST = route(async ({ request }) => {
         expires_at: expiresAt.toISOString(),
         fee_raw: fee.toString(),
         fee_mint: plan.asset?.mint.toBase58() ?? null,
-        fee_usd: fees[index]?.usd ?? 0,
+        fee_usd: fees[recipientIndex]?.usd ?? 0,
       },
       fee,
-      itemIds: items.map(() => crypto.randomUUID()),
+      items: items.map((item) => {
+        const amount = item.asset.isCash ? item.amount - cashDeduction : item.amount
+        return {
+          ...item,
+          id: crypto.randomUUID(),
+          amount,
+          // Cash is worth its raw dollar amount; the other estimates came from the client quote.
+          usdValue: item.asset.isCash ? Number(amount) / 1_000_000 : item.usdValue,
+        }
+      }),
     }
   })
   const giftIds = drafts.map((draft) => draft.gift.id)
@@ -146,11 +183,11 @@ export const POST = route(async ({ request }) => {
   if (giftsError) throw giftsError
   const { error: itemsError } = await db.from('gift_items').insert(
     drafts.flatMap((draft) =>
-      items.map((item, index) => ({
-        id: draft.itemIds[index],
+      draft.items.map((item) => ({
+        id: item.id,
         gift_id: draft.gift.id,
         mint: item.mint,
-        amount_raw: item.amountRaw,
+        amount_raw: item.amount.toString(),
         usd_value: item.usdValue ?? null,
       })),
     ),
@@ -170,14 +207,14 @@ export const POST = route(async ({ request }) => {
     drafts.map(async (draft) => ({
       gift: views.get(draft.gift.id),
       transaction: await buildRelayedTransaction([
-        ...items.map((item, index) =>
+        ...draft.items.map((item) =>
           createGiftInstruction({
             payer,
             sender: senderWallet,
             recipient: new PublicKey(draft.gift.recipient_wallet),
             mint: item.asset.mint,
             tokenProgram: item.asset.tokenProgram,
-            giftId: draft.itemIds[index] ?? '',
+            giftId: item.id,
             amount: item.amount,
             expiresAt,
           }),

@@ -1,3 +1,4 @@
+import { CurrencyDollarIcon } from '@phosphor-icons/react'
 import { useState } from 'react'
 import { Ticker } from '@/components/ui'
 
@@ -17,7 +18,7 @@ export function StockLogo({
   return (
     <img
       src={iconUrl}
-      alt=""
+      alt="Stock logo"
       width={size}
       height={size}
       loading="lazy"
@@ -25,5 +26,21 @@ export function StockLogo({
       style={{ width: size, height: size }}
       className="shrink-0 rounded-full border border-line bg-surface object-cover"
     />
+  )
+}
+
+/** Cash has no company logo, so it gets the dollar tile instead */
+export function CashLogo({ size = 44 }: { size?: number }) {
+  return (
+    <span
+      style={{ width: size, height: size }}
+      className="flex shrink-0 items-center justify-center rounded-full border border-line bg-orange-wash"
+    >
+      <CurrencyDollarIcon
+        weight="bold"
+        style={{ width: size * 0.55, height: size * 0.55 }}
+        className="text-ink"
+      />
+    </span>
   )
 }

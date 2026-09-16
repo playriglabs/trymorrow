@@ -1,12 +1,12 @@
 import { type RefundGiftParams, refundGiftInstruction } from '@morrow/sdk'
 import { PublicKey } from '@solana/web3.js'
-import { findStock } from '@/lib/server/catalog'
+import { findGiftAsset } from '@/lib/server/catalog'
 import { getGift } from '@/lib/server/gifts'
 import { badRequest, forbidden, json, route } from '@/lib/server/http'
 import { buildRelayedTransaction, relayer } from '@/lib/server/solana'
 import { requireUser, requireWallet } from '@/lib/server/users'
 
-/** Returns one transaction that takes every stock in the gift back to the sender */
+/** Returns one transaction that takes everything in the gift back to the sender */
 export const POST = route(async ({ params, request }) => {
   const [gift, viewer] = await Promise.all([getGift(params.id), requireUser(request)])
   if (gift.status !== 'pending')
@@ -22,7 +22,7 @@ export const POST = route(async ({ params, request }) => {
 
   const refunds: RefundGiftParams[] = []
   for (const item of gift.gift_items) {
-    const asset = await findStock(item.mint)
+    const asset = await findGiftAsset(item.mint)
     if (!asset) throw badRequest('This gift can’t be taken back right now.')
     refunds.push({
       payer: relayer().publicKey,

@@ -3,18 +3,20 @@ import { useState } from 'react'
 import { match } from 'ts-pattern'
 import { EmailLogin } from '@/components/email-login'
 import { withProviders } from '@/components/providers'
-import { StockLogo } from '@/components/stock-logo'
+import { CashLogo, StockLogo } from '@/components/stock-logo'
 import { SuccessMark } from '@/components/success-mark'
 import { Avatar, Button, LinkButton, Loading, Notice, Screen } from '@/components/ui'
 import { ApiError, errorMessage } from '@/lib/client/api'
 import { useClaimGiftMutation, useGiftQuery, useRefundGiftMutation } from '@/lib/client/queries'
 import { useSession } from '@/lib/client/session'
 import { formatDate, formatUsd } from '@/lib/format'
-import { giftAssetsLabel } from '@/lib/gifts'
+import { giftAmountLabel, giftAssetsLabel, giftContentsLabel } from '@/lib/gifts'
 import type { GiftView } from '@/lib/types'
 
 function GiftCard({ gift }: { gift: GiftView }) {
   const bundle = gift.items.length > 1
+  const hasCash = gift.items.some((item) => item.isCash)
+  const stockCount = gift.items.length - gift.items.filter((item) => item.isCash).length
 
   return (
     <div className="relative flex flex-col gap-4.5 mt-3 overflow-hidden rounded-sheet bg-orange p-6 text-white">
@@ -32,20 +34,28 @@ function GiftCard({ gift }: { gift: GiftView }) {
       </div>
       <div className="relative flex flex-col gap-1">
         <h1 className="font-sans text-[38px] leading-[1.08] font-medium tracking-[-0.02em]">
-          {bundle
-            ? `${formatUsd(gift.usdValue)} in stocks`
+          {bundle || hasCash
+            ? `${formatUsd(gift.usdValue)} in ${giftContentsLabel(gift.items)}`
             : `${formatUsd(gift.usdValue)} of ${giftAssetsLabel(gift.items)}`}
         </h1>
         <p className="text-[14px]">
-          {bundle ? `${gift.items.length} stocks, worth` : 'Worth'} about {formatUsd(gift.usdValue)}{' '}
-          when sent
+          {bundle && hasCash
+            ? `${stockCount} ${stockCount === 1 ? 'stock' : 'stocks'} and cash, worth`
+            : bundle
+              ? `${gift.items.length} stocks, worth`
+              : 'Worth'}{' '}
+          about {formatUsd(gift.usdValue)} when sent
         </p>
       </div>
       {bundle && (
         <ul className="relative flex flex-col divide-y divide-line rounded-button bg-white/90 px-4 text-ink">
           {gift.items.map((item) => (
             <li key={item.mint} className="flex items-center gap-3 py-2.5">
-              <StockLogo iconUrl={item.iconUrl} ticker={item.ticker} size={32} />
+              {item.isCash ? (
+                <CashLogo size={32} />
+              ) : (
+                <StockLogo iconUrl={item.iconUrl} ticker={item.ticker} size={32} />
+              )}
               <span className="min-w-0 flex-1 truncate">{item.name}</span>
               <span>{formatUsd(item.usdValue)}</span>
             </li>
@@ -86,8 +96,10 @@ function Gift({ giftId }: { giftId: string }) {
   const view = gift.data
   const assets = giftAssetsLabel(view.items)
   const bundle = view.items.length > 1
-  const heading = match({ viewer: view.viewer, bundle })
+  const hasCash = view.items.some((item) => item.isCash)
+  const heading = match({ viewer: view.viewer, bundle, hasCash })
     .with({ viewer: 'sender' }, () => `${view.recipientLabel} claimed your gift`)
+    .with({ hasCash: true, bundle: false }, () => 'The cash is yours')
     .with({ bundle: true }, () => `${assets} are yours`)
     .otherwise(() => `${assets} is yours`)
 
@@ -110,7 +122,7 @@ function Gift({ giftId }: { giftId: string }) {
                 {tookBack ? 'You took your gift back' : 'Your gift came back'}
               </h1>
               <p className="text-stone">
-                The {formatUsd(view.usdValue)} of {assets} is yours again.
+                The {giftAmountLabel(view.usdValue, view.items)} is yours again.
               </p>
             </div>
           </div>
@@ -150,7 +162,7 @@ function Gift({ giftId }: { giftId: string }) {
             </h1>
             <p className="text-stone">
               {view.viewer === 'sender'
-                ? `${formatUsd(view.usdValue)} of ${assets}`
+                ? giftAmountLabel(view.usdValue, view.items)
                 : 'Hold it, sell it, or send it on.'}
             </p>
           </div>
@@ -248,7 +260,11 @@ function Gift({ giftId }: { giftId: string }) {
             loading={claim.isPending}
             onClick={() => claim.mutate(undefined, { onSuccess: () => setOpened(true) })}
           >
-            {bundle ? 'Claim your gift' : `Claim ${formatUsd(view.usdValue)} of ${assets}`}
+            {bundle
+              ? 'Claim your gift'
+              : hasCash
+                ? `Claim ${formatUsd(view.usdValue)} in cash`
+                : `Claim ${formatUsd(view.usdValue)} of ${assets}`}
           </Button>
         </>
       }
@@ -257,8 +273,11 @@ function Gift({ giftId }: { giftId: string }) {
       <div className="flex flex-col gap-1.5">
         <h2 className="font-sans text-xl font-medium tracking-[-0.02em]">It’s yours to keep</h2>
         <p className="text-[15px] text-stone">
-          Real {assets} shares, in an account only you control. Hold them, sell them, or send them
-          on.
+          {hasCash && !bundle
+            ? 'Real cash, in an account only you control. Hold it, spend it, or send it on.'
+            : hasCash
+              ? 'Real stocks and cash, in an account only you control. Hold them, sell them, or send them on.'
+              : `Real ${assets} shares, in an account only you control. Hold them, sell them, or send them on.`}
         </p>
       </div>
     </Screen>

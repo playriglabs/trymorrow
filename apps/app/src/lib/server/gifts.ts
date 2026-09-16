@@ -1,5 +1,4 @@
-import { formatUsd } from '@/lib/format'
-import { giftAssetsLabel } from '@/lib/gifts'
+import { CASH_MINT, giftAmountLabel } from '@/lib/gifts'
 import { getStocks } from '@/lib/server/catalog'
 import { notFound } from '@/lib/server/http'
 import { avatarUrl, db } from '@/lib/server/supabase'
@@ -43,8 +42,10 @@ export const GIFT_LIFETIME_DAYS = 30
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+export const isGiftId = (id: string | undefined): id is string => Boolean(id && UUID.test(id))
+
 export async function getGift(id: string | undefined): Promise<GiftRow> {
-  if (!id || !UUID.test(id)) throw notFound('We couldn’t find that gift.')
+  if (!isGiftId(id)) throw notFound('We couldn’t find that gift.')
   const { data, error } = await db.from('gifts').select(GIFT_COLUMNS).eq('id', id).maybeSingle()
   if (error) throw error
   if (!data) throw notFound('We couldn’t find that gift.')
@@ -96,12 +97,23 @@ export async function toGiftViews(gifts: GiftRow[], viewer: UserRow | null): Pro
     const items: GiftItemView[] = [...gift.gift_items]
       .sort((a, b) => (toUsd(b.usd_value) ?? 0) - (toUsd(a.usd_value) ?? 0))
       .map((item) => {
+        if (item.mint === CASH_MINT) {
+          return {
+            mint: item.mint,
+            name: 'Cash',
+            ticker: 'USD',
+            iconUrl: null,
+            isCash: true,
+            usdValue: toUsd(item.usd_value),
+          }
+        }
         const asset = stockByMint.get(item.mint)
         return {
           mint: item.mint,
           name: asset?.name ?? 'Stock',
           ticker: asset?.ticker ?? '',
           iconUrl: asset?.iconUrl ?? null,
+          isCash: false,
           usdValue: toUsd(item.usd_value),
         }
       })
@@ -137,14 +149,14 @@ export async function toGiftView(gift: GiftRow, viewer: UserRow | null): Promise
   return view
 }
 
-/** "$25 of Apple and Nvidia" — how a notification names a gift */
+/** "$25 of SPY and HOOD", "$25 in cash" — how a notification names a gift */
 export async function giftLabel(gift: GiftRow): Promise<string> {
   const stocks = await getStocks()
-  const names = gift.gift_items.flatMap((item) => {
+  const items = gift.gift_items.flatMap((item) => {
+    if (item.mint === CASH_MINT) return [{ name: 'Cash', isCash: true }]
     const stock = stocks.find((entry) => entry.mint.toBase58() === item.mint)
-    return stock ? [stock.name] : []
+    return stock ? [{ name: stock.ticker, isCash: false }] : []
   })
   const usd = gift.gift_items.reduce((sum, item) => sum + (Number(item.usd_value) || 0), 0)
-  if (names.length === 0) return formatUsd(usd)
-  return `${formatUsd(usd)} of ${giftAssetsLabel(names.map((name) => ({ name })))}`
+  return giftAmountLabel(usd, items)
 }

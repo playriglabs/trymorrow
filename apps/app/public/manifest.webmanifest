@@ -1,7 +1,7 @@
 {
   "name": "Morrow",
   "short_name": "Morrow",
-  "description": "Give stocks that grow.",
+  "description": "Give stocks and cash that grow.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#fff7e9",

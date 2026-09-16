@@ -1,7 +1,8 @@
 import { findGiftAddress, USDC } from '@morrow/sdk'
 import { PublicKey } from '@solana/web3.js'
 import { z } from 'astro/zod'
-import { findStock } from '@/lib/server/catalog'
+import { CASH_MINT } from '@/lib/gifts'
+import { findGiftAsset } from '@/lib/server/catalog'
 import { isFeeTransfer } from '@/lib/server/fees'
 import { GIFT_COLUMNS, type GiftRow, getGift, giftLabel, toGiftView } from '@/lib/server/gifts'
 import { badRequest, forbidden, json, readBody, route } from '@/lib/server/http'
@@ -37,7 +38,7 @@ export const POST = route(async ({ params, request }) => {
   // The only other thing a gift transaction may do is pay the sender's fee, exactly as recorded
   const transfers = tokenTransfers(transaction)
   const feeRaw = BigInt(gift.fee_raw)
-  const feeAsset = gift.fee_mint ? await findStock(gift.fee_mint) : USDC
+  const feeAsset = gift.fee_mint ? await findGiftAsset(gift.fee_mint) : USDC
   const transfersMatch =
     action === 'createGift' && feeRaw > 0n
       ? feeAsset != null &&
@@ -113,7 +114,9 @@ export const POST = route(async ({ params, request }) => {
                     userId: sent.recipient_id,
                     kind: 'gift_received' as const,
                     title: `${viewer.name ?? 'Someone'} sent you ${label}`,
-                    body: 'Open it to keep the shares.',
+                    body: sent.gift_items.some((item) => item.mint === CASH_MINT)
+                      ? 'Open it to keep it.'
+                      : 'Open it to keep the shares.',
                     giftId: sent.id,
                     url: `/gift/${sent.id}`,
                   },

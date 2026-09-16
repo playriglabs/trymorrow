@@ -1,35 +1,74 @@
 ---
 import GiftScreen from '@/components/screens/gift-screen'
 import AppLayout from '@/layouts/app-layout.astro'
-import { giftAssetsLabel } from '@/lib/gifts'
-import { findStock } from '@/lib/server/catalog'
+import { giftContentsLabel } from '@/lib/gifts'
+import { findGiftAsset } from '@/lib/server/catalog'
+import { isGiftId } from '@/lib/server/gifts'
 import { db } from '@/lib/server/supabase'
 
 // Rendered on the server so WhatsApp, iMessage and Telegram show a real preview of the gift
 const { id = '' } = Astro.params
-const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
 
-const { data: gift } = isUuid
-  ? await db.from('gifts').select('status, sender_id, gift_items (mint)').eq('id', id).maybeSingle()
-  : { data: null }
+const { data: gift, error: giftError } = isGiftId(id)
+  ? await db
+      .from('gifts')
+      .select('status, sender_id, recipient_id, gift_items (mint)')
+      .eq('id', id)
+      .maybeSingle()
+  : { data: null, error: null }
+if (giftError) throw giftError
+
 const mints = ((gift?.gift_items ?? []) as { mint: string }[]).map((item) => item.mint)
-const [{ data: sender }, foundStocks] = gift
+const [
+  { data: sender, error: senderError },
+  { data: recipient, error: recipientError },
+  foundAssets,
+] = gift
   ? await Promise.all([
       db.from('users').select('name').eq('id', gift.sender_id).maybeSingle(),
-      Promise.all(mints.map((mint) => findStock(mint))),
+      gift.recipient_id
+        ? db.from('users').select('name').eq('id', gift.recipient_id).maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+      Promise.all(mints.map((mint) => findGiftAsset(mint))),
     ])
-  : [{ data: null }, []]
-const stocks = foundStocks.flatMap((stock) => (stock ? [stock] : []))
+  : [{ data: null, error: null }, { data: null, error: null }, []]
+if (senderError) throw senderError
+if (recipientError) throw recipientError
+
+const assets = foundAssets.flatMap((asset) => (asset ? [asset] : []))
+const stocks = assets.filter((asset) => !asset.isCash)
 
 const found = Boolean(gift && gift.status !== 'draft')
 if (!found) Astro.response.status = 404
 
-const title = found ? `${sender?.name ?? 'Someone'} sent you a gift` : 'Gift not found · Morrow'
-const description = found
-  ? `${stocks.length > 1 ? `Shares of ${giftAssetsLabel(stocks)}` : `A piece of ${giftAssetsLabel(stocks)}`}, waiting for you on Morrow. Only the person it’s for can open it.`
-  : 'This gift link doesn’t exist.'
+const senderName = sender?.name ?? 'Someone'
+const recipientName = recipient?.name ?? null
+const contents = assets.length > 0 ? giftContentsLabel(assets) : 'gift'
+const capitalizedContents = contents.replace(/^./, (character) => character.toUpperCase())
+
+const title = !found
+  ? 'Gift not found — Morrow'
+  : gift?.status === 'claimed'
+    ? recipientName
+      ? `${recipientName} claimed ${senderName}’s gift — Morrow`
+      : `Gift claimed — Morrow`
+    : gift?.status === 'refunded'
+      ? `Gift returned to ${senderName} — Morrow`
+      : `${senderName} sent you a gift — Morrow`
+
+const description = !found
+  ? 'This gift link doesn’t exist.'
+  : gift?.status === 'claimed'
+    ? recipientName
+      ? `${recipientName} opened the ${contents} ${senderName} sent on Morrow.`
+      : `This ${contents} gift has been opened and delivered on Morrow.`
+    : gift?.status === 'refunded'
+      ? `This ${contents} gift was returned to ${senderName} and can no longer be opened.`
+      : `${capitalizedContents}, waiting for you on Morrow. Only the person it’s for can open it.`
+// Cash has no logo of its own, so a mixed gift leans on its first stock and a cash-only one falls back
+const image = stocks[0]?.iconUrl ?? undefined
 ---
 
-<AppLayout title={title} description={description} image={found ? stocks[0]?.iconUrl : undefined}>
+<AppLayout title={title} description={description} image={found ? image : undefined}>
   <GiftScreen client:only="react" giftId={id} />
 </AppLayout>

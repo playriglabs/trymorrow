@@ -1,5 +1,6 @@
-import { type Asset, STOCKS, TOKEN_2022_PROGRAM } from '@morrow/sdk'
+import { type Asset, STOCKS, TOKEN_2022_PROGRAM, USDC } from '@morrow/sdk'
 import { PublicKey } from '@solana/web3.js'
+import { CASH_MINT } from '@/lib/gifts'
 
 const VERIFIED_TOKENS_API = 'https://lite-api.jup.ag/tokens/v2/tag?query=verified'
 const LOGO_BASE = 'https://xstocks-metadata.backed.fi/logos/tokens'
@@ -115,4 +116,26 @@ export async function findStock(mint: string): Promise<StockAsset | null> {
 export async function findStockByTicker(ticker: string): Promise<StockAsset | null> {
   const wanted = ticker.toUpperCase()
   return (await getStocks()).find((stock) => stock.ticker.toUpperCase() === wanted) ?? null
+}
+
+/** A stock, plus the marker that tells gift UI and copy it's cash instead */
+export type GiftAsset = Omit<StockAsset, 'iconUrl'> & { iconUrl: string | null; isCash: boolean }
+
+/** The cash entry, in the same shape the catalog gives stocks: a dollar is always worth a dollar */
+export function cashAsset(): GiftAsset {
+  return {
+    ...USDC,
+    iconUrl: null,
+    priceUsd: 1,
+    change24hPct: null,
+    liquidityUsd: 0,
+    isCash: true,
+  }
+}
+
+/** What a gift can hold, by mint: cash or any verified xStock */
+export async function findGiftAsset(mint: string): Promise<GiftAsset | null> {
+  if (mint === CASH_MINT) return cashAsset()
+  const stock = await findStock(mint)
+  return stock ? { ...stock, isCash: false } : null
 }

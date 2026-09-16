@@ -19,7 +19,7 @@ const COLORS = {
 }
 const SANS = '"Aeonik", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif'
 const BODY = '"Pilat", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif'
-const TAGLINE = 'Give stocks that grow'
+const TAGLINE = 'Give stocks and cash that grow'
 const MARK_SRC = '/favicon.svg'
 const QR_LOGO_SRC = '/qr-logo.svg'
 

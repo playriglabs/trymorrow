@@ -186,6 +186,8 @@ export type GiftStatus = 'draft' | 'pending' | 'claimed' | 'refunded'
 /** A gift is free when everyone already holds its stocks; otherwise it's what opening them costs */
 export type GiftFeeQuote = {
   feeUsd: number
+  /** Per recipient, in request order; used to show cash gifts after fee deductions accurately */
+  feesUsd: number[]
   /** Share accounts that would be opened across all recipients */
   newAccounts: number
 }
@@ -195,6 +197,8 @@ export type GiftItemView = {
   name: string
   ticker: string
   iconUrl: string | null
+  /** Cash rather than a stock; drawn and worded differently everywhere it shows */
+  isCash: boolean
   usdValue: number | null
 }
 

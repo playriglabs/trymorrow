@@ -6,7 +6,7 @@ import { GiftRow } from '@/components/gift-row'
 import { byValue, HoldingRow } from '@/components/holding-row'
 import { InstallPrompt } from '@/components/install-prompt'
 import { withProviders } from '@/components/providers'
-import { StockLogo } from '@/components/stock-logo'
+import { CashLogo, StockLogo } from '@/components/stock-logo'
 import { TabBar } from '@/components/tab-bar'
 import { Avatar, Card, LinkButton, Loading } from '@/components/ui'
 import { useAnimatedNumber } from '@/lib/client/animated-number'
@@ -110,16 +110,38 @@ function House() {
           <section className="flex flex-col gap-3">
             <div className="flex items-baseline justify-between">
               <h2 className="font-sans text-lg font-medium tracking-[-0.02em]">Gifts for you</h2>
-              <span className="text-[14px] text-stone">{toClaim.length} to open</span>
+              <a href="/gifts" className="text-[14px] text-stone">
+                See all
+              </a>
             </div>
-            {toClaim.map((gift) => (
+            {toClaim.slice(0, 5).map((gift) => (
               <Card key={gift.id} className="flex items-center gap-3 py-3.5 pr-3.5 pl-4">
-                <StockLogo iconUrl={gift.items[0]?.iconUrl} ticker={gift.items[0]?.ticker ?? ''} />
+                <span className="relative size-11 shrink-0">
+                  {gift.items[0]?.isCash ? (
+                    <CashLogo />
+                  ) : (
+                    <StockLogo
+                      iconUrl={gift.items[0]?.iconUrl}
+                      ticker={gift.items[0]?.ticker ?? ''}
+                    />
+                  )}
+                  {gift.items.length > 1 && (
+                    <span className="absolute -top-1.5 -right-1.5 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-orange px-1 font-sans text-[11px] font-medium text-white ring-2 ring-surface">
+                      +{gift.items.length - 1}
+                    </span>
+                  )}
+                </span>
                 <div className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate">
-                    {gift.sender.name} sent you {giftAssetsLabel(gift.items)}
+                    {gift.sender.name} sent you{' '}
+                    {giftAssetsLabel(
+                      gift.items.map((item) => ({
+                        name: item.isCash ? 'cash' : item.ticker,
+                        isCash: item.isCash,
+                      })),
+                    )}
                   </span>
-                  <span className="text-[14px] text-stone">{formatUsd(gift.usdValue)}</span>
+                  <span className="text-[14px] text-stone">in {formatUsd(gift.usdValue)}</span>
                 </div>
                 <LinkButton href={`/gift/${gift.id}`} size="sm">
                   Open
@@ -166,6 +188,32 @@ function House() {
             </Card>
           )}
         </section>
+
+        {portfolio.data &&
+          portfolio.data.cashUsd === 0 &&
+          stocks.length === 0 &&
+          toClaim.length === 0 &&
+          (sent.data?.length ?? 0) === 0 && (
+            <Card className="flex flex-col gap-3 bg-orange-wash p-5">
+              <div className="flex flex-col gap-1">
+                <h2 className="font-sans text-lg font-medium tracking-[-0.02em]">
+                  🏁 Start your Morrow
+                </h2>
+                <p className="text-[15px] leading-[1.45] text-stone">
+                  Add cash, then turn it into your first stock. You can also send a gift whenever
+                  you’re ready.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <LinkButton href="/add-cash" size="sm">
+                  Add cash
+                </LinkButton>
+                <LinkButton href="/buy" variant="soft" size="sm">
+                  Explore stocks
+                </LinkButton>
+              </div>
+            </Card>
+          )}
 
         {(sent.data?.length ?? 0) > 0 && (
           <section className="flex flex-col gap-3">

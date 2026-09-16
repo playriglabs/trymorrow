@@ -7,7 +7,8 @@ import {
 } from '@morrow/sdk'
 import { type AccountInfo, PublicKey } from '@solana/web3.js'
 import bs58 from 'bs58'
-import { findStock } from '@/lib/server/catalog'
+import { CASH_MINT } from '@/lib/gifts'
+import { findGiftAsset } from '@/lib/server/catalog'
 import { GIFT_COLUMNS, type GiftRow, giftLabel } from '@/lib/server/gifts'
 import { json, route, unauthorized } from '@/lib/server/http'
 import { notify } from '@/lib/server/notify'
@@ -106,13 +107,14 @@ async function applySettled(gift: GiftRow, settled: Settled, summary: Summary): 
   // The row finally matches reality; a failed notification must not undo that
   try {
     const label = await giftLabel(gift)
+    const hasCash = gift.gift_items.some((item) => item.mint === CASH_MINT)
     await notify([
       settled.action === 'claimGift'
         ? {
             userId: gift.sender_id,
             kind: 'gift_opened',
             title: `${label} was opened`,
-            body: 'The shares are theirs to keep.',
+            body: hasCash ? 'It’s theirs to keep.' : 'The shares are theirs to keep.',
             giftId: gift.id,
             url: `/gift/${gift.id}`,
           }
@@ -120,7 +122,9 @@ async function applySettled(gift: GiftRow, settled: Settled, summary: Summary): 
             userId: gift.sender_id,
             kind: 'gift_returned',
             title: `${label} came back to you`,
-            body: 'It wasn’t opened in 30 days, so the shares are yours again.',
+            body: hasCash
+              ? 'It wasn’t opened in 30 days, so it’s yours again.'
+              : 'It wasn’t opened in 30 days, so the shares are yours again.',
             giftId: gift.id,
             url: `/gift/${gift.id}`,
           },
@@ -185,8 +189,8 @@ export const GET = route(async ({ request }) => {
 
       const refunds: RefundGiftParams[] = []
       for (const item of open) {
-        const asset = await findStock(item.mint)
-        if (!asset) throw new Error(`Unknown stock ${item.mint}`)
+        const asset = await findGiftAsset(item.mint)
+        if (!asset) throw new Error(`Unknown gift asset ${item.mint}`)
         refunds.push({
           payer: relayer().publicKey,
           authority: relayer().publicKey,
@@ -210,12 +214,15 @@ export const GET = route(async ({ request }) => {
 
       // The shares are already back; a failed notification must not retry the refund
       try {
+        const label = await giftLabel(gift)
         await notify([
           {
             userId: gift.sender_id,
             kind: 'gift_returned',
-            title: `${await giftLabel(gift)} came back to you`,
-            body: 'It wasn’t opened in 30 days, so the shares are yours again.',
+            title: `${label} came back to you`,
+            body: gift.gift_items.some((item) => item.mint === CASH_MINT)
+              ? 'It wasn’t opened in 30 days, so it’s yours again.'
+              : 'It wasn’t opened in 30 days, so the shares are yours again.',
             giftId: gift.id,
             url: `/gift/${gift.id}`,
           },

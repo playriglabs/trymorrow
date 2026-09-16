@@ -2,7 +2,7 @@ import { CheckIcon, CopyIcon, MagnifyingGlassIcon, ShareIcon, XIcon } from '@pho
 import clsx from 'clsx'
 import { useMemo, useState } from 'react'
 import { withProviders } from '@/components/providers'
-import { StockLogo } from '@/components/stock-logo'
+import { CashLogo, StockLogo } from '@/components/stock-logo'
 import { Button, Card, Label, Loading, Notice, Screen, TextInput } from '@/components/ui'
 import { errorMessage } from '@/lib/client/api'
 import { useStocksQuery } from '@/lib/client/queries'
@@ -24,6 +24,7 @@ function Ask() {
   const stocks = useStocksQuery({ enabled: session.ready })
   const [search, setSearch] = useState('')
   const [stock, setStock] = useState<StockListing | null>(null)
+  const [wishCash, setWishCash] = useState(false)
   const [amountText, setAmountText] = useState('25')
   const [note, setNote] = useState('')
   const [copied, setCopied] = useState(false)
@@ -45,7 +46,8 @@ function Ask() {
   const usd = Number.parseFloat(amountText) || 0
   const params = new URLSearchParams()
   if (stock) params.set('stock', stock.ticker)
-  if (usd > 0) params.set('amount', usd.toFixed(2).replace(/\.00$/, ''))
+  else if (wishCash && usd > 0) params.set('cash', usd.toFixed(2).replace(/\.00$/, ''))
+  if (stock && usd > 0) params.set('amount', usd.toFixed(2).replace(/\.00$/, ''))
   const trimmedNote = note.trim()
   if (trimmedNote) params.set('note', trimmedNote)
   const query = params.toString()
@@ -56,7 +58,11 @@ function Ask() {
       navigator
         .share({
           title: 'A gift idea',
-          text: stock ? `I'd love a piece of ${stock.name}` : 'Send me a gift on Morrow',
+          text: stock
+            ? `I'd love a piece of ${stock.name}`
+            : wishCash
+              ? `I'd love ${formatUsd(usd)} in cash`
+              : 'Send me a gift on Morrow',
           url: link,
         })
         .catch(() => {})
@@ -103,6 +109,22 @@ function Ask() {
               <XIcon className="size-4" />
             </button>
           </Card>
+        ) : wishCash ? (
+          <Card className="flex items-center gap-3 py-3 pr-3 pl-4">
+            <CashLogo size={36} />
+            <div className="flex min-w-0 flex-1 flex-col">
+              <span className="truncate">Cash</span>
+              <span className="text-[13px] text-stone">Any amount, theirs to spend</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setWishCash(false)}
+              aria-label="Remove cash"
+              className="flex size-9 shrink-0 items-center justify-center rounded-full text-stone hover:bg-orange-wash"
+            >
+              <XIcon className="size-4" />
+            </button>
+          </Card>
         ) : (
           <>
             <div className="relative">
@@ -122,7 +144,10 @@ function Ask() {
                   <button
                     key={item.mint}
                     type="button"
-                    onClick={() => setStock(item)}
+                    onClick={() => {
+                      setStock(item)
+                      setWishCash(false)
+                    }}
                     className="flex h-14 items-center gap-3 text-left"
                   >
                     <StockLogo iconUrl={item.iconUrl} ticker={item.ticker} size={32} />
@@ -135,6 +160,14 @@ function Ask() {
             {stocks.data && search.trim() && matches.length === 0 && (
               <p className="text-[13px] text-stone">Nothing by that name. Try the ticker.</p>
             )}
+            <button
+              type="button"
+              onClick={() => setWishCash(true)}
+              className="flex items-center gap-2 self-start rounded-link border border-line bg-surface pr-4 pl-1.5 font-sans text-[15px] font-medium"
+            >
+              <CashLogo size={30} />
+              Or just cash
+            </button>
           </>
         )}
       </div>

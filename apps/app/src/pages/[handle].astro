@@ -5,8 +5,8 @@ import { MAX_NOTE } from '@/lib/notes'
 import { findStockByTicker } from '@/lib/server/catalog'
 import { avatarUrl, db } from '@/lib/server/supabase'
 
-// Public gift link: trymorrow.money/maya, optionally carrying an ask from /ask:
-// trymorrow.money/maya?stock=AAPLX&amount=25&note=Birthday
+// Public gift link: app.trymorrow.money/maya, optionally carrying an ask from /ask:
+// app.trymorrow.money/maya?stock=AAPLX&amount=25&note=Birthday, or ?cash=25
 const handle = (Astro.params.handle ?? '').toLowerCase()
 const valid = HANDLE_PATTERN.test(handle)
 const { data: person } = valid
@@ -28,24 +28,31 @@ const askedTicker = Astro.url.searchParams.get('stock')
 const asked = person && askedTicker ? await findStockByTicker(askedTicker) : null
 const askedAmount = Number.parseFloat(Astro.url.searchParams.get('amount') ?? '')
 const amount = Number.isFinite(askedAmount) && askedAmount > 0 ? Math.min(askedAmount, 9999) : null
+const askedCash = Number.parseFloat(Astro.url.searchParams.get('cash') ?? '')
+const cash = Number.isFinite(askedCash) && askedCash > 0 ? Math.min(askedCash, 9999) : null
 const note = (Astro.url.searchParams.get('note') ?? '').trim().slice(0, MAX_NOTE)
-const money = amount == null ? null : `$${amount % 1 === 0 ? amount : amount.toFixed(2)}`
+const askedValue = amount ?? cash
+const money =
+  askedValue == null ? null : `$${askedValue % 1 === 0 ? askedValue : askedValue.toFixed(2)}`
 
-const asking = Boolean(person && (asked || amount))
-const wish = [money, asked ? `of ${asked.name}` : null].filter(Boolean).join(' ')
+const asking = Boolean(person && (asked || amount || cash))
+const wish = [money, asked ? `of ${asked.name}` : null, cash != null ? 'in cash' : null]
+  .filter(Boolean)
+  .join(' ')
 
 const sendParams = new URLSearchParams({ to: `@${handle}` })
 if (asked) sendParams.set('stock', asked.ticker)
 if (amount != null) sendParams.set('amount', String(amount))
+if (cash != null) sendParams.set('cash', String(cash))
 ---
 
 <AppLayout
   title={
     person
       ? asking
-        ? `${firstName} would love ${wish} · Morrow`
-        : `Send ${name} a gift · Morrow`
-      : 'Not found · Morrow'
+        ? `${firstName} would love ${wish} — Morrow`
+        : `Send ${name} a gift — Morrow`
+      : 'Not found — Morrow'
   }
   description={
     person
