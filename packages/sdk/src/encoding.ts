@@ -76,6 +76,32 @@ export function decodeGiftAccount(data: Uint8Array): GiftAccount {
   }
 }
 
+export type GiftCardAccount = {
+  sender: PublicKey
+  /** sha256 of the redeem code; the code itself never touches chain */
+  codeHash: Uint8Array
+  mint: PublicKey
+  rentPayer: PublicKey
+  amount: bigint
+  expiresAt: bigint
+  bump: number
+}
+
+/** Decodes `GiftCard` account data (8-byte discriminator + fields in declaration order) */
+export function decodeGiftCardAccount(data: Uint8Array): GiftCardAccount {
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength)
+  const key = (offset: number) => new PublicKey(data.slice(offset, offset + 32))
+  return {
+    sender: key(8),
+    codeHash: data.slice(40, 72),
+    mint: key(72),
+    rentPayer: key(104),
+    amount: view.getBigUint64(136, true),
+    expiresAt: view.getBigInt64(144, true),
+    bump: data[168] ?? 0,
+  }
+}
+
 export type FundAccount = {
   creator: PublicKey
   beneficiary: PublicKey

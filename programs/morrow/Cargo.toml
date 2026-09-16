@@ -27,3 +27,5 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 [dependencies]
 anchor-lang = { version = "0.32.1", features = ["init-if-needed"] }
 anchor-spl = "0.32.1"
+# anchor 0.32's solana_program re-export has no hash module; same sha256 syscall, Hash type from solana-hash
+solana-sha256-hasher = "2.3.0"

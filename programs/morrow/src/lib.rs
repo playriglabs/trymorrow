@@ -7,6 +7,7 @@ use anchor_spl::{
 declare_id!("AjwKavx3r4NJ9tgmjxv24mCpFLp2QMnKzcRC5J7vaupa");
 
 pub const GIFT_SEED: &[u8] = b"gift";
+pub const GIFT_CARD_SEED: &[u8] = b"gift_card";
 pub const FUND_SEED: &[u8] = b"fund";
 
 /// Nobody should be able to lock money away for a lifetime by mistyping a year.
@@ -121,6 +122,121 @@ pub mod morrow {
 
         emit!(GiftRefunded {
             gift: ctx.accounts.gift.key(),
+            sender,
+            amount,
+        });
+        Ok(())
+    }
+
+    /// Locks `amount` of `mint` behind a redeem code instead of a person. Only the sha256 of
+    /// the code lives on-chain; whoever presents the code itself can claim the card.
+    pub fn create_gift_card(
+        ctx: Context<CreateGiftCard>,
+        card_id: [u8; 16],
+        code_hash: [u8; 32],
+        amount: u64,
+        expires_at: i64,
+    ) -> Result<()> {
+        require!(amount > 0, MorrowError::ZeroAmount);
+        require!(
+            expires_at > Clock::get()?.unix_timestamp,
+            MorrowError::InvalidExpiry
+        );
+
+        token_interface::transfer_checked(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                TransferChecked {
+                    from: ctx.accounts.sender_token.to_account_info(),
+                    mint: ctx.accounts.mint.to_account_info(),
+                    to: ctx.accounts.vault.to_account_info(),
+                    authority: ctx.accounts.sender.to_account_info(),
+                },
+            ),
+            amount,
+            ctx.accounts.mint.decimals,
+        )?;
+
+        let card = &mut ctx.accounts.card;
+        card.sender = ctx.accounts.sender.key();
+        card.code_hash = code_hash;
+        card.mint = ctx.accounts.mint.key();
+        card.rent_payer = ctx.accounts.payer.key();
+        card.amount = amount;
+        card.expires_at = expires_at;
+        card.card_id = card_id;
+        card.bump = ctx.bumps.card;
+
+        emit!(GiftCardCreated {
+            card: card.key(),
+            sender: card.sender,
+            code_hash,
+            mint: card.mint,
+            amount,
+            expires_at,
+        });
+        Ok(())
+    }
+
+    /// Redeems a card to whoever presents the code. There is no recipient check to pass:
+    /// the code itself is the authority, and it dies with the card once claimed.
+    pub fn claim_gift_card(ctx: Context<ClaimGiftCard>, code: [u8; 16]) -> Result<()> {
+        require!(
+            solana_sha256_hasher::hash(&code).to_bytes() == ctx.accounts.card.code_hash,
+            MorrowError::WrongCode
+        );
+        let (sender, card_id, bump) = {
+            let card = &ctx.accounts.card;
+            (card.sender, card.card_id, card.bump)
+        };
+        let seeds: &[&[u8]] = &[GIFT_CARD_SEED, sender.as_ref(), &card_id, &[bump]];
+        let amount = ctx.accounts.vault.amount;
+
+        release_vault(
+            &ctx.accounts.token_program,
+            &ctx.accounts.mint,
+            &ctx.accounts.vault,
+            ctx.accounts.claimant_token.to_account_info(),
+            ctx.accounts.card.to_account_info(),
+            ctx.accounts.rent_payer.to_account_info(),
+            seeds,
+        )?;
+
+        emit!(GiftCardClaimed {
+            card: ctx.accounts.card.key(),
+            claimant: ctx.accounts.claimant.key(),
+            amount,
+        });
+        Ok(())
+    }
+
+    /// The sender can take a card back any time before it is redeemed.
+    /// After expiry anyone can trigger the refund, so unredeemed cards always go home.
+    pub fn refund_gift_card(ctx: Context<RefundGiftCard>) -> Result<()> {
+        let (sender, card_id, bump, expires_at) = {
+            let card = &ctx.accounts.card;
+            (card.sender, card.card_id, card.bump, card.expires_at)
+        };
+        require!(
+            ctx.accounts.authority.key() == sender
+                || Clock::get()?.unix_timestamp >= expires_at,
+            MorrowError::NotRefundable
+        );
+        let seeds: &[&[u8]] = &[GIFT_CARD_SEED, sender.as_ref(), &card_id, &[bump]];
+        let amount = ctx.accounts.vault.amount;
+
+        release_vault(
+            &ctx.accounts.token_program,
+            &ctx.accounts.mint,
+            &ctx.accounts.vault,
+            ctx.accounts.sender_token.to_account_info(),
+            ctx.accounts.card.to_account_info(),
+            ctx.accounts.rent_payer.to_account_info(),
+            seeds,
+        )?;
+
+        emit!(GiftCardRefunded {
+            card: ctx.accounts.card.key(),
             sender,
             amount,
         });
@@ -389,6 +505,125 @@ pub struct RefundGift<'info> {
     pub system_program: Program<'info, System>,
 }
 
+#[derive(Accounts)]
+#[instruction(card_id: [u8; 16])]
+pub struct CreateGiftCard<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub sender: Signer<'info>,
+    #[account(mint::token_program = token_program)]
+    pub mint: InterfaceAccount<'info, Mint>,
+    #[account(
+        mut,
+        token::mint = mint,
+        token::authority = sender,
+        token::token_program = token_program,
+    )]
+    pub sender_token: InterfaceAccount<'info, TokenAccount>,
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + GiftCard::INIT_SPACE,
+        seeds = [GIFT_CARD_SEED, sender.key().as_ref(), card_id.as_ref()],
+        bump,
+    )]
+    pub card: Account<'info, GiftCard>,
+    #[account(
+        init,
+        payer = payer,
+        associated_token::mint = mint,
+        associated_token::authority = card,
+        associated_token::token_program = token_program,
+    )]
+    pub vault: InterfaceAccount<'info, TokenAccount>,
+    pub token_program: Interface<'info, TokenInterface>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct ClaimGiftCard<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// Signer slot 1: the cron reads this account from the claim instruction to learn who
+    /// redeemed a card whose submit crashed before the row could be updated.
+    pub claimant: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [GIFT_CARD_SEED, card.sender.as_ref(), card.card_id.as_ref()],
+        bump = card.bump,
+        has_one = mint,
+        has_one = rent_payer,
+        close = rent_payer,
+    )]
+    pub card: Account<'info, GiftCard>,
+    /// CHECK: only receives lamports; pinned to `card.rent_payer` by `has_one`.
+    #[account(mut)]
+    pub rent_payer: UncheckedAccount<'info>,
+    #[account(mint::token_program = token_program)]
+    pub mint: InterfaceAccount<'info, Mint>,
+    #[account(
+        mut,
+        associated_token::mint = mint,
+        associated_token::authority = card,
+        associated_token::token_program = token_program,
+    )]
+    pub vault: InterfaceAccount<'info, TokenAccount>,
+    #[account(
+        init_if_needed,
+        payer = payer,
+        associated_token::mint = mint,
+        associated_token::authority = claimant,
+        associated_token::token_program = token_program,
+    )]
+    pub claimant_token: InterfaceAccount<'info, TokenAccount>,
+    pub token_program: Interface<'info, TokenInterface>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct RefundGiftCard<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub authority: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [GIFT_CARD_SEED, card.sender.as_ref(), card.card_id.as_ref()],
+        bump = card.bump,
+        has_one = sender,
+        has_one = mint,
+        has_one = rent_payer,
+        close = rent_payer,
+    )]
+    pub card: Account<'info, GiftCard>,
+    /// CHECK: token destination owner; pinned to `card.sender` by `has_one`.
+    pub sender: UncheckedAccount<'info>,
+    /// CHECK: only receives lamports; pinned to `card.rent_payer` by `has_one`.
+    #[account(mut)]
+    pub rent_payer: UncheckedAccount<'info>,
+    #[account(mint::token_program = token_program)]
+    pub mint: InterfaceAccount<'info, Mint>,
+    #[account(
+        mut,
+        associated_token::mint = mint,
+        associated_token::authority = card,
+        associated_token::token_program = token_program,
+    )]
+    pub vault: InterfaceAccount<'info, TokenAccount>,
+    #[account(
+        init_if_needed,
+        payer = payer,
+        associated_token::mint = mint,
+        associated_token::authority = sender,
+        associated_token::token_program = token_program,
+    )]
+    pub sender_token: InterfaceAccount<'info, TokenAccount>,
+    pub token_program: Interface<'info, TokenInterface>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub system_program: Program<'info, System>,
+}
+
 #[account]
 #[derive(InitSpace)]
 pub struct Gift {
@@ -422,6 +657,44 @@ pub struct GiftClaimed {
 #[event]
 pub struct GiftRefunded {
     pub gift: Pubkey,
+    pub sender: Pubkey,
+    pub amount: u64,
+}
+
+#[account]
+#[derive(InitSpace)]
+pub struct GiftCard {
+    pub sender: Pubkey,
+    /// Only the sha256 of the redeem code is ever stored; the code itself never touches chain
+    pub code_hash: [u8; 32],
+    pub mint: Pubkey,
+    pub rent_payer: Pubkey,
+    pub amount: u64,
+    pub expires_at: i64,
+    pub card_id: [u8; 16],
+    pub bump: u8,
+}
+
+#[event]
+pub struct GiftCardCreated {
+    pub card: Pubkey,
+    pub sender: Pubkey,
+    pub code_hash: [u8; 32],
+    pub mint: Pubkey,
+    pub amount: u64,
+    pub expires_at: i64,
+}
+
+#[event]
+pub struct GiftCardClaimed {
+    pub card: Pubkey,
+    pub claimant: Pubkey,
+    pub amount: u64,
+}
+
+#[event]
+pub struct GiftCardRefunded {
+    pub card: Pubkey,
     pub sender: Pubkey,
     pub amount: u64,
 }
@@ -586,4 +859,6 @@ pub enum MorrowError {
     WrongBeneficiary,
     #[msg("This fund still holds shares")]
     FundNotEmpty,
+    #[msg("That redeem code didn't work")]
+    WrongCode,
 }

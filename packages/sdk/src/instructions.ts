@@ -2,7 +2,13 @@ import { ASSOCIATED_TOKEN_PROGRAM_ID, getAssociatedTokenAddressSync } from '@sol
 import { type PublicKey, SystemProgram, TransactionInstruction } from '@solana/web3.js'
 import type { Buffer } from 'buffer'
 import { ArgWriter, uuidToBytes } from './encoding'
-import { DISCRIMINATORS, findFundAddress, findGiftAddress, MORROW_PROGRAM_ID } from './program'
+import {
+  DISCRIMINATORS,
+  findFundAddress,
+  findGiftAddress,
+  findGiftCardAddress,
+  MORROW_PROGRAM_ID,
+} from './program'
 
 type Meta = { pubkey: PublicKey; isSigner: boolean; isWritable: boolean }
 
@@ -26,6 +32,13 @@ const programs = (tokenProgram: PublicKey): Meta[] => [
 
 const instruction = (keys: Meta[], data: Buffer) =>
   new TransactionInstruction({ programId: MORROW_PROGRAM_ID, keys, data })
+
+/** Redeem codes are 16 Crockford-base32 characters on the wire; pasted dashes and case are noise */
+export function encodeRedeemCode(code: string): Uint8Array {
+  const normalized = code.toUpperCase().replaceAll(/[^A-Z0-9]/g, '')
+  if (normalized.length !== 16) throw new Error(`Redeem code must be 16 characters: ${code}`)
+  return new TextEncoder().encode(normalized)
+}
 
 export type CreateGiftParams = {
   /** Pays rent for the gift + vault and gets it back on claim or refund (the relayer) */
@@ -115,6 +128,101 @@ export function refundGiftInstruction(p: RefundGiftParams): TransactionInstructi
       ...programs(p.tokenProgram),
     ],
     new ArgWriter(DISCRIMINATORS.refundGift, 0).done(),
+  )
+}
+
+export type CreateGiftCardParams = {
+  /** Pays rent for the card + vault and gets it back on claim or refund (the relayer) */
+  payer: PublicKey
+  sender: PublicKey
+  mint: PublicKey
+  tokenProgram: PublicKey
+  cardId: string
+  /** sha256 of the redeem code, 32 bytes; the code itself never touches chain */
+  codeHash: Uint8Array
+  amount: bigint
+  expiresAt: Date
+}
+
+export function createGiftCardInstruction(p: CreateGiftCardParams): TransactionInstruction {
+  if (p.codeHash.length !== 32) throw new Error('codeHash must be 32 bytes')
+  const card = findGiftCardAddress(p.sender, p.cardId)
+  const data = new ArgWriter(DISCRIMINATORS.createGiftCard, 16 + 32 + 8 + 8)
+    .bytes(uuidToBytes(p.cardId))
+    .bytes(p.codeHash)
+    .u64(p.amount)
+    .i64(BigInt(Math.floor(p.expiresAt.getTime() / 1000)))
+    .done()
+
+  return instruction(
+    [
+      signer(p.payer, true),
+      signer(p.sender),
+      readonly(p.mint),
+      writable(ata(p.mint, p.sender, p.tokenProgram)),
+      writable(card),
+      writable(ata(p.mint, card, p.tokenProgram)),
+      ...programs(p.tokenProgram),
+    ],
+    data,
+  )
+}
+
+export type ClaimGiftCardParams = {
+  payer: PublicKey
+  /** Whoever is redeeming; the program releases to this account, not a stored one */
+  claimant: PublicKey
+  sender: PublicKey
+  rentPayer: PublicKey
+  mint: PublicKey
+  tokenProgram: PublicKey
+  cardId: string
+  code: string
+}
+
+export function claimGiftCardInstruction(p: ClaimGiftCardParams): TransactionInstruction {
+  const card = findGiftCardAddress(p.sender, p.cardId)
+  return instruction(
+    [
+      signer(p.payer, true),
+      signer(p.claimant),
+      writable(card),
+      writable(p.rentPayer),
+      readonly(p.mint),
+      writable(ata(p.mint, card, p.tokenProgram)),
+      writable(ata(p.mint, p.claimant, p.tokenProgram)),
+      ...programs(p.tokenProgram),
+    ],
+    new ArgWriter(DISCRIMINATORS.claimGiftCard, 16).bytes(encodeRedeemCode(p.code)).done(),
+  )
+}
+
+export type RefundGiftCardParams = {
+  payer: PublicKey
+  /** The sender, or anyone once the card has expired */
+  authority: PublicKey
+  sender: PublicKey
+  rentPayer: PublicKey
+  mint: PublicKey
+  tokenProgram: PublicKey
+  cardId: string
+}
+
+export function refundGiftCardInstruction(p: RefundGiftCardParams): TransactionInstruction {
+  const card = findGiftCardAddress(p.sender, p.cardId)
+  return instruction(
+    [
+      signer(p.payer, true),
+      signer(p.authority),
+      writable(card),
+      readonly(p.sender),
+      writable(p.rentPayer),
+      readonly(p.mint),
+      writable(ata(p.mint, card, p.tokenProgram)),
+      writable(ata(p.mint, p.sender, p.tokenProgram)),
+      ...programs(p.tokenProgram),
+    ],
+    new ArgWriter(DISCRIMINATORS.refundGiftCard, 0).done(),
   )
 }
 

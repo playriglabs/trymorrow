@@ -4,11 +4,15 @@
  * the claim hands both to the recipient in one transaction, a second pair goes back to the sender,
  * and every lamport of rent returns to the account that paid it. Also checks that the biggest gift
  * the app builds — two stocks, cash, and a cash fee — still fits Solana's 1,232-byte limit.
+ * Gift cards then run the same gauntlet: the code is the only authority, a wrong code is refused,
+ * a redeemed card lands with whoever presented the code, unredeemed cards go home — by the sender
+ * or by anyone at expiry — and again every lamport comes back.
  * Run with `pnpm test:gifts` after `pnpm build:program`.
  */
 
 import { strict as assert } from 'node:assert'
 import { spawn } from 'node:child_process'
+import { createHash, randomInt } from 'node:crypto'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
@@ -32,10 +36,14 @@ import {
   VersionedTransaction,
 } from '@solana/web3.js'
 import {
+  claimGiftCardInstruction,
   claimGiftInstruction,
+  createGiftCardInstruction,
   createGiftInstruction,
   findGiftAddress,
+  findGiftCardAddress,
   MORROW_PROGRAM_ID,
+  refundGiftCardInstruction,
   refundGiftInstruction,
 } from '../src/index.ts'
 
@@ -333,29 +341,289 @@ async function main() {
     )
   }
 
+  // Gift cards: the code is the only authority. Same mints, same 1,232-byte ceiling, and again
+  // every lamport of rent has to come back to the relayer.
+  const claimant = Keypair.generate()
+  await fund(claimant)
+  for (const [mint, tokenProgram, amount] of [
+    [stockMint, TOKEN_2022_PROGRAM_ID, amounts.stock],
+    [cashMint, TOKEN_PROGRAM_ID, amounts.cash],
+  ] as const) {
+    await mintTo(
+      connection,
+      relayer,
+      mint,
+      getAssociatedTokenAddressSync(mint, sender.publicKey, true, tokenProgram),
+      relayer,
+      amount * 3n, // one redeemed card, one taken back, one expired
+      [],
+      undefined,
+      tokenProgram,
+    )
+  }
+
+  const CODE_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ' // Crockford base32: no I L O U
+  const generateCode = () =>
+    Array.from({ length: 16 }, () => CODE_ALPHABET[randomInt(CODE_ALPHABET.length)]).join('')
+  const codeHashOf = (code: string) =>
+    new Uint8Array(createHash('sha256').update(code, 'ascii').digest())
+  const card = (
+    mint: PublicKey,
+    tokenProgram: PublicKey,
+    cardId: string,
+    amount: bigint,
+    codeHash: Uint8Array,
+    expires = expiresAt,
+  ) =>
+    createGiftCardInstruction({
+      payer: relayer.publicKey,
+      sender: sender.publicKey,
+      mint,
+      tokenProgram,
+      cardId,
+      codeHash,
+      amount,
+      expiresAt: expires,
+    })
+  const cardVaultOf = (cardId: string, mint: PublicKey, tokenProgram: PublicKey) =>
+    getAssociatedTokenAddressSync(
+      mint,
+      findGiftCardAddress(sender.publicKey, cardId),
+      true,
+      tokenProgram,
+    )
+
+  // The biggest card the app can build: three cards and the cash fee transfer on top
+  const sizeCode = generateCode()
+  const worstCard = await sizeOf([
+    card(stockMint, TOKEN_2022_PROGRAM_ID, crypto.randomUUID(), 1n, codeHashOf(sizeCode)),
+    card(otherStock, TOKEN_2022_PROGRAM_ID, crypto.randomUUID(), 1n, codeHashOf(sizeCode)),
+    card(cashMint, TOKEN_PROGRAM_ID, crypto.randomUUID(), 1n, codeHashOf(sizeCode)),
+    createTransferInstruction(
+      getAssociatedTokenAddressSync(cashMint, sender.publicKey, true, TOKEN_PROGRAM_ID),
+      getAssociatedTokenAddressSync(cashMint, relayer.publicKey, true, TOKEN_PROGRAM_ID),
+      sender.publicKey,
+      1n,
+      [],
+      TOKEN_PROGRAM_ID,
+    ),
+  ])
+  console.log('transaction bytes: 2 stocks + cash + cash fee =', worstCard)
+  assert.ok(
+    worstCard <= 1232,
+    `the biggest gift card is ${worstCard} bytes, over Solana's 1,232-byte limit`,
+  )
+
+  // Redeeming three cards in one transaction has to fit too
+  const claimCard = (mint: PublicKey, tokenProgram: PublicKey, cardId: string, code: string) =>
+    claimGiftCardInstruction({
+      payer: relayer.publicKey,
+      claimant: claimant.publicKey,
+      sender: sender.publicKey,
+      rentPayer: relayer.publicKey,
+      mint,
+      tokenProgram,
+      cardId,
+      code,
+    })
+  const redeemSize = await sizeOf([
+    claimCard(stockMint, TOKEN_2022_PROGRAM_ID, crypto.randomUUID(), sizeCode),
+    claimCard(otherStock, TOKEN_2022_PROGRAM_ID, crypto.randomUUID(), sizeCode),
+    claimCard(cashMint, TOKEN_PROGRAM_ID, crypto.randomUUID(), sizeCode),
+  ])
+  console.log('transaction bytes: redeem 3 cards =', redeemSize)
+  assert.ok(
+    redeemSize <= 1232,
+    `redeeming three cards is ${redeemSize} bytes, over Solana's 1,232-byte limit`,
+  )
+
+  // A stock and cash card locked behind one code; a wrong code is refused, the right one pays out
+  const happyCode = generateCode()
+  const happyHash = codeHashOf(happyCode)
+  const happyIds = [crypto.randomUUID(), crypto.randomUUID()]
+  await send(
+    [
+      card(stockMint, TOKEN_2022_PROGRAM_ID, happyIds[0], amounts.stock, happyHash),
+      card(cashMint, TOKEN_PROGRAM_ID, happyIds[1], amounts.cash, happyHash),
+    ],
+    [relayer, sender],
+  )
+  const wrongCode = generateCode()
+  await assert.rejects(
+    send(
+      [
+        claimCard(stockMint, TOKEN_2022_PROGRAM_ID, happyIds[0], wrongCode),
+        claimCard(cashMint, TOKEN_PROGRAM_ID, happyIds[1], wrongCode),
+      ],
+      [relayer, claimant],
+    ),
+    /0x1779|failed/i, // 0x1779 is on-chain error 6009, WrongCode
+  )
+  await send(
+    [
+      claimCard(stockMint, TOKEN_2022_PROGRAM_ID, happyIds[0], happyCode),
+      claimCard(cashMint, TOKEN_PROGRAM_ID, happyIds[1], happyCode),
+    ],
+    [relayer, claimant],
+  )
+  const redeemed = await Promise.all(
+    [stockMint, cashMint].map(async (mint, index) =>
+      getAccount(
+        connection,
+        getAssociatedTokenAddressSync(
+          mint,
+          claimant.publicKey,
+          true,
+          index === 0 ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID,
+        ),
+        'confirmed',
+        index === 0 ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID,
+      ),
+    ),
+  )
+  assert.equal(redeemed[0].amount, amounts.stock, 'the redeemed stock reached the claimant')
+  assert.equal(redeemed[1].amount, amounts.cash, 'the redeemed cash reached the claimant')
+  for (const [index, cardId] of happyIds.entries()) {
+    const [mint, tokenProgram] =
+      index === 0 ? [stockMint, TOKEN_2022_PROGRAM_ID] : [cashMint, TOKEN_PROGRAM_ID]
+    assert.equal(
+      await connection.getAccountInfo(cardVaultOf(cardId, mint, tokenProgram), 'confirmed'),
+      null,
+      'the card vault should be closed once redeemed',
+    )
+    assert.equal(
+      await connection.getAccountInfo(findGiftCardAddress(sender.publicKey, cardId), 'confirmed'),
+      null,
+      'the card itself should be closed once redeemed',
+    )
+  }
+
+  // A card the sender takes back before expiry
+  const backCode = generateCode()
+  const backIds = [crypto.randomUUID(), crypto.randomUUID()]
+  await send(
+    [
+      card(stockMint, TOKEN_2022_PROGRAM_ID, backIds[0], amounts.stock, codeHashOf(backCode)),
+      card(cashMint, TOKEN_PROGRAM_ID, backIds[1], amounts.cash, codeHashOf(backCode)),
+    ],
+    [relayer, sender],
+  )
+  const senderMid = await Promise.all([
+    tokenAmountOf(stockMint, TOKEN_2022_PROGRAM_ID, sender.publicKey),
+    tokenAmountOf(cashMint, TOKEN_PROGRAM_ID, sender.publicKey),
+  ])
+  await send(
+    [
+      refundGiftCardInstruction({
+        payer: relayer.publicKey,
+        authority: sender.publicKey,
+        sender: sender.publicKey,
+        rentPayer: relayer.publicKey,
+        mint: stockMint,
+        tokenProgram: TOKEN_2022_PROGRAM_ID,
+        cardId: backIds[0],
+      }),
+      refundGiftCardInstruction({
+        payer: relayer.publicKey,
+        authority: sender.publicKey,
+        sender: sender.publicKey,
+        rentPayer: relayer.publicKey,
+        mint: cashMint,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        cardId: backIds[1],
+      }),
+    ],
+    [relayer, sender],
+  )
+  for (const [index, cardId] of backIds.entries()) {
+    const [mint, tokenProgram] =
+      index === 0 ? [stockMint, TOKEN_2022_PROGRAM_ID] : [cashMint, TOKEN_PROGRAM_ID]
+    const back = await tokenAmountOf(mint, tokenProgram, sender.publicKey)
+    assert.equal(
+      back,
+      senderMid[index] + (index === 0 ? amounts.stock : amounts.cash),
+      'the taken-back card should be back with the sender',
+    )
+    assert.equal(
+      await connection.getAccountInfo(cardVaultOf(cardId, mint, tokenProgram), 'confirmed'),
+      null,
+      'the card vault should be closed once taken back',
+    )
+  }
+
+  // A card that expires, so anyone — the cron, in practice — can send it home
+  const staleCode = generateCode()
+  const staleId = crypto.randomUUID()
+  await send(
+    [
+      card(
+        stockMint,
+        TOKEN_2022_PROGRAM_ID,
+        staleId,
+        amounts.stock,
+        codeHashOf(staleCode),
+        new Date(Date.now() + 5_000),
+      ),
+    ],
+    [relayer, sender],
+  )
+  await wait(6_000)
+  await send(
+    [
+      refundGiftCardInstruction({
+        payer: relayer.publicKey,
+        authority: relayer.publicKey,
+        sender: sender.publicKey,
+        rentPayer: relayer.publicKey,
+        mint: stockMint,
+        tokenProgram: TOKEN_2022_PROGRAM_ID,
+        cardId: staleId,
+      }),
+    ],
+    [relayer],
+  )
+  assert.equal(
+    await connection.getAccountInfo(
+      cardVaultOf(staleId, stockMint, TOKEN_2022_PROGRAM_ID),
+      'confirmed',
+    ),
+    null,
+    'the expired card vault should be closed once refunded',
+  )
+
   // Rent returns to the relayer on claim and refund; the only thing that stays is the two
   // accounts the recipient needed to hold the gift, which is exactly what the gift fee charges for
-  const openedForRecipient = (
-    await Promise.all(
+  const accountsOf = (owner: PublicKey) =>
+    Promise.all(
       [stockMint, cashMint].map((mint, index) =>
         balance(
           getAssociatedTokenAddressSync(
             mint,
-            recipient.publicKey,
+            owner,
             true,
             index === 0 ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID,
           ),
         ),
       ),
     )
-  ).reduce((sum, lamports) => sum + lamports, 0)
-  const spent = relayerBefore - (await balance(relayer.publicKey)) - openedForRecipient
+  const openedForRecipient = (await accountsOf(recipient.publicKey)).reduce(
+    (sum, lamports) => sum + lamports,
+    0,
+  )
+  const openedForClaimant = (await accountsOf(claimant.publicKey)).reduce(
+    (sum, lamports) => sum + lamports,
+    0,
+  )
+  const spent =
+    relayerBefore - (await balance(relayer.publicKey)) - openedForRecipient - openedForClaimant
   console.log(
     'relayer out of pocket:',
     spent,
     'lamports of fees, plus',
     openedForRecipient,
-    'lamports of accounts opened for the recipient',
+    'lamports of accounts opened for the recipient and',
+    openedForClaimant,
+    'for the claimant',
   )
   assert.ok(spent < 200_000, `the relayer did not get its rent back: ${spent} lamports`)
   console.log('all gift checks passed')
