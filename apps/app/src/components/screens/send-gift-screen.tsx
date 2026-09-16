@@ -237,8 +237,8 @@ function AssetPickerSheet({
           </div>
         )}
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5">
-          <Card className="overflow-hidden">
+        <div className="flex min-h-0 flex-col px-5">
+          <Card className="min-h-0 max-h-[322px] overflow-y-auto overscroll-contain">
             <div className="flex flex-col divide-y divide-line">
               {visible.map((holding) => {
                 const isSelected = draft.includes(holding.mint)
@@ -251,7 +251,7 @@ function AssetPickerSheet({
                     aria-disabled={unavailable}
                     onClick={() => toggle(holding.mint)}
                     className={clsx(
-                      'flex min-h-16 w-full items-center gap-3 px-4 py-2.5 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ink',
+                      'flex h-16 w-full shrink-0 items-center gap-3 px-4 py-2.5 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ink',
                       {
                         'bg-orange-wash': isSelected,
                         'opacity-45': unavailable,
@@ -290,7 +290,7 @@ function AssetPickerSheet({
               )}
             </div>
           </Card>
-          <p className="px-1 pt-2 text-[13px] text-stone">
+          <p className="shrink-0 px-1 pt-2 text-[13px] text-stone">
             {full
               ? `Maximum ${MAX_GIFT_STOCKS} selected. Remove one to choose another.`
               : draft.length === 1
@@ -700,7 +700,10 @@ function SendGift() {
                 ) : (
                   <StockLogo iconUrl={holding.iconUrl} ticker={holding.ticker} size={26} />
                 )}
-                <span className="max-w-37 truncate">${holding.ticker}</span>
+                <span className="max-w-37 truncate">
+                  {!holding.isCash && '$'}
+                  {holding.ticker}
+                </span>
               </span>
             ))}
           </span>

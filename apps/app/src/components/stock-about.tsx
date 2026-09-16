@@ -2,11 +2,42 @@ import { Card } from '@/components/ui'
 import { useStockProfileQuery } from '@/lib/client/queries'
 
 /**
- * What the company does. Renders nothing at all when we have no description — no provider key,
+ * What the company does. Shows skeletons while loading, then renders nothing if there is no description — no provider key,
  * a ticker the provider doesn't cover, or an ETF — so the page never shows an empty box.
  */
 export function StockAbout({ mint, name }: { mint: string; name: string }) {
   const profile = useStockProfileQuery(mint)
+  if (profile.isPending) {
+    return (
+      <>
+        <span role="status" className="sr-only">
+          Loading company details
+        </span>
+        <Card className="flex flex-col gap-3 px-4 py-4">
+          <div className="flex animate-pulse flex-col gap-3 motion-reduce:animate-none" aria-hidden>
+            <div className="h-5 w-40 max-w-full rounded bg-orange-wash" />
+            <div className="flex flex-col gap-2">
+              <div className="h-3.5 w-full rounded bg-orange-wash" />
+              <div className="h-3.5 w-full rounded bg-orange-wash" />
+              <div className="h-3.5 w-full rounded bg-orange-wash" />
+              <div className="h-3.5 w-3/4 rounded bg-orange-wash" />
+            </div>
+          </div>
+        </Card>
+        <Card className="flex flex-col divide-y divide-line px-4 text-[14px]">
+          {['Sector', 'Industry'].map((label) => (
+            <div key={label} className="flex items-center justify-between gap-3 py-3">
+              <span className="text-stone">{label}</span>
+              <div
+                className="h-7 w-36 max-w-[70%] animate-pulse rounded-link bg-orange-wash motion-reduce:animate-none"
+                aria-hidden
+              />
+            </div>
+          ))}
+        </Card>
+      </>
+    )
+  }
   if (!profile.data) return null
 
   const classifications = [

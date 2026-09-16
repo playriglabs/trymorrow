@@ -47,8 +47,18 @@ function GiftCard({ gift }: { gift: GiftView }) {
 
   return (
     <div className="relative flex flex-col gap-4.5 mt-3 overflow-hidden rounded-sheet bg-orange p-6 text-white">
+      <div
+        className="pointer-events-none absolute inset-2 z-10 rounded-3xl border-2 border-dashed border-white/60"
+        aria-hidden
+      />
       <div className="absolute -top-20 -right-20 size-45 rounded-full bg-[#ff8f33]" aria-hidden />
       <div className="absolute -top-7.5 -right-7.5 size-22.5 rounded-full bg-sun" aria-hidden />
+      <div
+        className="pointer-events-none absolute -top-6 left-1/2 z-10 size-12 -translate-x-1/2 rounded-full border-2 border-dashed border-white/60 bg-orange"
+        aria-hidden
+      >
+        <div className="absolute inset-1.5 rounded-full bg-cream" />
+      </div>
       <div className="relative flex items-center gap-2.5 text-ink">
         <Avatar
           name={gift.sender.name}
@@ -83,8 +93,11 @@ function GiftCard({ gift }: { gift: GiftView }) {
               ) : (
                 <StockLogo iconUrl={item.iconUrl} ticker={item.ticker} size={32} />
               )}
-              <span className="min-w-0 flex-1 truncate">{item.name}</span>
-              <span>{formatUsd(item.usdValue)}</span>
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate">{item.name}</span>
+                {!item.isCash && <span className="text-[12px] text-stone">${item.ticker}</span>}
+              </span>
+              <span className="shrink-0">{formatUsd(item.usdValue)}</span>
             </li>
           ))}
         </ul>
@@ -222,7 +235,7 @@ function Gift({ giftId }: { giftId: string }) {
                 </Button>
               </>
             ) : (
-              <Button variant="soft" onClick={() => setConfirming(true)}>
+              <Button variant="filled" onClick={() => setConfirming(true)}>
                 Take it back
               </Button>
             )}

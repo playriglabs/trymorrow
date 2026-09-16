@@ -65,6 +65,10 @@ function House() {
 
   if (!session.ready || !session.profile) return <Loading />
 
+  const balanceLabel = portfolio.isPending ? '—' : balanceHidden ? '$••••' : formatUsd(shownTotal)
+  // Keep short balances at 1× (44px), then reduce the size as formatted amounts grow.
+  const balanceFontSize = Math.max(24, 44 - Math.max(0, balanceLabel.length - 7) * 3)
+
   const toClaim = received.data?.filter((gift) => gift.status === 'pending') ?? []
   const stocks = (portfolio.data?.holdings.filter((holding) => !holding.isCash) ?? []).sort(byValue)
 
@@ -113,9 +117,33 @@ function House() {
             </button>
           </div>
           <div className="flex items-center justify-between gap-3">
-            <h1 className="font-sans text-[44px] leading-[1.05] font-medium tracking-[-0.02em]">
-              {portfolio.isPending ? '—' : balanceHidden ? '$••••' : formatUsd(shownTotal)}
-            </h1>
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+              <h1
+                className="font-sans leading-[1.05] font-medium tracking-[-0.02em] break-all"
+                style={{ fontSize: balanceFontSize }}
+              >
+                {balanceLabel}
+              </h1>
+              {portfolio.data?.stocksPnl24hUsd != null && !balanceHidden && (
+                <p
+                  className={clsx('text-[14px] whitespace-nowrap', {
+                    'text-gain': portfolio.data.stocksPnl24hUsd > 0,
+                    'text-loss': portfolio.data.stocksPnl24hUsd < 0,
+                    'text-stone': portfolio.data.stocksPnl24hUsd === 0,
+                  })}
+                >
+                  {portfolio.data.stocksPnl24hUsd > 0 ? '+' : ''}
+                  {portfolio.data.stocksPnl24hUsd.toLocaleString('en-US', {
+                    style: 'currency',
+                    currency: 'USD',
+                    minimumFractionDigits: 1,
+                    maximumFractionDigits: 1,
+                  })}
+                  {portfolio.data.stocksPnl24hPct != null &&
+                    `(${portfolio.data.stocksPnl24hPct > 0 ? '+' : ''}${portfolio.data.stocksPnl24hPct.toFixed(0)}%)`}
+                </p>
+              )}
+            </div>
             <LinkButton href="/add-cash" variant="soft" size="sm">
               <PlusIcon className="size-4" />
               Add cash
@@ -125,22 +153,6 @@ function House() {
             <p className="text-[13px] text-stone">
               {balanceHidden ? '••••' : formatUsd(portfolio.data.cashUsd)} cash ·{' '}
               {balanceHidden ? '••••' : formatUsd(portfolio.data.stocksUsd)} in stocks
-              {portfolio.data.stocksPnl24hUsd != null && (
-                <>
-                  {' · '}
-                  <span
-                    className={clsx({
-                      'text-gain': portfolio.data.stocksPnl24hUsd > 0,
-                      'text-loss': portfolio.data.stocksPnl24hUsd < 0,
-                    })}
-                  >
-                    {portfolio.data.stocksPnl24hUsd > 0 ? '+' : ''}
-                    {formatUsd(portfolio.data.stocksPnl24hUsd)}
-                    {portfolio.data.stocksPnl24hPct != null &&
-                      ` (${portfolio.data.stocksPnl24hPct > 0 ? '+' : ''}${portfolio.data.stocksPnl24hPct.toFixed(2)}%)`}
-                  </span>
-                </>
-              )}
             </p>
           )}
         </section>
@@ -224,11 +236,32 @@ function House() {
               </a>
             )}
           </div>
-          {stocks.length === 0 ? (
+          {portfolio.isPending ? (
+            <Card className="flex flex-col divide-y divide-line px-4">
+              <span role="status" className="sr-only">
+                Loading stocks
+              </span>
+              {[0, 1, 2, 3].map((row) => (
+                <div
+                  key={row}
+                  className="flex animate-pulse items-center gap-3 py-3 motion-reduce:animate-none"
+                  aria-hidden
+                >
+                  <div className="size-10 shrink-0 rounded-full bg-orange-wash" />
+                  <div className="flex min-w-0 flex-1 flex-col gap-2">
+                    <div className="h-4 w-28 max-w-full rounded bg-orange-wash" />
+                    <div className="h-3 w-18 max-w-full rounded bg-orange-wash" />
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-2">
+                    <div className="h-4 w-16 rounded bg-orange-wash" />
+                    <div className="h-3 w-20 rounded bg-orange-wash" />
+                  </div>
+                </div>
+              ))}
+            </Card>
+          ) : stocks.length === 0 ? (
             <Card className="px-4 py-5 text-[15px] text-stone">
-              {portfolio.isPending
-                ? 'Loading…'
-                : 'No stocks yet. Buy one, or open a gift, to get started.'}
+              No stocks yet. Buy one, or open a gift, to get started.
             </Card>
           ) : (
             <Card className="flex flex-col divide-y divide-line px-4">

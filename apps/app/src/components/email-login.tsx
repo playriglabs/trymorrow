@@ -101,14 +101,14 @@ export function EmailLogin({ intro }: { intro?: string }) {
         </p>
       </div>
 
-      <label className="relative grid grid-cols-6 gap-2">
+      <label className="group relative grid grid-cols-6 gap-2">
         <span className="sr-only">6-digit code</span>
         {Array.from({ length: CODE_LENGTH }, (_, index) => (
           <span
             // biome-ignore lint/suspicious/noArrayIndexKey: fixed-length code slots
             key={index}
             className={clsx(
-              'flex h-15 items-center justify-center rounded-[14px] border bg-surface font-sans text-[26px] font-medium',
+              'relative flex h-15 min-w-0 items-center justify-center rounded-[14px] border bg-surface font-sans text-[26px] leading-none font-medium',
               {
                 'border-orange ring-4 ring-orange-wash': index === code.length,
                 'border-line': index !== code.length,
@@ -116,11 +116,17 @@ export function EmailLogin({ intro }: { intro?: string }) {
             )}
           >
             {code[index] ?? ''}
+            {index === code.length && state.status !== 'submitting-code' && (
+              <span
+                className="pointer-events-none absolute top-1/2 left-1/2 h-6 w-px -translate-x-1/2 -translate-y-1/2 bg-ink opacity-0 group-focus-within:opacity-100"
+                aria-hidden
+              />
+            )}
           </span>
         ))}
         <input
           ref={codeInput}
-          className="absolute inset-0 opacity-0"
+          className="absolute inset-0 h-full w-full caret-transparent opacity-0"
           inputMode="numeric"
           autoComplete="one-time-code"
           maxLength={CODE_LENGTH}

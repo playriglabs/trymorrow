@@ -118,7 +118,7 @@ export function InstallPrompt() {
       <dialog
         ref={dialog}
         aria-labelledby="install-title"
-        className="fixed inset-0 m-auto w-[calc(100%-2rem)] max-w-96 rounded-[28px] bg-white p-6 text-ink backdrop:bg-black/40"
+        className="fixed inset-0 m-auto w-[calc(100%-2rem)] max-w-96 rounded-sheet bg-white p-6 text-ink backdrop:bg-black/40"
       >
         <div className="mb-4 flex items-center justify-between gap-3">
           <h2 id="install-title" className="font-sans text-xl font-medium">
