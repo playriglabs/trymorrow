@@ -10,6 +10,12 @@ export default defineConfig({
   integrations: [react()],
   vite: {
     plugins: [tailwindcss()],
+    // Every page is a client-only React island. Pre-bundle Privy's entry points up front so
+    // Vite does not discover `/solana` after the first page has already loaded and invalidate
+    // the main Privy chunk with a 504 "Outdated Optimize Dep" response.
+    optimizeDeps: {
+      include: ['@privy-io/react-auth', '@privy-io/react-auth/solana'],
+    },
   },
   env: {
     schema: {
