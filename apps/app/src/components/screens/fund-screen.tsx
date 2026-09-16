@@ -698,32 +698,34 @@ function Fund({ fundId }: { fundId: string }) {
         {view.holdings.length > 0 && (
           <section className="flex flex-col gap-3">
             <h2 className="font-sans text-lg font-medium tracking-[-0.02em]">What it holds</h2>
-            <Card className="flex flex-col divide-y divide-line px-4">
-              {view.holdings.map((holding) => (
-                <div key={holding.mint} className="flex items-center gap-3 py-3">
-                  <StockLogo iconUrl={holding.iconUrl} ticker={holding.ticker} size={40} />
-                  <div className="flex flex-1 flex-col">
-                    <span>{holding.name}</span>
-                    <span className="text-[13px] text-stone">
-                      {holding.weightPct.toFixed(0)}% of the fund
-                    </span>
-                  </div>
-                  <div className="flex flex-col items-end">
-                    <span>{formatUsd(holding.valueUsd)}</span>
-                    {holding.change24hPct != null && (
-                      <span
-                        className={clsx('text-[13px]', {
-                          'text-gain': holding.change24hPct >= 0,
-                          'text-loss': holding.change24hPct < 0,
-                        })}
-                      >
-                        {holding.change24hPct >= 0 ? '+' : ''}
-                        {holding.change24hPct.toFixed(1)}% today
+            <Card className="px-4">
+              <div className="flex max-h-80 flex-col divide-y divide-line overflow-y-auto overscroll-contain">
+                {view.holdings.map((holding) => (
+                  <div key={holding.mint} className="flex shrink-0 items-center gap-3 py-3">
+                    <StockLogo iconUrl={holding.iconUrl} ticker={holding.ticker} size={40} />
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <span className="truncate">{holding.name}</span>
+                      <span className="text-[13px] text-stone">
+                        {holding.weightPct.toFixed(0)}% of the fund
                       </span>
-                    )}
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end">
+                      <span>{formatUsd(holding.valueUsd)}</span>
+                      {holding.change24hPct != null && (
+                        <span
+                          className={clsx('text-[13px]', {
+                            'text-gain': holding.change24hPct >= 0,
+                            'text-loss': holding.change24hPct < 0,
+                          })}
+                        >
+                          {holding.change24hPct >= 0 ? '+' : ''}
+                          {holding.change24hPct.toFixed(1)}% today
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </Card>
           </section>
         )}

@@ -1,6 +1,14 @@
-import { CheckIcon, CopyIcon, LockIcon, ShareIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
+import {
+  CheckIcon,
+  CopyIcon,
+  LockIcon,
+  MagnifyingGlassIcon,
+  ShareIcon,
+  WarningIcon,
+  XIcon,
+} from '@phosphor-icons/react'
 import clsx from 'clsx'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { match } from 'ts-pattern'
 import { MonthPicker } from '@/components/month-picker'
 import { withProviders } from '@/components/providers'
@@ -121,12 +129,28 @@ function CreateFund() {
   const [month, setMonth] = useState(() => monthValue(yearsFromNow(DEFAULT_YEARS)))
   const [custom, setCustom] = useState<string[] | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [pickerSearch, setPickerSearch] = useState('')
   const [created, setCreated] = useState<FundView | null>(null)
 
   const stocks = useStocksQuery({ enabled: session.ready })
   const portfolio = usePortfolioQuery({ enabled: session.ready })
   const fee = useFundFeeQuery({ enabled: session.ready })
   const create = useCreateFundMutation()
+
+  useEffect(() => {
+    if (!pickerOpen) return
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPickerOpen(false)
+    }
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [pickerOpen])
 
   // Stocks this person already holds come first: a mix you recognise is easier to commit to for
   // years, and it's the only way to spot one that isn't in the most-traded handful
@@ -153,6 +177,12 @@ function CreateFund() {
     () => new Map(listings.map((stock) => [stock.ticker.toUpperCase(), stock])),
     [listings],
   )
+  const pickerQuery = pickerSearch.trim().toLocaleLowerCase()
+  const visibleListings = pickerQuery
+    ? listings.filter((stock) =>
+        `${stock.ticker} ${stock.name}`.toLocaleLowerCase().includes(pickerQuery),
+      )
+    : listings
 
   /** The steady mix, or an even split of whatever they picked */
   const allocations = useMemo(() => {
@@ -376,13 +406,13 @@ function CreateFund() {
             </span>
           </button>
         )}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
           {allocations.map((allocation) => {
             const stock = stockOf(allocation.mint)
             return stock ? (
               <span
                 key={stock.mint}
-                className="flex h-10 items-center gap-2 rounded-link border border-orange bg-orange-wash pr-3 pl-1.5 font-sans text-[14px] font-medium"
+                className="flex h-10 items-center gap-2 rounded-link border border-orange bg-orange-wash pr-2 pl-1.5 font-sans text-[14px] font-medium"
               >
                 <StockLogo iconUrl={stock.iconUrl} ticker={stock.ticker} size={28} />
                 {stock.ticker}
@@ -391,10 +421,13 @@ function CreateFund() {
           })}
           <button
             type="button"
-            onClick={() => setPickerOpen(true)}
+            onClick={() => {
+              setPickerSearch('')
+              setPickerOpen(true)
+            }}
             className="flex h-10 items-center rounded-link border border-line bg-surface px-3 font-sans text-[14px] font-medium text-stone"
           >
-            {custom ? 'Change stocks' : 'Customize mix'}
+            {custom ? 'Change' : 'Customize'}
           </button>
         </div>
         <p className="text-[13px] text-stone">
@@ -431,7 +464,7 @@ function CreateFund() {
       </Notice>
 
       {pickerOpen && (
-        <div className="fixed inset-0 z-40 flex items-end bg-ink/35" role="presentation">
+        <div className="modal-backdrop-in fixed inset-0 z-40 flex items-end justify-center bg-ink/30">
           <button
             type="button"
             aria-label="Close stock picker"
@@ -442,63 +475,101 @@ function CreateFund() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="fund-stock-picker-title"
-            className="relative flex max-h-[82dvh] w-full flex-col gap-4 overflow-hidden rounded-t-sheet bg-cream px-5 pt-5 pb-[max(20px,env(safe-area-inset-bottom))] shadow-elevated"
+            className="modal-sheet-in relative flex h-[60dvh] w-full max-w-107.5 flex-col overflow-hidden rounded-t-sheet bg-cream"
           >
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 id="fund-stock-picker-title" className="font-sans text-xl font-medium">
+            <div className="flex shrink-0 items-center justify-between px-5 pt-4 pb-3">
+              <div className="flex flex-col gap-0.5">
+                <h2
+                  id="fund-stock-picker-title"
+                  className="font-sans text-xl font-medium tracking-[-0.02em]"
+                >
                   Choose stocks
                 </h2>
-                <p className="text-[13px] text-stone">Pick up to {MAX_FUND_STOCKS}</p>
+                <p className="text-[13px] text-stone">
+                  {allocations.length} of {MAX_FUND_STOCKS} selected
+                </p>
               </div>
               <button
                 type="button"
-                aria-label="Close stock picker"
+                aria-label="Close"
                 onClick={() => setPickerOpen(false)}
-                className="flex size-10 items-center justify-center rounded-full hover:bg-orange-wash"
+                className="flex size-11 items-center justify-center rounded-full text-stone hover:bg-orange-wash focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
               >
                 <XIcon className="size-5" />
               </button>
             </div>
-            <div className="flex min-h-0 flex-col overflow-y-auto rounded-card border border-line bg-surface">
-              {listings.map((stock) => {
-                const selected = allocations.some((item) => item.mint === stock.mint)
-                return (
-                  <button
-                    key={stock.mint}
-                    type="button"
-                    aria-pressed={selected}
-                    disabled={!selected && (custom?.length ?? 0) >= MAX_FUND_STOCKS}
-                    onClick={() => toggleStock(stock.mint)}
-                    className={clsx(
-                      'flex min-h-18 items-center gap-3 border-b border-line px-4 py-3 text-left font-sans text-[15px] font-medium last:border-b-0 disabled:opacity-40',
-                      {
-                        'bg-orange-wash': selected,
-                      },
-                    )}
-                  >
-                    <StockLogo iconUrl={stock.iconUrl} ticker={stock.ticker} size={40} />
-                    <span className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate">{stock.ticker}</span>
-                      <span className="text-[13px] text-stone">
-                        {ownedMints.has(stock.mint) ? 'You own this' : stock.name}
-                      </span>
-                    </span>
-                    <span
+            <div className="mx-5 mb-3 flex h-11 shrink-0 items-center gap-2.5 rounded-button border border-line bg-surface px-3.5 focus-within:border-orange focus-within:ring-4 focus-within:ring-orange-wash">
+              <MagnifyingGlassIcon className="size-4.5 shrink-0 text-stone" />
+              <input
+                type="text"
+                inputMode="search"
+                enterKeyHint="search"
+                autoComplete="off"
+                aria-label="Search stocks"
+                value={pickerSearch}
+                onChange={(event) => setPickerSearch(event.target.value)}
+                placeholder="Search stocks"
+                className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-steel"
+              />
+              {pickerSearch && (
+                <button
+                  type="button"
+                  onClick={() => setPickerSearch('')}
+                  aria-label="Clear search"
+                  className="flex size-8 shrink-0 items-center justify-center rounded-full text-stone"
+                >
+                  <XIcon className="size-4" />
+                </button>
+              )}
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5">
+              <div className="overflow-hidden rounded-card border border-line bg-surface">
+                {visibleListings.map((stock) => {
+                  const selected = allocations.some((item) => item.mint === stock.mint)
+                  const unavailable = !selected && allocations.length >= MAX_FUND_STOCKS
+                  return (
+                    <button
+                      key={stock.mint}
+                      type="button"
+                      aria-pressed={selected}
+                      aria-disabled={unavailable}
+                      onClick={() => toggleStock(stock.mint)}
                       className={clsx(
-                        'flex size-8 shrink-0 items-center justify-center rounded-full border',
-                        selected ? 'border-orange bg-orange text-white' : 'border-line bg-surface',
+                        'flex min-h-16 w-full items-center gap-3 border-b border-line px-4 py-2.5 text-left font-sans text-[15px] font-medium last:border-b-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ink',
+                        {
+                          'bg-orange-wash': selected,
+                          'opacity-45': unavailable,
+                        },
                       )}
                     >
-                      {selected && <CheckIcon className="size-4" weight="bold" />}
-                    </span>
-                  </button>
-                )
-              })}
+                      <StockLogo iconUrl={stock.iconUrl} ticker={stock.ticker} size={36} />
+                      <span className="flex min-w-0 flex-1 flex-col">
+                        <span className="truncate">{stock.ticker}</span>
+                        <span className="truncate text-[13px] font-normal text-stone">
+                          {ownedMints.has(stock.mint) ? 'You own this' : stock.name}
+                        </span>
+                      </span>
+                      <span
+                        className={clsx(
+                          'flex size-6 shrink-0 items-center justify-center rounded-full border',
+                          selected
+                            ? 'border-orange bg-orange text-white'
+                            : 'border-line bg-surface',
+                        )}
+                      >
+                        {selected && <CheckIcon className="size-4" weight="bold" />}
+                      </span>
+                    </button>
+                  )
+                })}
+                {visibleListings.length === 0 && (
+                  <p className="px-4 py-6 text-center text-[14px] text-stone">No stocks found.</p>
+                )}
+              </div>
             </div>
-            <div className="sticky bottom-0 -mx-5 -mb-[max(20px,env(safe-area-inset-bottom))] border-t border-line bg-cream px-5 pt-5 pb-[max(20px,env(safe-area-inset-bottom))]">
+            <div className="shrink-0 bg-cream px-5 pt-4 pb-[max(28px,env(safe-area-inset-bottom))]">
               <Button className="w-full" size="md" onClick={() => setPickerOpen(false)}>
-                Done
+                Use {allocations.length} {allocations.length === 1 ? 'stock' : 'stocks'}
               </Button>
             </div>
           </div>

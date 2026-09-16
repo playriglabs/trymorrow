@@ -55,11 +55,12 @@ export function MonthPicker({
     (year === maxYear && index > now.getMonth())
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col">
       <button
         id={id}
         type="button"
         aria-expanded={open}
+        aria-controls={`${id ?? 'month-picker'}-panel`}
         onClick={() => setOpen(!open)}
         className={clsx(
           'flex h-14 items-center justify-between rounded-button border bg-surface px-4 text-left text-[17px]',
@@ -80,84 +81,97 @@ export function MonthPicker({
         </span>
       </button>
 
-      {open && (
-        <div className="flex flex-col gap-3 rounded-card border border-line bg-surface p-3">
-          <div className="flex flex-wrap gap-2">
-            {presets.map((count) => {
-              const target = inYears(count)
-              return (
-                <button
-                  key={count}
-                  type="button"
-                  aria-pressed={month === target}
-                  onClick={() => {
-                    onChange(target)
-                    setYear(parse(target)[0])
-                  }}
-                  className={clsx(
-                    'h-9 rounded-link border px-3 font-sans text-[14px] font-medium',
-                    {
-                      'border-orange bg-orange-wash': month === target,
-                      'border-line': month !== target,
-                    },
-                  )}
-                >
-                  In {count} years
-                </button>
-              )
-            })}
-          </div>
+      <div
+        id={`${id ?? 'month-picker'}-panel`}
+        aria-hidden={!open}
+        inert={open ? undefined : true}
+        className={clsx(
+          'grid origin-top transition-[grid-template-rows,opacity,transform] duration-300 ease-out motion-reduce:transition-none',
+          {
+            'grid-rows-[1fr] translate-y-0 opacity-100': open,
+            'pointer-events-none grid-rows-[0fr] -translate-y-1 opacity-0': !open,
+          },
+        )}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <div className="mt-2 flex flex-col gap-3 rounded-card border border-line bg-surface p-3">
+            <div className="flex flex-wrap gap-2">
+              {presets.map((count) => {
+                const target = inYears(count)
+                return (
+                  <button
+                    key={count}
+                    type="button"
+                    aria-pressed={month === target}
+                    onClick={() => {
+                      onChange(target)
+                      setYear(parse(target)[0])
+                    }}
+                    className={clsx(
+                      'h-9 rounded-link border px-3 font-sans text-[14px] font-medium',
+                      {
+                        'border-orange bg-orange-wash': month === target,
+                        'border-line': month !== target,
+                      },
+                    )}
+                  >
+                    In {count} years
+                  </button>
+                )
+              })}
+            </div>
 
-          <div className="flex items-center justify-between">
-            <button
-              type="button"
-              aria-label="Previous year"
-              disabled={year <= now.getFullYear()}
-              onClick={() => setYear(year - 1)}
-              className="flex size-9 items-center justify-center rounded-full text-stone hover:bg-orange-wash disabled:opacity-30"
-            >
-              <CaretLeftIcon className="size-4.5" />
-            </button>
-            <span className="font-sans text-[17px] font-medium tabular-nums">{year}</span>
-            <button
-              type="button"
-              aria-label="Next year"
-              disabled={year >= maxYear}
-              onClick={() => setYear(year + 1)}
-              className="flex size-9 items-center justify-center rounded-full text-stone hover:bg-orange-wash disabled:opacity-30"
-            >
-              <CaretRightIcon className="size-4.5" />
-            </button>
-          </div>
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                aria-label="Previous year"
+                disabled={year <= now.getFullYear()}
+                onClick={() => setYear(year - 1)}
+                className="flex size-9 items-center justify-center rounded-full text-stone hover:bg-orange-wash disabled:opacity-30"
+              >
+                <CaretLeftIcon className="size-4.5" />
+              </button>
+              <span className="font-sans text-[17px] font-medium tabular-nums">{year}</span>
+              <button
+                type="button"
+                aria-label="Next year"
+                disabled={year >= maxYear}
+                onClick={() => setYear(year + 1)}
+                className="flex size-9 items-center justify-center rounded-full text-stone hover:bg-orange-wash disabled:opacity-30"
+              >
+                <CaretRightIcon className="size-4.5" />
+              </button>
+            </div>
 
-          <div className="grid grid-cols-4 gap-1.5">
-            {MONTHS.map((label, index) => {
-              const isSelected = year === selectedYear && index === selectedMonth
-              return (
-                <button
-                  key={label}
-                  type="button"
-                  aria-pressed={isSelected}
-                  disabled={disabled(index)}
-                  onClick={() => {
-                    onChange(value(year, index))
-                    setOpen(false)
-                  }}
-                  className={clsx(
-                    'h-10 rounded-link border font-sans text-[14px] font-medium disabled:opacity-30',
-                    {
-                      'border-orange bg-orange-wash': isSelected,
-                      'border-line': !isSelected,
-                    },
-                  )}
-                >
-                  {label}
-                </button>
-              )
-            })}
+            <div className="grid grid-cols-4 gap-1.5">
+              {MONTHS.map((label, index) => {
+                const isSelected = year === selectedYear && index === selectedMonth
+                return (
+                  <button
+                    key={label}
+                    type="button"
+                    aria-pressed={isSelected}
+                    disabled={disabled(index)}
+                    onClick={() => {
+                      onChange(value(year, index))
+                      setOpen(false)
+                    }}
+                    className={clsx(
+                      'h-10 rounded-link border font-sans text-[14px] font-medium disabled:opacity-30',
+                      {
+                        'border-orange bg-orange-wash': isSelected,
+                        'border-line': !isSelected,
+                      },
+                    )}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
           </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }
