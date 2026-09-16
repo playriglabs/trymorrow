@@ -1,8 +1,8 @@
-import { useMemo } from 'react'
+import { useId, useMemo } from 'react'
 import { MODULE_RADIUS, qrLayout } from '@/lib/client/qr-layout'
 
 /** Swap this file (or pass `logoSrc`) to change the mark in the middle of every QR code */
-export const QR_LOGO_SRC = '/qr-logo.svg'
+export const QR_LOGO_SRC = '/trymorrow-logo-rounded.png?v=5'
 
 type QrCodeProps = {
   value: string
@@ -27,6 +27,7 @@ export function QrCode({
   label = 'QR code',
   className,
 }: QrCodeProps) {
+  const logoClipId = `qr-logo-${useId().replaceAll(':', '')}`
   const layout = useMemo(
     () => qrLayout(value, logoSrc ? logoScale : 0),
     [value, logoSrc, logoScale],
@@ -57,14 +58,28 @@ export function QrCode({
       ))}
 
       {logoSrc && layout.logo && (
-        <image
-          href={logoSrc}
-          x={layout.logo.position}
-          y={layout.logo.position}
-          width={layout.logo.size}
-          height={layout.logo.size}
-          preserveAspectRatio="xMidYMid meet"
-        />
+        <>
+          <defs>
+            <clipPath id={logoClipId}>
+              <rect
+                x={layout.logo.position}
+                y={layout.logo.position}
+                width={layout.logo.size}
+                height={layout.logo.size}
+                rx={1.5}
+              />
+            </clipPath>
+          </defs>
+          <image
+            href={logoSrc}
+            x={layout.logo.position}
+            y={layout.logo.position}
+            width={layout.logo.size}
+            height={layout.logo.size}
+            preserveAspectRatio="xMidYMid meet"
+            clipPath={`url(#${logoClipId})`}
+          />
+        </>
       )}
     </svg>
   )

@@ -43,7 +43,7 @@ function AddCash() {
       </Notice>
 
       <Card className="flex flex-col gap-4 p-4">
-        <div className="self-center rounded-button border border-line bg-white p-1">
+        <div className="self-center rounded-button border border-line bg-white p-0.5">
           <QrCode value={address} size={220} label="Your deposit address as a QR code" />
         </div>
         <div className="flex flex-col gap-1">

@@ -5,6 +5,7 @@ import {
   canShareImage,
   downloadImage,
   renderShareCard,
+  SHARE_CARD_RENDER_VERSION,
   type ShareCardInput,
   shareImage,
 } from '@/lib/client/share-card'
@@ -18,11 +19,13 @@ export function ShareCardPreview({
   fileName,
   alt,
   shareTitle,
+  renderVersion = SHARE_CARD_RENDER_VERSION,
 }: {
   input: ShareCardInput
   fileName: string
   alt: string
   shareTitle: string
+  renderVersion?: string
 }) {
   const [image, setImage] = useState<{ blob: Blob; url: string } | null>(null)
   const [failed, setFailed] = useState(false)
@@ -31,7 +34,7 @@ export function ShareCardPreview({
     let url: string | null = null
     let cancelled = false
 
-    renderShareCard(input)
+    renderShareCard(input, renderVersion)
       .then((blob) => {
         if (cancelled) return
         url = URL.createObjectURL(blob)
@@ -44,7 +47,7 @@ export function ShareCardPreview({
       cancelled = true
       if (url) URL.revokeObjectURL(url)
     }
-  }, [input])
+  }, [input, renderVersion])
 
   if (failed) return null
 

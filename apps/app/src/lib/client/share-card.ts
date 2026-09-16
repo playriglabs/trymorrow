@@ -20,8 +20,7 @@ const COLORS = {
 const SANS = '"Aeonik", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif'
 const BODY = '"Pilat", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif'
 const TAGLINE = 'Give stocks and cash that grow'
-const MARK_SRC = '/favicon.svg'
-const QR_LOGO_SRC = '/qr-logo.svg'
+export const SHARE_CARD_RENDER_VERSION = '5'
 
 /** One line on the receipt sheet. `tone` colours the value; leave it off for plain facts */
 export type ShareCardRow = { label: string; value: string; tone?: 'gain' | 'loss' }
@@ -171,6 +170,7 @@ async function drawQr(
   x: number,
   y: number,
   size: number,
+  renderVersion: string,
 ) {
   const logoScale = 0.22
   const layout = qrLayout(url, logoScale)
@@ -206,24 +206,38 @@ async function drawQr(
 
   if (!layout.logo) return
   try {
-    const mark = await loadImage(QR_LOGO_SRC)
+    const mark = await loadImage(`/trymorrow-logo-rounded.png?v=${renderVersion}`)
     const at = x + layout.logo.position * unit
     const of = layout.logo.size * unit
+    ctx.save()
+    ctx.beginPath()
+    ctx.roundRect(at, y + layout.logo.position * unit, of, of, 8)
+    ctx.clip()
     ctx.drawImage(mark, at, y + layout.logo.position * unit, of, of)
+    ctx.restore()
   } catch {
     // A code without its mark still scans
   }
 }
 
 /** Wordmark, tagline and the code that takes a scanner to the sharer's page */
-async function drawFooter(ctx: CanvasRenderingContext2D, qrUrl: string | null) {
+async function drawFooter(
+  ctx: CanvasRenderingContext2D,
+  qrUrl: string | null,
+  renderVersion: string,
+) {
   const top = PANEL.y + PANEL.h
   const middle = top + (HEIGHT - top) / 2
-  const markSize = 80
+  const markSize = 96
 
   try {
-    const mark = await loadImage(MARK_SRC)
+    const mark = await loadImage(`/trymorrow-logo-rounded.png?v=${renderVersion}`)
+    ctx.save()
+    ctx.beginPath()
+    ctx.roundRect(88, middle - markSize / 2, markSize, markSize, 20)
+    ctx.clip()
     ctx.drawImage(mark, 88, middle - markSize / 2, markSize, markSize)
+    ctx.restore()
   } catch {
     ctx.beginPath()
     ctx.roundRect(88, middle - markSize / 2, markSize, markSize, 20)
@@ -244,11 +258,14 @@ async function drawFooter(ctx: CanvasRenderingContext2D, qrUrl: string | null) {
 
   if (qrUrl) {
     const size = 172
-    await drawQr(ctx, qrUrl, WIDTH - 72 - size, middle - size / 2, size)
+    await drawQr(ctx, qrUrl, WIDTH - 72 - size, middle - size / 2, size, renderVersion)
   }
 }
 
-export async function renderShareCard(input: ShareCardInput): Promise<Blob> {
+export async function renderShareCard(
+  input: ShareCardInput,
+  renderVersion = SHARE_CARD_RENDER_VERSION,
+): Promise<Blob> {
   await Promise.all([
     document.fonts.load(`500 96px ${SANS}`).catch(() => {}),
     document.fonts.load(`400 40px ${BODY}`).catch(() => {}),
@@ -289,7 +306,7 @@ export async function renderShareCard(input: ShareCardInput): Promise<Blob> {
   ctx.fillText(`$${input.subhero}`, textX, eyebrowBaseline + heroSize + 72)
   ctx.globalAlpha = 1
 
-  await drawFooter(ctx, input.qrUrl)
+  await drawFooter(ctx, input.qrUrl, renderVersion)
 
   return new Promise((resolve, reject) =>
     canvas.toBlob(
