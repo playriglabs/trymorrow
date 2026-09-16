@@ -66,7 +66,12 @@ export type Portfolio = {
   walletAddress: string
   cashUsd: number
   stocksUsd: number
+  /** Mark-to-market change of the currently held stocks over the last 24 hours */
+  stocksPnl24hUsd: number | null
+  stocksPnl24hPct: number | null
   holdings: Holding[]
+  /** Feed rows created by this portfolio fetch (cash/stock deposits); client refreshes the feed */
+  newNotifications?: number
 }
 
 export type TradeSide = 'buy' | 'sell'
@@ -159,6 +164,8 @@ export type CashoutStatus = 'draft' | 'sent'
 /** What cashing out this amount to this address would do, priced by the server */
 export type CashoutQuote = {
   destination: string
+  /** Who the cash is going to, when they were resolved by handle or email; null for a pasted address */
+  recipient: PublicProfile | null
   /** Cash leaving the account, in USDC base units: what lands plus the fee */
   amountRaw: string
   amountUsd: number
@@ -249,6 +256,8 @@ export type NotificationKind =
   | 'cash_deposited'
   /** You sent cash out to an account of your own */
   | 'cash_sent'
+  /** A stock landed from an outside wallet (not a gift, trade, or fund payout) */
+  | 'stock_deposited'
 
 export type NotificationView = {
   id: string

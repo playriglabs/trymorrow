@@ -1,4 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect } from 'react'
 import { useApi } from '@/lib/client/api'
 import { useSignRelayed } from '@/lib/client/sign'
 import { HANDLE_PATTERN } from '@/lib/handles'
@@ -54,8 +55,8 @@ export const queryKeys = {
   notificationFeed: () => ['notification-feed'] as const,
   tradeQuote: ({ side, mint, amountRaw }: TradeQuoteParams) =>
     ['trade-quote', side, mint, amountRaw] as const,
-  cashoutQuote: (destination: string, amountRaw: string) =>
-    ['cashout-quote', destination, amountRaw] as const,
+  cashoutQuote: (target: string, amountRaw: string) =>
+    ['cashout-quote', target, amountRaw] as const,
 }
 
 type Options = { enabled?: boolean }
@@ -79,12 +80,21 @@ export function usePortfolioQuery({
   watch = false,
 }: Options & { watch?: boolean } = {}) {
   const api = useApi()
-  return useQuery({
+  const queryClient = useQueryClient()
+  const query = useQuery({
     queryKey: queryKeys.portfolio(),
     enabled,
     refetchInterval: watch ? 10_000 : false,
     queryFn: () => api<Portfolio>('/api/portfolio'),
   })
+  // A deposit is noted server-side during the portfolio fetch; the feed cache wouldn't hear about
+  // it otherwise, so the badge on home stays stale until the next mount refetch.
+  useEffect(() => {
+    if (query.data?.newNotifications) {
+      queryClient.invalidateQueries({ queryKey: queryKeys.notificationFeed() })
+    }
+  }, [query.data?.newNotifications, queryClient])
+  return query
 }
 
 /** One stock someone owns, for the screen that shows just that position */
@@ -181,6 +191,12 @@ export function useNotificationsQuery({ enabled = true }: Options = {}) {
   return useQuery({
     queryKey: queryKeys.notificationFeed(),
     enabled,
+    // Poll so the home bell reflects notifications that arrive while someone sits on the screen —
+    // a gift from someone else, or a deposit detected server-side. Without this the badge only
+    // updates on mount/invalidation, and most notification sources can't reach this client.
+    // staleTime 0 (overriding the 30s client default) so returning to home always refetches.
+    staleTime: 0,
+    refetchInterval: 30_000,
     queryFn: () => api<NotificationsResponse>('/api/notifications'),
   })
 }
@@ -711,23 +727,24 @@ export function usePriceChartQuery(mint: string, range: ChartRange) {
 // Cashing out
 
 /**
- * What sending this much to this address would cost. Address mistakes come back as an error here,
+ * What sending this much to this target would cost. The target can be a pasted account address or
+ * an @handle/email that the server resolves to a wallet. Mistakes come back as an error here,
  * which is why it's quoted while people type rather than only on the review screen.
  */
 export function useCashoutQuoteQuery(
-  destination: string,
+  target: string,
   amountRaw: string,
   { enabled = true }: Options = {},
 ) {
   const api = useApi()
   return useQuery({
-    queryKey: queryKeys.cashoutQuote(destination, amountRaw),
-    enabled: enabled && destination.length >= 32 && BigInt(amountRaw || '0') > 0n,
+    queryKey: queryKeys.cashoutQuote(target, amountRaw),
+    enabled: enabled && target.trim().length > 0 && BigInt(amountRaw || '0') > 0n,
     retry: false,
     queryFn: () =>
       api<CashoutQuote>('/api/cashouts/quote', {
         method: 'POST',
-        body: { destination, amountRaw },
+        body: { target, amountRaw },
       }),
   })
 }
@@ -738,7 +755,7 @@ export function useCashoutMutation() {
   const sign = useSignRelayed()
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (input: { destination: string; amountRaw: string }): Promise<CashoutView> => {
+    mutationFn: async (input: { target: string; amountRaw: string }): Promise<CashoutView> => {
       const built = await api<{ cashout: CashoutView; transaction: string }>('/api/cashouts', {
         method: 'POST',
         body: input,

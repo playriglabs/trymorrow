@@ -16,7 +16,7 @@ import { db } from '@/lib/server/supabase'
 import { isOnboarded, requireUser, requireWallet } from '@/lib/server/users'
 
 const schema = z.object({
-  destination: z.string().trim().min(32).max(44),
+  target: z.string().trim().min(1).max(254),
   amountRaw: z.string().regex(/^[1-9]\d{0,19}$/),
 })
 
@@ -31,7 +31,7 @@ export const POST = route(async ({ request }) => {
   const wallet = new PublicKey(requireWallet(user))
   const body = await readBody(request, schema)
 
-  const plan = await planCashout(wallet, body.destination, BigInt(body.amountRaw))
+  const plan = await planCashout(wallet, body.target, BigInt(body.amountRaw), user)
   if (plan.fee > 0n) await ensureTreasuryAccount()
   // Paid for by the fee above, and only reached once someone has confirmed the amount
   if (plan.opensAccount) await openDestinationCashAccount(plan.destination)

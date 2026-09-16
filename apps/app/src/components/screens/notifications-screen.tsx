@@ -1,4 +1,5 @@
 import {
+  ArrowFatDownIcon,
   ArrowLineUpRightIcon,
   ArrowUUpLeftIcon,
   ConfettiIcon,
@@ -32,6 +33,7 @@ const ICONS: Record<NotificationKind, typeof GiftIcon> = {
   fund_unlocked: LockOpenIcon,
   cash_deposited: CurrencyDollarIcon,
   cash_sent: ArrowLineUpRightIcon,
+  stock_deposited: ArrowFatDownIcon,
 }
 
 function NotificationRow({ notification }: { notification: NotificationView }) {

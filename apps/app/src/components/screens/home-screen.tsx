@@ -1,4 +1,4 @@
-import { BagIcon, BellIcon, GiftIcon, PlusIcon } from '@phosphor-icons/react'
+import { BagIcon, BellIcon, EyeIcon, EyeSlashIcon, GiftIcon, PlusIcon } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { useEffect, useState } from 'react'
 import { FundCard } from '@/components/fund-card'
@@ -22,6 +22,7 @@ import { giftAssetsLabel } from '@/lib/gifts'
 
 /** Home shows the biggest handful; the rest live on their own page */
 const HOME_STOCKS = 7
+const BALANCE_HIDDEN_KEY = 'morrow:balance-hidden'
 
 function House() {
   const session = useSession()
@@ -34,6 +35,25 @@ function House() {
 
   const total = portfolio.data ? portfolio.data.cashUsd + portfolio.data.stocksUsd : null
   const shownTotal = useAnimatedNumber(total)
+  const [balanceHidden, setBalanceHidden] = useState(() => {
+    try {
+      return window.localStorage.getItem(BALANCE_HIDDEN_KEY) === 'true'
+    } catch {
+      return false
+    }
+  })
+
+  const toggleBalance = () => {
+    setBalanceHidden((hidden) => {
+      const next = !hidden
+      try {
+        window.localStorage.setItem(BALANCE_HIDDEN_KEY, String(next))
+      } catch {
+        // Storage can be unavailable in private browsing; the toggle still works for this page.
+      }
+      return next
+    })
+  }
 
   // Header grows slightly once the page scrolls, so it reads as a bar rather than floating space
   const [scrolled, setScrolled] = useState(false)
@@ -77,10 +97,25 @@ function House() {
         </header>
 
         <section className="flex flex-col gap-1.5">
-          <p className="text-[14px] text-stone">Your Morrow</p>
+          <div className="flex items-center gap-1">
+            <p className="text-[14px] text-stone">Your Morrow</p>
+            <button
+              type="button"
+              onClick={toggleBalance}
+              aria-label={balanceHidden ? 'Show balance' : 'Hide balance'}
+              aria-pressed={balanceHidden}
+              className="flex size-7 items-center justify-center rounded-full text-stone hover:bg-orange-wash hover:text-ink"
+            >
+              {balanceHidden ? (
+                <EyeSlashIcon className="size-4.5" />
+              ) : (
+                <EyeIcon className="size-4.5" />
+              )}
+            </button>
+          </div>
           <div className="flex items-center justify-between gap-3">
             <h1 className="font-sans text-[44px] leading-[1.05] font-medium tracking-[-0.02em]">
-              {portfolio.isPending ? '—' : formatUsd(shownTotal)}
+              {portfolio.isPending ? '—' : balanceHidden ? '$••••' : formatUsd(shownTotal)}
             </h1>
             <LinkButton href="/add-cash" variant="soft" size="sm">
               <PlusIcon className="size-4" />
@@ -89,8 +124,24 @@ function House() {
           </div>
           {portfolio.data && (
             <p className="text-[13px] text-stone">
-              {formatUsd(portfolio.data.cashUsd)} cash · {formatUsd(portfolio.data.stocksUsd)} in
-              stocks
+              {balanceHidden ? '••••' : formatUsd(portfolio.data.cashUsd)} cash ·{' '}
+              {balanceHidden ? '••••' : formatUsd(portfolio.data.stocksUsd)} in stocks
+              {portfolio.data.stocksPnl24hUsd != null && (
+                <>
+                  {' · '}
+                  <span
+                    className={clsx({
+                      'text-gain': portfolio.data.stocksPnl24hUsd > 0,
+                      'text-loss': portfolio.data.stocksPnl24hUsd < 0,
+                    })}
+                  >
+                    {portfolio.data.stocksPnl24hUsd > 0 ? '+' : ''}
+                    {formatUsd(portfolio.data.stocksPnl24hUsd)}
+                    {portfolio.data.stocksPnl24hPct != null &&
+                      ` (${portfolio.data.stocksPnl24hPct > 0 ? '+' : ''}${portfolio.data.stocksPnl24hPct.toFixed(2)}%)`}
+                  </span>
+                </>
+              )}
             </p>
           )}
         </section>
@@ -183,7 +234,7 @@ function House() {
           ) : (
             <Card className="flex flex-col divide-y divide-line px-4">
               {stocks.slice(0, HOME_STOCKS).map((holding) => (
-                <HoldingRow key={holding.mint} holding={holding} />
+                <HoldingRow key={holding.mint} holding={holding} hideValue={balanceHidden} />
               ))}
             </Card>
           )}
@@ -204,7 +255,7 @@ function House() {
                   you’re ready.
                 </p>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2 mt-3">
                 <LinkButton href="/add-cash" size="sm">
                   Add cash
                 </LinkButton>

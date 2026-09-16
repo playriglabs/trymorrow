@@ -4,9 +4,11 @@ import { PublicKey, SystemProgram } from '@solana/web3.js'
 import { formatUsd } from '@/lib/format'
 import { cashAccount, cashBalance, cashoutFee } from '@/lib/server/fees'
 import { badRequest, notFound } from '@/lib/server/http'
+import { parseRecipient } from '@/lib/server/recipients'
 import { connection, relayer, sendRelayedTransaction, signRelayed } from '@/lib/server/solana'
 import { db } from '@/lib/server/supabase'
-import type { CashoutView } from '@/lib/types'
+import { toPublicProfile, USER_COLUMNS, type UserRow } from '@/lib/server/users'
+import type { CashoutView, PublicProfile } from '@/lib/types'
 
 /** Smallest cash out worth making; below this the fee is most of it */
 export const MIN_CASHOUT_USD = 1
@@ -28,6 +30,9 @@ export type CashoutRow = {
 
 export const CASHOUT_COLUMNS =
   'id, user_id, wallet, destination, amount_raw, net_raw, fee_raw, fee_usd, status, signature, created_at, sent_at'
+
+/** Base58, the length every Solana account address falls in */
+const ADDRESS_PATTERN = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/
 
 /**
  * The address someone typed, checked hard enough that cash can't fall into a hole. It must be a
@@ -57,6 +62,34 @@ export async function resolveDestination(address: string, self: PublicKey): Prom
     throw badRequest('That address can’t receive cash. Use the main account address from your app.')
   }
   return destination
+}
+
+/**
+ * A cash out can go to a pasted account address or to someone on Morrow, by @handle or email.
+ * Addresses pass through to the on-chain checks in `resolveDestination`; handles and emails map to
+ * a wallet from our users, so the cash only ever lands in an account that belongs to someone who
+ * signed in. We never pregenerate a wallet here — the recipient has to already have one.
+ */
+export async function resolveCashoutTarget(
+  target: string,
+  sender: UserRow,
+): Promise<{ address: string; profile: PublicProfile | null }> {
+  const trimmed = target.trim()
+  if (ADDRESS_PATTERN.test(trimmed)) return { address: trimmed, profile: null }
+
+  const parsed = parseRecipient(trimmed)
+  if (!parsed) throw badRequest('That isn’t an account address, @handle, or email.')
+  const column = 'email' in parsed ? 'email' : 'handle'
+  const value = 'email' in parsed ? parsed.email : parsed.handle
+  const { data } = await db.from('users').select(USER_COLUMNS).eq(column, value).maybeSingle()
+  const row = data as UserRow | null
+  if (!row?.wallet_address) {
+    throw badRequest('No one on Morrow has that account yet. Try an account address instead.')
+  }
+  if (row.id === sender.id) {
+    throw badRequest('That’s your own account. Enter where the cash should go.')
+  }
+  return { address: row.wallet_address, profile: toPublicProfile(row) }
 }
 
 /**
@@ -110,6 +143,8 @@ export function toCashoutView(row: CashoutRow): CashoutView {
 
 export type CashoutPlan = {
   destination: PublicKey
+  /** Who the cash is going to, when they were resolved by handle or email */
+  profile: PublicProfile | null
   /** Cash leaving the account */
   amount: bigint
   fee: bigint
@@ -126,13 +161,15 @@ export type CashoutPlan = {
  */
 export async function planCashout(
   wallet: PublicKey,
-  address: string,
+  target: string,
   amount: bigint,
+  sender: UserRow,
 ): Promise<CashoutPlan> {
   const minimum = BigInt(MIN_CASHOUT_USD) * 10n ** BigInt(USDC.decimals)
   if (amount < minimum) {
     throw badRequest(`The smallest cash out is ${formatUsd(MIN_CASHOUT_USD)}.`, 'below_minimum')
   }
+  const { address, profile } = await resolveCashoutTarget(target, sender)
   const destination = await resolveDestination(address, wallet)
   const [balance, fee] = await Promise.all([cashBalance(wallet), cashoutFee(destination)])
   if (balance < amount) {
@@ -145,5 +182,13 @@ export async function planCashout(
       'below_minimum',
     )
   }
-  return { destination, amount, fee: fee.raw, net, feeUsd: fee.usd, opensAccount: fee.opensAccount }
+  return {
+    destination,
+    profile,
+    amount,
+    fee: fee.raw,
+    net,
+    feeUsd: fee.usd,
+    opensAccount: fee.opensAccount,
+  }
 }

@@ -2,7 +2,7 @@ import { TOKEN_2022_PROGRAM, TOKEN_PROGRAM, USDC } from '@morrow/sdk'
 import { PublicKey } from '@solana/web3.js'
 import { getStocks } from '@/lib/server/catalog'
 import { getCostBasis } from '@/lib/server/pnl'
-import { getPrices } from '@/lib/server/prices'
+import { getPriceData } from '@/lib/server/prices'
 import { connection } from '@/lib/server/solana'
 import type { Holding, Portfolio } from '@/lib/types'
 
@@ -33,7 +33,7 @@ export async function getPortfolio(walletAddress: string): Promise<Portfolio> {
   const ownedStockMints = [...balances.keys()].filter(
     (mint) => mint !== cashMint && (balances.get(mint)?.raw ?? 0n) > 0n,
   )
-  const prices = ownedStockMints.length > 0 ? await getPrices(ownedStockMints) : {}
+  const prices = ownedStockMints.length > 0 ? await getPriceData(ownedStockMints) : {}
 
   const cash = balances.get(cashMint)
   const holdings: Holding[] = [
@@ -55,7 +55,7 @@ export async function getPortfolio(walletAddress: string): Promise<Portfolio> {
       const stock = stockByMint.get(mint)
       const balance = balances.get(mint)
       if (!stock || !balance) return []
-      const priceUsd = prices[mint] ?? stock.priceUsd
+      const priceUsd = prices[mint]?.usdPrice ?? stock.priceUsd
       return [
         {
           mint,
@@ -86,10 +86,28 @@ export async function getPortfolio(walletAddress: string): Promise<Portfolio> {
     )
     for (const item of stockHoldings) item.costUsd = basis.get(item.mint) ?? null
   }
+
+  // Convert each percentage move back to yesterday's value, then sum the dollar moves.
+  // This gives a correctly weighted portfolio P&L rather than averaging percentages.
+  const dailyMoves = stockHoldings.flatMap((item) => {
+    const changePct = prices[item.mint]?.change24hPct ?? stockByMint.get(item.mint)?.change24hPct
+    if (item.valueUsd == null || changePct == null || changePct <= -100) return []
+    const previousValueUsd = item.valueUsd / (1 + changePct / 100)
+    return [{ pnlUsd: item.valueUsd - previousValueUsd, previousValueUsd }]
+  })
+  const stocksPnl24hUsd =
+    dailyMoves.length > 0 ? dailyMoves.reduce((total, move) => total + move.pnlUsd, 0) : null
+  const previousStocksUsd = dailyMoves.reduce((total, move) => total + move.previousValueUsd, 0)
+
   return {
     walletAddress,
     cashUsd: sum(holdings.filter((item) => item.isCash)),
     stocksUsd: sum(holdings.filter((item) => !item.isCash)),
+    stocksPnl24hUsd,
+    stocksPnl24hPct:
+      stocksPnl24hUsd != null && previousStocksUsd > 0
+        ? (stocksPnl24hUsd / previousStocksUsd) * 100
+        : null,
     holdings,
   }
 }

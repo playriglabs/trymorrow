@@ -9,7 +9,13 @@ export function byValue(a: Holding, b: Holding): number {
 }
 
 /** One stock someone owns: what it is, how much of it, what it's worth and how it's done */
-export function HoldingRow({ holding }: { holding: Holding }) {
+export function HoldingRow({
+  holding,
+  hideValue = false,
+}: {
+  holding: Holding
+  hideValue?: boolean
+}) {
   const pnl =
     holding.costUsd != null && holding.valueUsd != null ? holding.valueUsd - holding.costUsd : null
   const pnlPct =
@@ -23,7 +29,7 @@ export function HoldingRow({ holding }: { holding: Holding }) {
         <span className="text-[13px] text-stone">{formatShares(holding.amount)} shares</span>
       </div>
       <div className="flex flex-col items-end">
-        <span>{formatUsd(holding.valueUsd)}</span>
+        <span>{hideValue ? '$••••' : formatUsd(holding.valueUsd)}</span>
         {pnl != null && (
           <span
             // A flat +$0.00 is a non-event, not a gain: show it in stone
