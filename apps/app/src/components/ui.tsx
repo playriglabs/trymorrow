@@ -10,10 +10,10 @@ import type {
 } from 'react'
 
 const variants = {
-  filled: 'bg-orange text-white',
-  soft: 'bg-orange-wash text-ink',
+  filled: 'button-shiny bg-orange text-white',
+  soft: 'glass-soft text-ink',
   outline: 'border border-line bg-surface text-ink',
-  dark: 'bg-ink text-surface',
+  dark: 'button-shiny bg-ink text-surface',
   ghost: 'bg-transparent text-ink',
   danger: 'bg-transparent text-loss',
 } as const
@@ -157,7 +157,7 @@ export function Screen({
 
 export function Card({ className, children }: { className?: string; children: ReactNode }) {
   return (
-    <div className={clsx('rounded-card border border-line bg-surface shadow-elevated', className)}>
+    <div className={clsx('glass-surface rounded-card border border-line', className)}>
       {children}
     </div>
   )
