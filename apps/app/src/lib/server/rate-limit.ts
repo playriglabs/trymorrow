@@ -1,11 +1,14 @@
 import { tooManyRequests } from '@/lib/server/http'
 
 /** Per-user, per-route windows. Creating gifts pregenerates accounts for any email typed in,
- * so it gets the tightest one; the lookups fire per keystroke and get the loosest. */
+ * so it gets the tightest one; the lookups fire per keystroke and get the loosest. Redeem looks
+ * go by a code hash, so they're capped hard even though the code space is unguessable. */
 export const RATE_LIMITS = {
   recipients: { limit: 30, windowMs: 60_000 },
   giftQuote: { limit: 20, windowMs: 60_000 },
   createGifts: { limit: 5, windowMs: 60_000 },
+  createGiftCards: { limit: 5, windowMs: 60_000 },
+  redeemLookup: { limit: 10, windowMs: 60_000 },
 } as const
 
 type Window = { count: number; resetAt: number }

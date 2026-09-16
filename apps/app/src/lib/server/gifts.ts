@@ -1,4 +1,6 @@
+import { createHash } from 'node:crypto'
 import { CASH_MINT, giftAmountLabel } from '@/lib/gifts'
+import { CODE_LENGTH, normalizeCode } from '@/lib/redeem-code'
 import { getStocks } from '@/lib/server/catalog'
 import { notFound } from '@/lib/server/http'
 import { avatarUrl, db } from '@/lib/server/supabase'
@@ -19,7 +21,7 @@ export type GiftRow = {
   sender_wallet: string
   recipient_id: string | null
   recipient_email: string | null
-  recipient_wallet: string
+  recipient_wallet: string | null
   message: string | null
   status: GiftStatus
   rent_payer: string
@@ -32,17 +34,29 @@ export type GiftRow = {
   fee_raw: string
   fee_mint: string | null
   fee_usd: string | null
+  /** sha256 hex of the redeem code; set when this is a gift card, null for a person-locked gift */
+  code_hash: string | null
   gift_items: GiftItemRow[]
 }
 
 export const GIFT_COLUMNS =
-  'id, sender_id, sender_wallet, recipient_id, recipient_email, recipient_wallet, message, status, rent_payer, expires_at, create_signature, settle_signature, claimed_at, created_at, fee_raw, fee_mint, fee_usd, gift_items (id, mint, amount_raw, usd_value)'
+  'id, sender_id, sender_wallet, recipient_id, recipient_email, recipient_wallet, message, status, rent_payer, expires_at, create_signature, settle_signature, claimed_at, created_at, fee_raw, fee_mint, fee_usd, code_hash, gift_items (id, mint, amount_raw, usd_value)'
 
 export const GIFT_LIFETIME_DAYS = 30
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export const isGiftId = (id: string | undefined): id is string => Boolean(id && UUID.test(id))
+
+/** The only form of a redeem code the database ever sees */
+export function hashCode(code: string): string {
+  return createHash('sha256').update(normalizeCode(code), 'ascii').digest('hex')
+}
+
+/** A well-formed redeem code once normalized; anything else can't have a row behind it */
+export function isRedeemCode(input: string): boolean {
+  return normalizeCode(input).length === CODE_LENGTH
+}
 
 export async function getGift(id: string | undefined): Promise<GiftRow> {
   if (!isGiftId(id)) throw notFound('We couldn’t find that gift.')
@@ -90,9 +104,12 @@ export async function toGiftViews(gifts: GiftRow[], viewer: UserRow | null): Pro
     const sender = users.get(gift.sender_id)
     const recipient = gift.recipient_id ? users.get(gift.recipient_id) : undefined
     const role = viewerRole(gift, viewer)
-    const recipientLabel = recipient?.handle
-      ? (recipient.name ?? `@${recipient.handle}`)
-      : maskEmail(gift.recipient_email ?? '')
+    const codeCard = gift.code_hash != null
+    const recipientLabel = codeCard
+      ? (recipient?.name ?? 'Anyone with the code')
+      : recipient?.handle
+        ? (recipient.name ?? `@${recipient.handle}`)
+        : maskEmail(gift.recipient_email ?? '')
 
     const items: GiftItemView[] = [...gift.gift_items]
       .sort((a, b) => (toUsd(b.usd_value) ?? 0) - (toUsd(a.usd_value) ?? 0))
@@ -130,11 +147,16 @@ export async function toGiftViews(gifts: GiftRow[], viewer: UserRow | null): Pro
         avatarUrl: avatarUrl(sender?.avatar_path ?? null),
       },
       recipientLabel,
-      recipientIsEmail: !recipient?.handle,
+      recipientIsEmail: !codeCard && !recipient?.handle,
+      codeCard,
       items,
       usdValue,
       feeUsd: role === 'sender' ? (toUsd(gift.fee_usd) ?? 0) : null,
-      message: role === 'sender' || role === 'recipient' ? gift.message : null,
+      // A card's message is meant for whoever redeems it, so it travels with the code
+      message:
+        role === 'sender' || role === 'recipient' || (codeCard && gift.status === 'pending')
+          ? gift.message
+          : null,
       expiresAt: gift.expires_at,
       createdAt: gift.created_at,
       claimedAt: gift.claimed_at,

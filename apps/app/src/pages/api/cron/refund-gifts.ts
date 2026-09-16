@@ -1,8 +1,11 @@
 import { CRON_SECRET } from 'astro:env/server'
 import {
   findGiftAddress,
+  findGiftCardAddress,
   MORROW_PROGRAM_ID,
+  type RefundGiftCardParams,
   type RefundGiftParams,
+  refundGiftCardInstruction,
   refundGiftInstruction,
 } from '@morrow/sdk'
 import { type AccountInfo, PublicKey } from '@solana/web3.js'
@@ -39,9 +42,19 @@ type Summary = {
 }
 
 type Settled = {
-  action: 'claimGift' | 'refundGift'
+  action: 'claimGift' | 'refundGift' | 'claimGiftCard' | 'refundGiftCard'
   signature: string
   claimedAt: string | null
+  /** Who redeemed a gift card; the row has no recipient until this is written onto it */
+  claimant: PublicKey | null
+}
+
+/** The address a gift's items live at: card PDAs for a code card, gift PDAs otherwise */
+function itemAddressOf(gift: GiftRow, itemId: string): PublicKey {
+  const sender = new PublicKey(gift.sender_wallet)
+  return gift.code_hash != null
+    ? findGiftCardAddress(sender, itemId)
+    : findGiftAddress(sender, itemId)
 }
 
 /**
@@ -51,7 +64,7 @@ type Settled = {
 async function howGiftSettled(gift: GiftRow): Promise<Settled | null> {
   const [first] = gift.gift_items
   if (!first) return null
-  const target = findGiftAddress(new PublicKey(gift.sender_wallet), first.id)
+  const target = itemAddressOf(gift, first.id)
   const [entry] = await connection.getSignaturesForAddress(target, { limit: 1 })
   if (!entry || entry.err) return null
   const transaction = await connection.getParsedTransaction(entry.signature, {
@@ -65,11 +78,22 @@ async function howGiftSettled(gift: GiftRow): Promise<Settled | null> {
     if (!('accounts' in instruction)) continue
     if (!instruction.accounts.some((account) => account.equals(target))) continue
     const action = actionOf(bs58.decode(instruction.data))
-    if (action === 'claimGift' || action === 'refundGift') {
+    if (action === 'claimGift' || action === 'claimGiftCard') {
       return {
         action,
         signature: entry.signature,
         claimedAt: entry.blockTime ? new Date(entry.blockTime * 1000).toISOString() : null,
+        // The claimer signs right after the relayer: for a gift it's the locked recipient and
+        // the row knows them, for a card this account is the only record of who redeemed
+        claimant: action === 'claimGiftCard' ? (instruction.accounts[1] ?? null) : null,
+      }
+    }
+    if (action === 'refundGift' || action === 'refundGiftCard') {
+      return {
+        action,
+        signature: entry.signature,
+        claimedAt: entry.blockTime ? new Date(entry.blockTime * 1000).toISOString() : null,
+        claimant: null,
       }
     }
   }
@@ -78,30 +102,33 @@ async function howGiftSettled(gift: GiftRow): Promise<Settled | null> {
 
 /** Moves a stuck gift row to whatever actually happened on-chain while nobody was watching */
 async function applySettled(gift: GiftRow, settled: Settled, summary: Summary): Promise<void> {
+  const claimed = settled.action === 'claimGift' || settled.action === 'claimGiftCard'
   const update: {
     status: 'claimed' | 'refunded'
     settle_signature: string
     claimed_at?: string
     recipient_id?: string | null
+    recipient_wallet?: string
   } = {
-    status: settled.action === 'claimGift' ? 'claimed' : 'refunded',
+    status: claimed ? 'claimed' : 'refunded',
     settle_signature: settled.signature,
   }
-  if (settled.action === 'claimGift') {
+  if (claimed) {
     update.claimed_at = settled.claimedAt ?? new Date().toISOString()
-    // The recipient never reached submit, so their row is found by the wallet the gift is locked to
-    const { data: recipient } = await db
-      .from('users')
-      .select('id')
-      .eq('wallet_address', gift.recipient_wallet)
-      .maybeSingle()
+    // A gift is locked to its recipient, so their row is found by that wallet. A card has no
+    // recipient until someone redeems it, so the claimant the chain recorded is the one.
+    const wallet = gift.code_hash != null ? settled.claimant?.toBase58() : gift.recipient_wallet
+    const { data: recipient } = wallet
+      ? await db.from('users').select('id').eq('wallet_address', wallet).maybeSingle()
+      : { data: null }
     update.recipient_id = recipient?.id ?? null
+    if (gift.code_hash != null && wallet) update.recipient_wallet = wallet
   }
   const { error } = await db.from('gifts').update(update).eq('id', gift.id)
   // Another run settled this gift first; the row is already right
   if (error?.code === UNIQUE_VIOLATION) return
   if (error) throw error
-  if (settled.action === 'claimGift') summary.reconciledClaimed++
+  if (claimed) summary.reconciledClaimed++
   else summary.reconciledRefunded++
 
   // The row finally matches reality; a failed notification must not undo that
@@ -109,11 +136,11 @@ async function applySettled(gift: GiftRow, settled: Settled, summary: Summary): 
     const label = await giftLabel(gift)
     const hasCash = gift.gift_items.some((item) => item.mint === CASH_MINT)
     await notify([
-      settled.action === 'claimGift'
+      claimed
         ? {
             userId: gift.sender_id,
             kind: 'gift_opened',
-            title: `${label} was opened`,
+            title: gift.code_hash != null ? `${label} was redeemed` : `${label} was opened`,
             body: hasCash ? 'It’s theirs to keep.' : 'The shares are theirs to keep.',
             giftId: gift.id,
             url: `/gift/${gift.id}`,
@@ -170,8 +197,9 @@ export const GET = route(async ({ request }) => {
   for (const gift of data as GiftRow[]) {
     try {
       const sender = new PublicKey(gift.sender_wallet)
+      const codeCard = gift.code_hash != null
       const accounts = await connection.getMultipleAccountsInfo(
-        gift.gift_items.map((item) => findGiftAddress(sender, item.id)),
+        gift.gift_items.map((item) => itemAddressOf(gift, item.id)),
       )
       const open = gift.gift_items.filter((_, index) => accounts[index])
       if (open.length === 0) {
@@ -188,22 +216,29 @@ export const GET = route(async ({ request }) => {
       }
 
       const refunds: RefundGiftParams[] = []
+      const cardRefunds: RefundGiftCardParams[] = []
       for (const item of open) {
         const asset = await findGiftAsset(item.mint)
         if (!asset) throw new Error(`Unknown gift asset ${item.mint}`)
-        refunds.push({
+        const base = {
           payer: relayer().publicKey,
+          // The program lets anyone refund after expiry, so the relayer signs alone
           authority: relayer().publicKey,
           sender,
           rentPayer: new PublicKey(gift.rent_payer),
           mint: asset.mint,
           tokenProgram: asset.tokenProgram,
-          giftId: item.id,
-        })
+        }
+        if (codeCard) cardRefunds.push({ ...base, cardId: item.id })
+        else refunds.push({ ...base, giftId: item.id })
       }
 
       const signature = await sendRelayedTransaction(
-        await signRelayed(refunds.map(refundGiftInstruction)),
+        await signRelayed(
+          codeCard
+            ? cardRefunds.map(refundGiftCardInstruction)
+            : refunds.map(refundGiftInstruction),
+        ),
       )
       const { error: updateError } = await db
         .from('gifts')
@@ -250,7 +285,7 @@ export const GET = route(async ({ request }) => {
   const entries = (live as GiftRow[]).flatMap((gift) =>
     gift.gift_items.map((item) => ({
       gift,
-      address: findGiftAddress(new PublicKey(gift.sender_wallet), item.id),
+      address: itemAddressOf(gift, item.id),
     })),
   )
   const infos: (AccountInfo<Buffer> | null)[] = []

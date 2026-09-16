@@ -1,4 +1,9 @@
-import { type RefundGiftParams, refundGiftInstruction } from '@morrow/sdk'
+import {
+  type RefundGiftCardParams,
+  type RefundGiftParams,
+  refundGiftCardInstruction,
+  refundGiftInstruction,
+} from '@morrow/sdk'
 import { PublicKey } from '@solana/web3.js'
 import { findGiftAsset } from '@/lib/server/catalog'
 import { getGift } from '@/lib/server/gifts'
@@ -6,7 +11,7 @@ import { badRequest, forbidden, json, route } from '@/lib/server/http'
 import { buildRelayedTransaction, relayer } from '@/lib/server/solana'
 import { requireUser, requireWallet } from '@/lib/server/users'
 
-/** Returns one transaction that takes everything in the gift back to the sender */
+/** Returns one transaction that takes everything in the gift — or the unredeemed card — back */
 export const POST = route(async ({ params, request }) => {
   const [gift, viewer] = await Promise.all([getGift(params.id), requireUser(request)])
   if (gift.status !== 'pending')
@@ -21,21 +26,31 @@ export const POST = route(async ({ params, request }) => {
   }
 
   const refunds: RefundGiftParams[] = []
+  const cardRefunds: RefundGiftCardParams[] = []
   for (const item of gift.gift_items) {
     const asset = await findGiftAsset(item.mint)
     if (!asset) throw badRequest('This gift can’t be taken back right now.')
-    refunds.push({
+    const base = {
       payer: relayer().publicKey,
       authority: new PublicKey(wallet),
       sender: new PublicKey(gift.sender_wallet),
       rentPayer: new PublicKey(gift.rent_payer),
       mint: asset.mint,
       tokenProgram: asset.tokenProgram,
-      giftId: item.id,
-    })
+    }
+    if (gift.code_hash != null) {
+      cardRefunds.push({ ...base, cardId: item.id })
+    } else {
+      refunds.push({ ...base, giftId: item.id })
+    }
   }
-  if (refunds.length === 0) throw badRequest('This gift can’t be taken back right now.')
+  if (refunds.length === 0 && cardRefunds.length === 0)
+    throw badRequest('This gift can’t be taken back right now.')
 
-  const transaction = await buildRelayedTransaction(refunds.map(refundGiftInstruction))
+  const transaction = await buildRelayedTransaction(
+    gift.code_hash != null
+      ? cardRefunds.map(refundGiftCardInstruction)
+      : refunds.map(refundGiftInstruction),
+  )
   return json({ transaction })
 })

@@ -49,6 +49,7 @@ export const RESERVED_HANDLES = new Set([
   'offline',
   'onboarding',
   'profile',
+  'redeem',
   'send',
   'stocks',
   'support',

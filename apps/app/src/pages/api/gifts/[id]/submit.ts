@@ -1,4 +1,4 @@
-import { findGiftAddress, USDC } from '@morrow/sdk'
+import { findGiftAddress, findGiftCardAddress, USDC } from '@morrow/sdk'
 import { PublicKey } from '@solana/web3.js'
 import { z } from 'astro/zod'
 import { CASH_MINT } from '@/lib/gifts'
@@ -15,7 +15,7 @@ import {
   tokenTransfers,
 } from '@/lib/server/solana'
 import { db } from '@/lib/server/supabase'
-import { requireUser } from '@/lib/server/users'
+import { requireUser, requireWallet } from '@/lib/server/users'
 
 const schema = z.object({ transaction: z.string().min(100).max(4000) })
 
@@ -30,17 +30,22 @@ export const POST = route(async ({ params, request }) => {
 
   const transaction = parseRelayedTransaction(body.transaction)
   const sender = new PublicKey(gift.sender_wallet)
+  // A gift card's items live at card PDAs, so a normal-gift transaction finds nothing there —
+  // and vice versa. That keeps the card and gift flows from ever validating each other.
+  const findItemAddress = gift.code_hash != null ? findGiftCardAddress : findGiftAddress
   const actions = gift.gift_items.map((item) =>
-    morrowActions(transaction, findGiftAddress(sender, item.id)),
+    morrowActions(transaction, findItemAddress(sender, item.id)),
   )
   const kinds = new Set(actions.flat())
   const [action] = kinds
-  // The only other thing a gift transaction may do is pay the sender's fee, exactly as recorded
+  // The only other thing a gift or card transaction may do is pay the sender's fee, exactly as
+  // recorded
   const transfers = tokenTransfers(transaction)
   const feeRaw = BigInt(gift.fee_raw)
   const feeAsset = gift.fee_mint ? await findGiftAsset(gift.fee_mint) : USDC
+  const isCreate = action === 'createGift' || action === 'createGiftCard'
   const transfersMatch =
-    action === 'createGift' && feeRaw > 0n
+    isCreate && feeRaw > 0n
       ? feeAsset != null &&
         transfers?.length === 1 &&
         transfers.every((transfer) => isFeeTransfer(transfer, sender, feeRaw, feeAsset))
@@ -56,22 +61,25 @@ export const POST = route(async ({ params, request }) => {
   }
 
   let update: Partial<GiftRow>
-  if (action === 'createGift') {
+  if (action === 'createGift' || action === 'createGiftCard') {
     if (viewer.id !== gift.sender_id) throw forbidden('Only the sender can send this gift.')
     if (gift.status !== 'draft') throw badRequest('This gift was already sent.', 'already_sent')
     update = { status: 'pending', create_signature: await sendRelayedTransaction(transaction) }
-  } else if (action === 'claimGift') {
-    if (viewer.wallet_address !== gift.recipient_wallet) {
+  } else if (action === 'claimGift' || action === 'claimGiftCard') {
+    if (action === 'claimGift' && viewer.wallet_address !== gift.recipient_wallet) {
       throw forbidden('This gift is for a different account.', 'wrong_account')
     }
+    // A card claims to whichever account redeemed it, so the claimer becomes its recipient
+    const wallet = action === 'claimGiftCard' ? requireWallet(viewer) : gift.recipient_wallet
     if (gift.status !== 'pending') throw badRequest('This gift can’t be opened anymore.')
     update = {
       status: 'claimed',
       settle_signature: await sendRelayedTransaction(transaction),
       claimed_at: new Date().toISOString(),
       recipient_id: viewer.id,
+      ...(action === 'claimGiftCard' ? { recipient_wallet: wallet } : {}),
     }
-  } else if (action === 'refundGift') {
+  } else if (action === 'refundGift' || action === 'refundGiftCard') {
     if (viewer.id !== gift.sender_id)
       throw forbidden('Only the sender can take a gift back.', 'wrong_account')
     if (gift.status !== 'pending')
@@ -98,13 +106,16 @@ export const POST = route(async ({ params, request }) => {
     // A take-back doesn't notify: the sender did it themselves and sees the result on screen,
     // and notify only buzzes for things that happened while someone was away
     const rows: NotificationInput[] =
-      action === 'createGift'
+      action === 'createGift' || action === 'createGiftCard'
         ? [
             {
               userId: sent.sender_id,
               kind: 'gift_sent',
               title: `You sent ${label}`,
-              body: 'They have 30 days to open it, or it comes back to you.',
+              body:
+                action === 'createGiftCard'
+                  ? 'Anyone with the code can add it to their account. Not redeemed in 30 days? It comes back to you.'
+                  : 'They have 30 days to open it, or it comes back to you.',
               giftId: sent.id,
               url: `/gift/${sent.id}`,
             },
@@ -123,12 +134,15 @@ export const POST = route(async ({ params, request }) => {
                 ]
               : []),
           ]
-        : action === 'claimGift'
+        : action === 'claimGift' || action === 'claimGiftCard'
           ? [
               {
                 userId: sent.sender_id,
                 kind: 'gift_opened',
-                title: `${viewer.name ?? 'They'} claimed your gift`,
+                title:
+                  action === 'claimGiftCard'
+                    ? `${viewer.name ?? 'Someone'} redeemed your gift card`
+                    : `${viewer.name ?? 'They'} claimed your gift`,
                 body: label,
                 giftId: sent.id,
                 url: `/gift/${sent.id}`,
