@@ -3,10 +3,14 @@ members = ["morrow"]
 resolver = "2"
 
 [profile.release]
-opt-level = "s"
+# "z" over "s": the program account and every upgrade buffer pay rent per byte, so a smaller
+# binary is cheaper SOL the deployer never gets back (extend) or briefly locks (buffer)
+opt-level = "z"
 overflow-checks = true
 lto = "fat"
 codegen-units = 1
+panic = "abort"
+strip = "symbols"
 
 [profile.release.build-override]
 opt-level = 3
