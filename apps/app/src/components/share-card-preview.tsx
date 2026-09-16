@@ -20,12 +20,16 @@ export function ShareCardPreview({
   alt,
   shareTitle,
   renderVersion = SHARE_CARD_RENDER_VERSION,
+  showActions = true,
+  fullWidth = false,
 }: {
   input: ShareCardInput
   fileName: string
   alt: string
   shareTitle: string
   renderVersion?: string
+  showActions?: boolean
+  fullWidth?: boolean
 }) {
   const [image, setImage] = useState<{ blob: Blob; url: string } | null>(null)
   const [failed, setFailed] = useState(false)
@@ -59,40 +63,49 @@ export function ShareCardPreview({
         <img
           src={image.url}
           alt={alt}
-          className="w-54 rounded-card border border-line shadow-elevated"
+          className={clsx(
+            'rounded-card border border-line shadow-elevated',
+            fullWidth ? 'w-full' : 'w-54',
+          )}
         />
       ) : (
         <div className="h-67.5 w-54 animate-pulse rounded-card bg-orange-wash motion-reduce:animate-none" />
       )}
-      <div
-        className={clsx('grid w-54 gap-1 rounded-link border border-line bg-surface p-1', {
-          'grid-cols-2': shareSupported,
-          'grid-cols-1': !shareSupported,
-        })}
-      >
-        {shareSupported && (
+      {showActions && (
+        <div
+          className={clsx(
+            'grid gap-1 rounded-link border border-line bg-surface p-1',
+            fullWidth ? 'w-full' : 'w-54',
+            {
+              'grid-cols-2': shareSupported,
+              'grid-cols-1': !shareSupported,
+            },
+          )}
+        >
+          {shareSupported && (
+            <button
+              type="button"
+              aria-label="Share image"
+              disabled={!image}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-link px-3 font-sans text-[14px] font-medium text-stone hover:bg-orange-wash hover:text-ink disabled:opacity-50"
+              onClick={() => image && shareImage(image.blob, fileName, shareTitle).catch(() => {})}
+            >
+              <ShareIcon className="size-4.5" />
+              Share
+            </button>
+          )}
           <button
             type="button"
-            aria-label="Share image"
+            aria-label="Save image"
             disabled={!image}
             className="inline-flex h-10 items-center justify-center gap-2 rounded-link px-3 font-sans text-[14px] font-medium text-stone hover:bg-orange-wash hover:text-ink disabled:opacity-50"
-            onClick={() => image && shareImage(image.blob, fileName, shareTitle).catch(() => {})}
+            onClick={() => image && downloadImage(image.blob, fileName)}
           >
-            <ShareIcon className="size-4.5" />
-            Share
+            <DownloadIcon className="size-4.5" />
+            Save
           </button>
-        )}
-        <button
-          type="button"
-          aria-label="Save image"
-          disabled={!image}
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-link px-3 font-sans text-[14px] font-medium text-stone hover:bg-orange-wash hover:text-ink disabled:opacity-50"
-          onClick={() => image && downloadImage(image.blob, fileName)}
-        >
-          <DownloadIcon className="size-4.5" />
-          Save
-        </button>
-      </div>
+        </div>
+      )}
     </div>
   )
 }

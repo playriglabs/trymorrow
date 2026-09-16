@@ -26,6 +26,13 @@ export const SHARE_CARD_RENDER_VERSION = '5'
 export type ShareCardRow = { label: string; value: string; tone?: 'gain' | 'loss' }
 
 export type ShareCardInput = {
+  giftCard?: {
+    amount: string
+    contents: string[]
+    message?: string | null
+    senderName: string
+    code?: string
+  }
   /** Small line above the hero, e.g. "Just bought" */
   eyebrow: string
   /** Biggest words on the card; shrinks until it fits */
@@ -270,6 +277,7 @@ export async function renderShareCard(
     document.fonts.load(`500 96px ${SANS}`).catch(() => {}),
     document.fonts.load(`400 40px ${BODY}`).catch(() => {}),
   ])
+  if (input.giftCard) return renderGiftCard(input.giftCard, input.qrUrl, renderVersion)
   const canvas = document.createElement('canvas')
   canvas.width = WIDTH
   canvas.height = HEIGHT
@@ -308,6 +316,141 @@ export async function renderShareCard(
 
   await drawFooter(ctx, input.qrUrl, renderVersion)
 
+  return new Promise((resolve, reject) =>
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error('Export failed'))),
+      'image/png',
+    ),
+  )
+}
+
+/** One renderer for the gift-card preview, completed card and downloaded image. */
+async function renderGiftCard(
+  card: NonNullable<ShareCardInput['giftCard']>,
+  qrUrl: string | null,
+  renderVersion: string,
+): Promise<Blob> {
+  const canvas = document.createElement('canvas')
+  canvas.width = 1080
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('Canvas is not available')
+  ctx.font = `400 14px ${BODY}`
+  const lines = (text: string) => {
+    const result: string[] = []
+    for (const paragraph of text.split('\n')) {
+      let line = ''
+      for (const character of paragraph) {
+        if (ctx.measureText(line + character).width > 280 && line) {
+          result.push(line)
+          line = ''
+        }
+        line += character
+      }
+      result.push(line)
+    }
+    return result
+  }
+  const contents = card.contents.flatMap(lines)
+  const message = card.message?.trim() ? lines(card.message.trim()) : []
+  const sender = lines(`From ${card.senderName}`)
+  const sheetHeight =
+    32 +
+    contents.length * 21 +
+    (message.length ? 25 + message.length * 21 : 0) +
+    12 +
+    sender.length * 19
+  const panelHeight = 176 + sheetHeight + 24
+  const height = panelHeight + 132
+  canvas.height = Math.ceil(height * 3)
+  ctx.scale(3, 3)
+  ctx.fillStyle = COLORS.surface
+  ctx.fillRect(0, 0, 360, height)
+  ctx.save()
+  ctx.beginPath()
+  ctx.rect(0, 0, 360, panelHeight)
+  ctx.clip()
+  ctx.fillStyle = COLORS.orange
+  ctx.fillRect(0, 0, 360, panelHeight)
+  ctx.strokeStyle = COLORS.sun
+  ctx.lineWidth = 24
+  ctx.beginPath()
+  ctx.arc(304, panelHeight + 20, 92, 0, Math.PI * 2)
+  ctx.stroke()
+  ctx.restore()
+  ctx.fillStyle = COLORS.white
+  ctx.font = `500 15px ${SANS}`
+  ctx.fillText('Morrow gift card', 20, 40)
+  ctx.save()
+  ctx.translate(316, 22)
+  ctx.strokeStyle = COLORS.white
+  ctx.lineWidth = 1.8
+  ctx.strokeRect(2, 10, 20, 6)
+  ctx.strokeRect(4, 16, 16, 12)
+  ctx.beginPath()
+  ctx.moveTo(12, 10)
+  ctx.lineTo(12, 28)
+  ctx.moveTo(12, 10)
+  ctx.bezierCurveTo(-2, 10, 4, -3, 12, 10)
+  ctx.bezierCurveTo(26, 10, 20, -3, 12, 10)
+  ctx.stroke()
+  ctx.restore()
+  ctx.font = `500 20px ${SANS}`
+  ctx.fillText('For you', 20, 85)
+  ctx.font = `500 48px ${SANS}`
+  ctx.fillText(card.amount, 20, 138, 320)
+  ctx.fillStyle = COLORS.surface
+  ctx.beginPath()
+  ctx.roundRect(20, 176, 320, sheetHeight, 16)
+  ctx.fill()
+  ctx.fillStyle = COLORS.ink
+  ctx.font = `400 14px ${BODY}`
+  let y = 206
+  for (const line of contents) {
+    ctx.fillText(line, 36, y)
+    y += 21
+  }
+  if (message.length) {
+    ctx.strokeStyle = COLORS.line
+    ctx.beginPath()
+    ctx.moveTo(36, y + 5)
+    ctx.lineTo(324, y + 5)
+    ctx.stroke()
+    y += 25
+    for (const line of message) {
+      ctx.fillText(line, 36, y)
+      y += 21
+    }
+  }
+  ctx.font = `400 13px ${BODY}`
+  ctx.fillStyle = COLORS.stone
+  y += 12
+  for (const line of sender) {
+    ctx.fillText(line, 36, y)
+    y += 19
+  }
+  ctx.strokeStyle = COLORS.line
+  ctx.setLineDash([4, 4])
+  ctx.beginPath()
+  ctx.moveTo(0, panelHeight)
+  ctx.lineTo(360, panelHeight)
+  ctx.stroke()
+  ctx.setLineDash([])
+  ctx.fillText('Redeem code', 20, panelHeight + 27)
+  ctx.fillStyle = COLORS.ink
+  ctx.font = `500 16px ${SANS}`
+  ctx.fillText(card.code ?? 'XXXX-XXXX-XXXX-XXXX', 20, panelHeight + 54, 320)
+  ctx.fillStyle = COLORS.stone
+  ctx.font = `400 13px ${BODY}`
+  if (card.code) {
+    ctx.fillText('Redeem your gift card', 20, panelHeight + 87)
+    ctx.fillText('at app.trymorrow.money/redeem', 20, panelHeight + 107)
+    if (qrUrl) {
+      ctx.save()
+      ctx.scale(1 / 3, 1 / 3)
+      await drawQr(ctx, qrUrl, 864, (panelHeight + 70) * 3, 156, renderVersion)
+      ctx.restore()
+    }
+  } else ctx.fillText('Your code appears once the card is made.', 20, panelHeight + 87, 320)
   return new Promise((resolve, reject) =>
     canvas.toBlob(
       (blob) => (blob ? resolve(blob) : reject(new Error('Export failed'))),
