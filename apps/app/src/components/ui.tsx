@@ -235,13 +235,14 @@ export function Avatar({
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() ?? '')
     .join('')
+
   return (
     <span
       style={style}
       role="img"
       aria-label={alt || `${name ?? 'Profile'} avatar`}
       className={clsx(
-        'flex shrink-0 items-center justify-center rounded-full font-sans font-medium',
+        'flex shrink-0 items-center justify-center rounded-full font-sans font-bold',
         className ?? 'bg-orange-wash',
       )}
     >

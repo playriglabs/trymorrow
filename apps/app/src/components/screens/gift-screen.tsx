@@ -1,5 +1,6 @@
 import { LockIcon, UserCircleIcon } from '@phosphor-icons/react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import Confetti from 'react-confetti'
 import { match } from 'ts-pattern'
 import { EmailLogin } from '@/components/email-login'
 import { withProviders } from '@/components/providers'
@@ -12,6 +13,32 @@ import { useSession } from '@/lib/client/session'
 import { formatDate, formatUsd } from '@/lib/format'
 import { giftAmountLabel, giftAssetsLabel, giftContentsLabel } from '@/lib/gifts'
 import type { GiftView } from '@/lib/types'
+
+function ClaimConfetti() {
+  const [size, setSize] = useState({ width: 0, height: 0 })
+
+  useEffect(() => {
+    const resize = () => setSize({ width: window.innerWidth, height: window.innerHeight })
+    resize()
+    window.addEventListener('resize', resize)
+    return () => window.removeEventListener('resize', resize)
+  }, [])
+
+  if (size.width === 0 || size.height === 0) return null
+
+  return (
+    <Confetti
+      width={size.width}
+      height={size.height}
+      numberOfPieces={220}
+      recycle={false}
+      gravity={0.32}
+      tweenDuration={900}
+      colors={['#ff6b00', '#1d4ed8', '#dc1231', '#f7c948', '#16a34a']}
+      style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 50 }}
+    />
+  )
+}
 
 function GiftCard({ gift }: { gift: GiftView }) {
   const bundle = gift.items.length > 1
@@ -154,6 +181,7 @@ function Gift({ giftId }: { giftId: string }) {
           )
         }
       >
+        {opened && <ClaimConfetti />}
         <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
           <SuccessMark />
           <div className="flex flex-col gap-1.5">
