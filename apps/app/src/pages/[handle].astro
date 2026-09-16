@@ -1,4 +1,6 @@
 ---
+import { LinkBreakIcon } from '@phosphor-icons/react'
+import clsx from 'clsx'
 import AppLayout from '@/layouts/app-layout.astro'
 import { HANDLE_PATTERN } from '@/lib/handles'
 import { MAX_NOTE } from '@/lib/notes'
@@ -63,7 +65,12 @@ if (cash != null) sendParams.set('cash', String(cash))
   }
   image={asked?.iconUrl ?? photo ?? undefined}
 >
-  <div class="flex flex-1 flex-col items-center justify-center gap-6 px-5 py-10 text-center">
+  <div
+    class={clsx(
+      'flex flex-1 flex-col items-center justify-center px-5 py-10 text-center',
+      person && photo ? 'gap-6' : 'gap-2',
+    )}
+  >
     {person ? (
       <>
         {photo ? (
@@ -101,11 +108,14 @@ if (cash != null) sendParams.set('cash', String(cash))
       </>
     ) : (
       <>
+        <span class="flex size-20 items-center justify-center rounded-full bg-orange-wash text-orange">
+          <LinkBreakIcon className="size-10" weight="duotone" aria-hidden="true" />
+        </span>
         <h1 class="font-sans text-[30px] font-medium tracking-[-0.02em]">No one’s here yet</h1>
         <p class="text-stone">This gift link isn’t taken. Grab it when you sign up.</p>
         <a
           href="/login"
-          class="inline-flex h-14 w-full items-center justify-center rounded-button bg-orange px-5 font-sans text-[17px] font-medium text-white"
+          class="inline-flex h-14 w-full items-center mt-5 justify-center rounded-button bg-orange px-5 font-sans text-[17px] font-medium text-white"
         >
           Get started
         </a>

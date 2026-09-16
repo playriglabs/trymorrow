@@ -9,13 +9,28 @@ import { useSyncProfileMutation } from '@/lib/client/queries'
 import { useEnsureWallet } from '@/lib/client/wallet'
 import { safeNext } from '@/lib/format'
 
+const HEADLINES = [
+  'Give stocks and cash that grow.',
+  'Own a piece of a real company.',
+  'Give today. Grow tomorrow.',
+] as const
+
 function Login() {
   const { ready, authenticated, login } = usePrivy()
   const wallet = useEnsureWallet()
   const { mutate: syncProfile } = useSyncProfileMutation()
   const [view, setView] = useState<'welcome' | 'email'>('welcome')
   const [oauthError, setOauthError] = useState<string | null>(null)
+  const [headlineIndex, setHeadlineIndex] = useState(0)
   const { initOAuth, state: oauth } = useLoginWithOAuth()
+
+  useEffect(() => {
+    const interval = window.setInterval(
+      () => setHeadlineIndex((index) => (index + 1) % HEADLINES.length),
+      3600,
+    )
+    return () => window.clearInterval(interval)
+  }, [])
 
   // Runs after email or Google login (and when someone lands here already signed in).
   // Waits for the account's wallet: leaving the page earlier interrupts Privy creating it.
@@ -95,9 +110,12 @@ function Login() {
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col gap-2.5 px-5 pt-7">
-        <h1 className="font-sans text-[36px] leading-[1.08] font-medium tracking-[-0.02em] text-balance">
-          Give stocks and cash that grow.
+      <div className="flex flex-1 flex-col gap-x-2.5 gap-y-4 px-5 pt-7">
+        <h1 className="min-h-19.5 font-sans text-[36px] leading-[1.08] font-medium tracking-[-0.02em] text-balance">
+          <span className="sr-only">{HEADLINES[0]}</span>
+          <span key={headlineIndex} aria-hidden="true" className="headline-switch block">
+            {HEADLINES[headlineIndex] ?? HEADLINES[0]}
+          </span>
         </h1>
         <p className="text-stone">
           Send a cash and piece of a real company to anyone, and build a fund the whole family can

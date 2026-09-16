@@ -425,7 +425,7 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
 
   return (
     <Screen
-      title={`${buying ? 'Buy' : 'Sell'} ${stock.ticker}`}
+      title={`${buying ? 'Buy' : 'Sell'} $${stock.ticker}`}
       back={() => setStage('overview')}
       footer={
         <>
@@ -448,7 +448,7 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
         <div className="mb-2 flex items-center gap-2 rounded-full bg-orange-wash py-1.5 pr-3 pl-1.5">
           <StockLogo iconUrl={stock.iconUrl} ticker={stock.ticker} size={28} />
           <span className="font-sans text-[14px] font-medium">
-            {buying ? 'Buying' : 'Selling'} {stock.ticker}
+            {buying ? 'Buying' : 'Selling'} ${stock.ticker}
           </span>
         </div>
         <label

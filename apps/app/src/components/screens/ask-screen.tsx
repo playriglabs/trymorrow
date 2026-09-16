@@ -163,7 +163,7 @@ function Ask() {
             <button
               type="button"
               onClick={() => setWishCash(true)}
-              className="flex items-center gap-2 self-start rounded-link border border-line bg-surface pr-4 pl-1.5 font-sans text-[15px] font-medium"
+              className="flex items-center gap-1.5 py-2 self-start rounded-link border border-line bg-surface pr-4 pl-1.5 font-sans text-[15px] font-medium"
             >
               <CashLogo size={30} />
               Or just cash

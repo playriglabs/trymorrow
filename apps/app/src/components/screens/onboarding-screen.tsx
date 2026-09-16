@@ -297,6 +297,7 @@ function Onboarding() {
         <Label htmlFor="name">Name</Label>
         <TextInput
           id="name"
+          maxLength={40}
           autoComplete="name"
           value={name}
           onChange={(event) => setName(event.target.value)}

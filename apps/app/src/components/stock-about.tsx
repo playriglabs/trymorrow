@@ -18,7 +18,7 @@ export function StockAbout({ mint, name }: { mint: string; name: string }) {
     <>
       <Card className="flex flex-col gap-2 px-4 py-4">
         <span className="font-sans text-[15px] font-medium tracking-[-0.01em]">About {name}</span>
-        <p className="text-[14px] leading-[1.5] text-stone">{profile.data.description}</p>
+        <p className="text-[14px] leading-normal text-stone">{profile.data.description}</p>
       </Card>
 
       {classifications.length > 0 && (

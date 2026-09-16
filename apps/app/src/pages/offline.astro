@@ -1,4 +1,5 @@
 ---
+import { WifiSlashIcon } from '@phosphor-icons/react'
 import AppLayout from '@/layouts/app-layout.astro'
 
 // Cached by the service worker at install, so it's what shows when the network is gone
@@ -7,6 +8,9 @@ export const prerender = true
 
 <AppLayout title="Offline — Morrow" description="Morrow needs a connection.">
   <div class="flex flex-1 flex-col items-center justify-center gap-4 px-5 py-10 text-center">
+    <span class="mb-1 flex size-20 items-center justify-center rounded-full bg-orange-wash text-orange">
+      <WifiSlashIcon className="size-10" weight="duotone" aria-hidden="true" />
+    </span>
     <h1 class="font-sans text-[30px] leading-[1.15] font-medium tracking-[-0.02em]">
       You’re offline
     </h1>

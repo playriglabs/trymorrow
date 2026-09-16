@@ -123,8 +123,8 @@ function Holding({ mint, ticker, name }: { mint: string; ticker: string; name: s
 
   const heading = (
     <span className="flex items-center justify-center gap-2">
-      <StockLogo iconUrl={holding.data?.holding.iconUrl ?? null} ticker={ticker} size={26} />
-      {name}
+      <StockLogo iconUrl={holding.data?.holding.iconUrl ?? null} ticker={ticker} size={26} />$
+      {ticker}
     </span>
   )
 

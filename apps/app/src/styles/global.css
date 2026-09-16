@@ -56,6 +56,22 @@
   }
 }
 
+@keyframes headline-switch {
+  0% {
+    transform: translateY(12px);
+    opacity: 0;
+  }
+  12%,
+  88% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-10px);
+    opacity: 0;
+  }
+}
+
 @keyframes modal-backdrop-in {
   from {
     opacity: 0;
@@ -103,6 +119,11 @@
   animation: rise-in 420ms ease-out both;
 }
 
+.headline-switch {
+  animation: headline-switch 3600ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: transform, opacity;
+}
+
 /* Shared modal motion: a quick scrim fade and a softly settling native-style sheet. */
 .modal-backdrop-in {
   animation: modal-backdrop-in 180ms ease-out both;
@@ -122,6 +143,7 @@
   .success-pop,
   .success-ring,
   .rise-in,
+  .headline-switch,
   .modal-backdrop-in,
   .modal-sheet-in,
   .modal-page-in {
