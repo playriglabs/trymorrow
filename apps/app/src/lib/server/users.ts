@@ -18,7 +18,6 @@ export type UserRow = {
   name: string | null
   avatar_path: string | null
   country: string | null
-  not_us_person: boolean
   terms_accepted_at: string | null
   /** Cash balance at the last look, in USDC base units; deposits are what came in above it */
   cash_seen_raw: string | null
@@ -26,7 +25,7 @@ export type UserRow = {
 }
 
 export const USER_COLUMNS =
-  'id, privy_id, email, wallet_address, handle, name, avatar_path, country, not_us_person, terms_accepted_at, cash_seen_raw, cash_seen_signature'
+  'id, privy_id, email, wallet_address, handle, name, avatar_path, country, terms_accepted_at, cash_seen_raw, cash_seen_signature'
 
 export { HANDLE_PATTERN } from '@/lib/handles'
 // Every top-level page route, plus the names we keep for ourselves: a handle that matches one
@@ -108,7 +107,7 @@ export function requireWallet(row: UserRow): string {
 }
 
 export function isOnboarded(row: UserRow): boolean {
-  return Boolean(row.handle && row.name && row.not_us_person && row.terms_accepted_at)
+  return Boolean(row.handle && row.name && row.terms_accepted_at)
 }
 
 export function toProfile(row: UserRow): Profile {

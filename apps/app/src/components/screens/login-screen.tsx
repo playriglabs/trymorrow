@@ -150,11 +150,11 @@ function Login() {
         </div>
         <p className="pt-1.5 text-center text-[12px] text-stone">
           By continuing you agree to our{' '}
-          <a href="/terms" className="underline">
+          <a href="https://trymorrow.money/terms-conditions" className="underline">
             Terms
           </a>{' '}
           and{' '}
-          <a href="/privacy" className="underline">
+          <a href="https://trymorrow.money/privacy-policy" className="underline">
             Privacy Policy
           </a>
           .

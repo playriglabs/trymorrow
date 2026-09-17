@@ -428,7 +428,6 @@ export type ProfileUpdate = {
   name?: string
   handle?: string
   country?: string
-  notUsPerson?: true
   acceptTerms?: true
 }
 
