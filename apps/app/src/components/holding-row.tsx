@@ -20,6 +20,10 @@ export function HoldingRow({
     holding.costUsd != null && holding.valueUsd != null ? holding.valueUsd - holding.costUsd : null
   const pnlPct =
     pnl != null && holding.costUsd && holding.costUsd > 0 ? (pnl / holding.costUsd) * 100 : null
+  // Under a cent prints as $0.00, so it's a flat position: no colour and no sign, like the
+  // holding screen. Tiny positions can still move a whole percent without moving a cent.
+  const flat = pnl != null && Math.abs(pnl) < 0.005
+  const pctRounded = pnlPct != null ? Math.round(pnlPct) : null
 
   return (
     <a href={`/holding/${holding.ticker.toLowerCase()}`} className="flex items-center gap-3 py-3">
@@ -32,16 +36,16 @@ export function HoldingRow({
         <span>{hideValue ? '$••••' : formatUsd(holding.valueUsd)}</span>
         {pnl != null && (
           <span
-            // A flat +$0.00 is a non-event, not a gain: show it in stone
             className={clsx('text-[13px]', {
-              'text-gain': pnl > 0,
-              'text-loss': pnl < 0,
-              'text-stone': pnl === 0,
+              'text-gain': !flat && pnl > 0,
+              'text-loss': !flat && pnl < 0,
+              'text-stone': flat,
             })}
           >
-            {pnl > 0 ? '+' : ''}
-            {formatUsd(pnl)}
-            {pnlPct != null && ` (${pnlPct > 0 ? '+' : ''}${pnlPct.toFixed(0)}%)`}
+            {!flat && pnl > 0 ? '+' : ''}
+            {formatUsd(flat ? 0 : pnl)}
+            {pctRounded != null &&
+              ` (${!flat && pctRounded > 0 ? '+' : ''}${flat ? Math.abs(pctRounded) : pctRounded}%)`}
           </span>
         )}
       </div>

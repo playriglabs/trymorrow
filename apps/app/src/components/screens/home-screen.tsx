@@ -61,7 +61,7 @@ function HomeFunds({ funds }: { funds: FundCardView[] }) {
     >
       <div
         ref={track}
-        className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain scrollbar-none [&::-webkit-scrollbar]:hidden"
         onScroll={(event) => {
           const container = event.currentTarget
           setActive(Math.round(container.scrollLeft / (container.clientWidth + 12)))
@@ -126,6 +126,8 @@ function House() {
   const session = useSession()
   const enabled = session.ready
   const portfolio = usePortfolioQuery({ enabled })
+  // The day's change prints with one decimal, so under 5 cents reads as $0.0: flat, not a gain
+  const dayFlat = Math.abs(portfolio.data?.stocksPnl24hUsd ?? 0) < 0.05
   const received = useGiftsQuery('received', { enabled })
   const sent = useGiftsQuery('sent', { enabled })
   const feed = useNotificationsQuery({ enabled })
@@ -180,7 +182,9 @@ function House() {
             scrolled ? 'h-13' : 'h-11',
           )}
         >
-          <span className="font-sans text-[22px] font-medium tracking-[-0.02em]">Morrow</span>
+          <span className="font-sans text-[22px] font-medium tracking-[-0.02em]">
+            morrow<span className="text-orange">*</span>
+          </span>
           <div className="flex items-center gap-1">
             <a
               href="/notifications"
@@ -226,20 +230,20 @@ function House() {
               {portfolio.data?.stocksPnl24hUsd != null && !balanceHidden && (
                 <p
                   className={clsx('text-[14px] whitespace-nowrap', {
-                    'text-gain': portfolio.data.stocksPnl24hUsd > 0,
-                    'text-loss': portfolio.data.stocksPnl24hUsd < 0,
-                    'text-stone': portfolio.data.stocksPnl24hUsd === 0,
+                    'text-gain': !dayFlat && portfolio.data.stocksPnl24hUsd > 0,
+                    'text-loss': !dayFlat && portfolio.data.stocksPnl24hUsd < 0,
+                    'text-stone': dayFlat,
                   })}
                 >
-                  {portfolio.data.stocksPnl24hUsd > 0 ? '+' : ''}
-                  {portfolio.data.stocksPnl24hUsd.toLocaleString('en-US', {
+                  {!dayFlat && portfolio.data.stocksPnl24hUsd > 0 ? '+' : ''}
+                  {(dayFlat ? 0 : portfolio.data.stocksPnl24hUsd).toLocaleString('en-US', {
                     style: 'currency',
                     currency: 'USD',
                     minimumFractionDigits: 1,
                     maximumFractionDigits: 1,
                   })}
                   {portfolio.data.stocksPnl24hPct != null &&
-                    `(${portfolio.data.stocksPnl24hPct > 0 ? '+' : ''}${portfolio.data.stocksPnl24hPct.toFixed(0)}%)`}
+                    ` (${!dayFlat && Math.round(portfolio.data.stocksPnl24hPct) > 0 ? '+' : ''}${dayFlat ? Math.abs(Math.round(portfolio.data.stocksPnl24hPct)) : Math.round(portfolio.data.stocksPnl24hPct)}%)`}
                 </p>
               )}
             </div>
