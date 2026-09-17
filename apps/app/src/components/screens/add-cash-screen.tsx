@@ -64,7 +64,7 @@ function AddCash() {
             onClick={() => navigator.share?.({ text: address }).catch(() => {})}
           >
             <ShareIcon className="size-4" />
-            ShareIcon
+            Share
           </Button>
         </div>
       </Card>
