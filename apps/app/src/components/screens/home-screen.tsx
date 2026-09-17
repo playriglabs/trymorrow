@@ -10,6 +10,7 @@ import {
 } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { useEffect, useRef, useState } from 'react'
+import { match } from 'ts-pattern'
 import { FundCard } from '@/components/fund-card'
 import { GiftRow } from '@/components/gift-row'
 import { byValue, HoldingRow } from '@/components/holding-row'
@@ -166,7 +167,10 @@ function House() {
 
   if (!session.ready || !session.profile) return <Loading />
 
-  const balanceLabel = portfolio.isPending ? '—' : balanceHidden ? '$••••' : formatUsd(shownTotal)
+  const balanceLabel = match({ pending: portfolio.isPending, balanceHidden })
+    .with({ pending: true }, () => '—')
+    .with({ balanceHidden: true }, () => '$••••')
+    .otherwise(() => formatUsd(shownTotal))
   // Keep short balances at 1× (44px), then reduce the size as formatted amounts grow.
   const balanceFontSize = Math.max(24, 44 - Math.max(0, balanceLabel.length - 7) * 3)
 
@@ -366,40 +370,43 @@ function House() {
               </a>
             )}
           </div>
-          {portfolio.isPending ? (
-            <Card className="flex flex-col divide-y divide-line px-4">
-              <span role="status" className="sr-only">
-                Loading stocks
-              </span>
-              {[0, 1, 2, 3].map((row) => (
-                <div
-                  key={row}
-                  className="flex animate-pulse items-center gap-3 py-3 motion-reduce:animate-none"
-                  aria-hidden
-                >
-                  <div className="size-10 shrink-0 rounded-full bg-orange-wash" />
-                  <div className="flex min-w-0 flex-1 flex-col gap-2">
-                    <div className="h-4 w-28 max-w-full rounded bg-orange-wash" />
-                    <div className="h-3 w-18 max-w-full rounded bg-orange-wash" />
+          {match({ pending: portfolio.isPending, empty: stocks.length === 0 })
+            .with({ pending: true }, () => (
+              <Card className="flex flex-col divide-y divide-line px-4">
+                <span role="status" className="sr-only">
+                  Loading stocks
+                </span>
+                {[0, 1, 2, 3].map((row) => (
+                  <div
+                    key={row}
+                    className="flex animate-pulse items-center gap-3 py-3 motion-reduce:animate-none"
+                    aria-hidden
+                  >
+                    <div className="size-10 shrink-0 rounded-full bg-orange-wash" />
+                    <div className="flex min-w-0 flex-1 flex-col gap-2">
+                      <div className="h-4 w-28 max-w-full rounded bg-orange-wash" />
+                      <div className="h-3 w-18 max-w-full rounded bg-orange-wash" />
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-2">
+                      <div className="h-4 w-16 rounded bg-orange-wash" />
+                      <div className="h-3 w-20 rounded bg-orange-wash" />
+                    </div>
                   </div>
-                  <div className="flex shrink-0 flex-col items-end gap-2">
-                    <div className="h-4 w-16 rounded bg-orange-wash" />
-                    <div className="h-3 w-20 rounded bg-orange-wash" />
-                  </div>
-                </div>
-              ))}
-            </Card>
-          ) : stocks.length === 0 ? (
-            <Card className="px-4 py-5 text-[15px] text-stone">
-              No stocks yet. Buy one, or open a gift, to get started.
-            </Card>
-          ) : (
-            <Card className="flex flex-col divide-y divide-line px-4">
-              {stocks.slice(0, HOME_STOCKS).map((holding) => (
-                <HoldingRow key={holding.mint} holding={holding} hideValue={balanceHidden} />
-              ))}
-            </Card>
-          )}
+                ))}
+              </Card>
+            ))
+            .with({ empty: true }, () => (
+              <Card className="px-4 py-5 text-[15px] text-stone">
+                No stocks yet. Buy one, or open a gift, to get started.
+              </Card>
+            ))
+            .otherwise(() => (
+              <Card className="flex flex-col divide-y divide-line px-4">
+                {stocks.slice(0, HOME_STOCKS).map((holding) => (
+                  <HoldingRow key={holding.mint} holding={holding} hideValue={balanceHidden} />
+                ))}
+              </Card>
+            ))}
         </section>
 
         {portfolio.data &&

@@ -9,6 +9,7 @@ import {
   useEffect,
   useState,
 } from 'react'
+import { match } from 'ts-pattern'
 import { Loading } from '@/components/ui'
 
 const ProviderScope = createContext(false)
@@ -17,7 +18,10 @@ const ProviderScope = createContext(false)
 function SessionCache({ children }: { children: ReactNode }) {
   const { ready, authenticated, user } = usePrivy()
   const queryClient = useQueryClient()
-  const identity = ready ? (authenticated ? user?.id : null) : undefined
+  const identity = match({ ready, authenticated })
+    .with({ ready: false }, () => undefined)
+    .with({ authenticated: true }, () => user?.id)
+    .otherwise(() => null)
   const [account, setAccount] = useState<string | null | undefined>(undefined)
   useEffect(() => {
     if (identity === undefined || account === identity) return

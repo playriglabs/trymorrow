@@ -1,6 +1,7 @@
 import { ArrowsDownUpIcon, DotsThreeIcon, GiftIcon, XIcon } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { useEffect, useState } from 'react'
+import { match, P } from 'ts-pattern'
 import { HoldingShareCard } from '@/components/holding-share-card'
 import { formatPointTime, RANGE_LABEL } from '@/components/price-chart'
 import { PricePlot } from '@/components/price-plot'
@@ -198,17 +199,21 @@ function Holding({ mint, ticker, name }: { mint: string; ticker: string; name: s
                 'bg-loss-wash text-loss': !flat && gain < 0,
               })}
             >
-              {flat ? '' : gain > 0 ? '+' : '−'}
+              {match({ flat, up: gain > 0 })
+                .with({ flat: true }, () => '')
+                .with({ up: true }, () => '+')
+                .otherwise(() => '−')}
               {formatUsd(Math.abs(gain))}
               {gainPct != null && ` · ${Math.abs(gainPct).toFixed(1)}%`}
             </span>
           )}
           <span>
-            {hover != null && active
-              ? formatPointTime(active.t, range)
-              : gain != null
-                ? sinceLabel(origin)
-                : RANGE_LABEL[range]}
+            {match({ hovering: hover != null, active, gain })
+              .with({ hovering: true, active: P.nonNullable }, ({ active }) =>
+                formatPointTime(active.t, range),
+              )
+              .with({ gain: P.nonNullable }, () => sinceLabel(origin))
+              .otherwise(() => RANGE_LABEL[range])}
           </span>
           {chart.data?.stale && <span>· may be a few minutes old</span>}
           {chart.data?.source === 'market' && <span>· daily closes on the stock market</span>}

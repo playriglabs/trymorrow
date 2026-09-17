@@ -7,6 +7,7 @@ import { Buffer } from 'node:buffer'
 import pilatDataUrl from '@morrow/ui/fonts/Pilat-Book.woff2?inline'
 import { create, type Font } from 'fontkitten'
 import sharp from 'sharp'
+import { match, P } from 'ts-pattern'
 import roundedLogoDataUrl from '@/../public/trymorrow-logo-rounded.png?inline'
 
 const loadedPilat = create(Buffer.from(pilatDataUrl.split(',')[1] ?? '', 'base64'))
@@ -264,19 +265,15 @@ function giftOrnament(card: GiftOgCard): string {
 
 export async function giftOgImage(card: GiftOgCard): Promise<Response> {
   const assets = await withEmbeddedImages(card.assets)
-  const state =
-    card.status === 'claimed'
-      ? { label: 'Opened', copy: 'This gift has been opened' }
-      : card.status === 'refunded'
-        ? { label: 'Returned', copy: 'This gift was returned' }
-        : card.codeCard
-          ? { label: null, copy: 'Anyone with the code can redeem it' }
-          : { label: null, copy: 'Only the person it’s for can open it' }
-  const recipient = card.recipientName
-    ? `for ${card.recipientName}`
-    : card.codeCard
-      ? 'for whoever holds the code'
-      : 'for someone special'
+  const state = match(card)
+    .with({ status: 'claimed' }, () => ({ label: 'Opened', copy: 'This gift has been opened' }))
+    .with({ status: 'refunded' }, () => ({ label: 'Returned', copy: 'This gift was returned' }))
+    .with({ codeCard: true }, () => ({ label: null, copy: 'Anyone with the code can redeem it' }))
+    .otherwise(() => ({ label: null, copy: 'Only the person it’s for can open it' }))
+  const recipient = match(card)
+    .with({ recipientName: P.string.minLength(1) }, ({ recipientName }) => `for ${recipientName}`)
+    .with({ codeCard: true }, () => 'for whoever holds the code')
+    .otherwise(() => 'for someone special')
   const hero = card.totalValue ?? 'Stocks and cash'
   // Keep longer amounts inside the existing gift column as the amount gains prominence.
   const heroSize = card.totalValue ? Math.min(72, (72 * 520) / textWidth(hero, 72)) : 47

@@ -1,3 +1,4 @@
+import { match, P } from 'ts-pattern'
 /** Draws a shareable card on a canvas and hands it to the share sheet or a download */
 
 import { MODULE_RADIUS, qrLayout } from '@/lib/client/qr-layout'
@@ -166,8 +167,10 @@ function drawSheet(ctx: CanvasRenderingContext2D, rows: ShareCardRow[]) {
     ctx.fillText(row.label, x + 48, middle)
 
     ctx.textAlign = 'right'
-    ctx.fillStyle =
-      row.tone === 'gain' ? COLORS.gain : row.tone === 'loss' ? COLORS.loss : COLORS.ink
+    ctx.fillStyle = match(row.tone)
+      .with('gain', () => COLORS.gain)
+      .with('loss', () => COLORS.loss)
+      .otherwise(() => COLORS.ink)
     ctx.font = `500 46px ${SANS}`
     ctx.fillText(row.value, x + w - 48, middle)
   })
@@ -436,13 +439,20 @@ async function renderGiftCard(
     ctx.beginPath()
     ctx.arc(iconX + 12, iconY + 12, 12, 0, Math.PI * 2)
     // Cash gets a solid orange tile so it stands out from company logos on the receipt
-    ctx.fillStyle = content.isCash ? COLORS.orange : content.logo ? COLORS.surface : COLORS.cream
+    ctx.fillStyle = match(content)
+      .with({ isCash: true }, () => COLORS.orange)
+      .with({ logo: P.nonNullable }, () => COLORS.surface)
+      .otherwise(() => COLORS.cream)
     ctx.fill()
     ctx.clip()
     if (content.logo) ctx.drawImage(content.logo, iconX, iconY, 24, 24)
     else {
       ctx.fillStyle = content.isCash ? COLORS.white : COLORS.orange
-      ctx.font = `500 ${content.isCash ? 17 : content.ticker.length > 4 ? 7 : 8}px ${SANS}`
+      const tickerSize = match(content)
+        .with({ isCash: true }, () => 17)
+        .with({ ticker: P.string.minLength(5) }, () => 7)
+        .otherwise(() => 8)
+      ctx.font = `500 ${tickerSize}px ${SANS}`
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
       ctx.fillText(content.isCash ? '$' : content.ticker, iconX + 12, iconY + 12, 20)

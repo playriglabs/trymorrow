@@ -80,11 +80,13 @@ function GiftCard({ gift }: { gift: GiftView }) {
             : `${formatUsd(gift.usdValue)} of ${giftAssetsLabel(gift.items)}`}
         </h1>
         <p className="text-[14px]">
-          {bundle && hasCash
-            ? `${stockCount} ${stockCount === 1 ? 'stock' : 'stocks'} and cash, worth`
-            : bundle
-              ? `${gift.items.length} stocks, worth`
-              : 'Worth'}{' '}
+          {match({ bundle, hasCash })
+            .with(
+              { bundle: true, hasCash: true },
+              () => `${stockCount} ${stockCount === 1 ? 'stock' : 'stocks'} and cash, worth`,
+            )
+            .with({ bundle: true }, () => `${gift.items.length} stocks, worth`)
+            .otherwise(() => 'Worth')}{' '}
           about {formatUsd(gift.usdValue)} when sent
         </p>
       </div>
@@ -343,11 +345,10 @@ function Gift({ giftId }: { giftId: string }) {
             loading={claim.isPending}
             onClick={() => claim.mutate(undefined, { onSuccess: () => setOpened(true) })}
           >
-            {bundle
-              ? 'Claim your gift'
-              : hasCash
-                ? `Claim ${formatUsd(view.usdValue)} in cash`
-                : `Claim ${formatUsd(view.usdValue)} of ${assets}`}
+            {match({ bundle, hasCash })
+              .with({ bundle: true }, () => 'Claim your gift')
+              .with({ hasCash: true }, () => `Claim ${formatUsd(view.usdValue)} in cash`)
+              .otherwise(() => `Claim ${formatUsd(view.usdValue)} of ${assets}`)}
           </Button>
         </>
       }
@@ -356,11 +357,20 @@ function Gift({ giftId }: { giftId: string }) {
       <div className="flex flex-col gap-1.5">
         <h2 className="font-sans text-xl font-medium tracking-[-0.02em]">It’s yours to keep</h2>
         <p className="text-[15px] text-stone">
-          {hasCash && !bundle
-            ? 'Real cash, in an account only you control. Hold it, spend it, or send it on.'
-            : hasCash
-              ? 'Real stocks and cash, in an account only you control. Hold them, sell them, or send them on.'
-              : `Real ${assets} shares, in an account only you control. Hold them, sell them, or send them on.`}
+          {match({ bundle, hasCash })
+            .with(
+              { hasCash: true, bundle: false },
+              () => 'Real cash, in an account only you control. Hold it, spend it, or send it on.',
+            )
+            .with(
+              { hasCash: true },
+              () =>
+                'Real stocks and cash, in an account only you control. Hold them, sell them, or send them on.',
+            )
+            .otherwise(
+              () =>
+                `Real ${assets} shares, in an account only you control. Hold them, sell them, or send them on.`,
+            )}
         </p>
       </div>
     </Screen>

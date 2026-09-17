@@ -1,3 +1,4 @@
+import { match } from 'ts-pattern'
 import { db } from '@/lib/server/supabase'
 import { toUi, uiMultiplier } from '@/lib/server/tokens'
 import type { HoldingOrigin } from '@/lib/types'
@@ -95,8 +96,11 @@ export async function getHoldingOrigin(
 
     const buys = lots.filter((lot) => lot.side === 'buy')
     const gifts = buys.filter((lot) => lot.from != null)
-    const kind =
-      gifts.length === buys.length ? 'gift' : gifts.length === 0 ? 'bought' : ('mixed' as const)
+    const kind = match({ allGifts: gifts.length === buys.length, noGifts: gifts.length === 0 })
+      .returnType<HoldingOrigin['kind']>()
+      .with({ allGifts: true }, () => 'gift')
+      .with({ noGifts: true }, () => 'bought')
+      .otherwise(() => 'mixed')
     return {
       kind,
       // One gift and nothing else is the only case where a name describes the whole holding

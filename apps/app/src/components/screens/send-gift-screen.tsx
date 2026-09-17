@@ -246,7 +246,10 @@ function SendGift() {
   }, [])
   const [picked, setPicked] = useState<string[]>([])
   const [amountText, setAmountText] = useState(() =>
-    asked.amount != null ? String(asked.amount) : asked.cash != null ? String(asked.cash) : '25',
+    match(asked)
+      .with({ amount: P.nonNullable }, ({ amount }) => String(amount))
+      .with({ cash: P.nonNullable }, ({ cash }) => String(cash))
+      .otherwise(() => '25'),
   )
   const [to, setTo] = useState(asked.to)
   const [added, setAdded] = useState<Recipient[]>([])
@@ -270,15 +273,12 @@ function SendGift() {
     ? stockHoldings.find((holding) => holding.ticker.toUpperCase() === asked.ticker)
     : undefined
   const askedCash = asked.cash != null && cashHolding ? cashHolding : undefined
-  const fallback = askedHolding
-    ? [askedHolding]
-    : askedCash
-      ? [askedCash]
-      : stockHoldings[0]
-        ? [stockHoldings[0]]
-        : cashHolding
-          ? [cashHolding]
-          : []
+  const fallback = match({ askedHolding, askedCash, firstStock: stockHoldings[0], cashHolding })
+    .with({ askedHolding: P.nonNullable }, ({ askedHolding }) => [askedHolding])
+    .with({ askedCash: P.nonNullable }, ({ askedCash }) => [askedCash])
+    .with({ firstStock: P.nonNullable }, ({ firstStock }) => [firstStock])
+    .with({ cashHolding: P.nonNullable }, ({ cashHolding }) => [cashHolding])
+    .otherwise(() => [])
   const stocks = chosen.length > 0 ? chosen : fallback
 
   const typedText = to.trim()
@@ -537,11 +537,17 @@ function SendGift() {
           <CaretRightIcon className="size-5 shrink-0 text-stone" />
         </button>
         <p className="text-[13px] text-stone">
-          {stocks.length === 1 && onlyStock?.isCash
-            ? `${formatUsd(onlyStock.valueUsd)} available in cash`
-            : stocks.length === 1 && onlyStock
-              ? `${formatUsd(onlyStock.priceUsd)} a share · ${formatUsd(onlyStock.valueUsd)} available`
-              : `${stocks.length} assets · ${formatUsd(perStock)} in each`}
+          {match({ single: stocks.length === 1, onlyStock })
+            .with(
+              { single: true, onlyStock: { isCash: true } },
+              ({ onlyStock }) => `${formatUsd(onlyStock.valueUsd)} available in cash`,
+            )
+            .with(
+              { single: true, onlyStock: P.nonNullable },
+              ({ onlyStock }) =>
+                `${formatUsd(onlyStock.priceUsd)} a share · ${formatUsd(onlyStock.valueUsd)} available`,
+            )
+            .otherwise(() => `${stocks.length} assets · ${formatUsd(perStock)} in each`)}
         </p>
       </div>
 
@@ -577,13 +583,22 @@ function SendGift() {
           />
         </label>
         <span className="text-[14px] text-stone">
-          {stocks.length === 1 && onlyStock?.isCash
-            ? 'in cash'
-            : stocks.length === 1 && onlyStock?.priceUsd
-              ? `≈ ${formatShares(usd / onlyStock.priceUsd)} shares`
-              : stocks.some((stock) => stock.isCash)
-                ? `in ${stocks.length - 1} ${stocks.length - 1 === 1 ? 'stock' : 'stocks'} and cash`
-                : `in ${stocks.length} stocks`}
+          {match({
+            single: stocks.length === 1,
+            onlyStock,
+            withCash: stocks.some((stock) => stock.isCash),
+          })
+            .with({ single: true, onlyStock: { isCash: true } }, () => 'in cash')
+            .with(
+              { single: true, onlyStock: { priceUsd: P.number.gt(0) } },
+              ({ onlyStock }) => `≈ ${formatShares(usd / onlyStock.priceUsd)} shares`,
+            )
+            .with(
+              { withCash: true },
+              () =>
+                `in ${stocks.length - 1} ${stocks.length - 1 === 1 ? 'stock' : 'stocks'} and cash`,
+            )
+            .otherwise(() => `in ${stocks.length} stocks`)}
           {recipients.length > 1 && ' for each person'}
         </span>
         {amountHint && <span className="text-center text-[13px] text-loss">{amountHint}</span>}

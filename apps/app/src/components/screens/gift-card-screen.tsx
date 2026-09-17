@@ -171,7 +171,10 @@ function GiftCardScreen() {
   /** Cash rides in the same picker, and the default pick stays a stock */
   const pickerHoldings = cashHolding ? [cashHolding, ...stockHoldings] : stockHoldings
   const chosen = holdings.filter((holding) => picked.includes(holding.mint))
-  const fallback = stockHoldings[0] ? [stockHoldings[0]] : cashHolding ? [cashHolding] : []
+  const fallback = match({ firstStock: stockHoldings[0], cashHolding })
+    .with({ firstStock: P.nonNullable }, ({ firstStock }) => [firstStock])
+    .with({ cashHolding: P.nonNullable }, ({ cashHolding }) => [cashHolding])
+    .otherwise(() => [])
   const stocks = chosen.length > 0 ? chosen : fallback
 
   const fee = useGiftCardFeeQuery(
@@ -359,11 +362,17 @@ function GiftCardScreen() {
           <CaretRightIcon className="size-5 shrink-0 text-stone" />
         </button>
         <p className="text-[13px] text-stone">
-          {stocks.length === 1 && onlyStock?.isCash
-            ? `${formatUsd(onlyStock.valueUsd)} available in cash`
-            : stocks.length === 1 && onlyStock
-              ? `${formatUsd(onlyStock.priceUsd)} a share · ${formatUsd(onlyStock.valueUsd)} available`
-              : `${stocks.length} assets · ${formatUsd(perStock)} in each`}
+          {match({ single: stocks.length === 1, onlyStock })
+            .with(
+              { single: true, onlyStock: { isCash: true } },
+              ({ onlyStock }) => `${formatUsd(onlyStock.valueUsd)} available in cash`,
+            )
+            .with(
+              { single: true, onlyStock: P.nonNullable },
+              ({ onlyStock }) =>
+                `${formatUsd(onlyStock.priceUsd)} a share · ${formatUsd(onlyStock.valueUsd)} available`,
+            )
+            .otherwise(() => `${stocks.length} assets · ${formatUsd(perStock)} in each`)}
         </p>
       </div>
 
@@ -397,13 +406,22 @@ function GiftCardScreen() {
           />
         </label>
         <span className="text-[14px] text-stone">
-          {stocks.length === 1 && onlyStock?.isCash
-            ? 'in cash'
-            : stocks.length === 1 && onlyStock?.priceUsd
-              ? `≈ ${formatShares(usd / onlyStock.priceUsd)} shares`
-              : stocks.some((stock) => stock.isCash)
-                ? `in ${stocks.length - 1} ${stocks.length - 1 === 1 ? 'stock' : 'stocks'} and cash`
-                : `in ${stocks.length} stocks`}
+          {match({
+            single: stocks.length === 1,
+            onlyStock,
+            withCash: stocks.some((stock) => stock.isCash),
+          })
+            .with({ single: true, onlyStock: { isCash: true } }, () => 'in cash')
+            .with(
+              { single: true, onlyStock: { priceUsd: P.number.gt(0) } },
+              ({ onlyStock }) => `≈ ${formatShares(usd / onlyStock.priceUsd)} shares`,
+            )
+            .with(
+              { withCash: true },
+              () =>
+                `in ${stocks.length - 1} ${stocks.length - 1 === 1 ? 'stock' : 'stocks'} and cash`,
+            )
+            .otherwise(() => `in ${stocks.length} stocks`)}
         </span>
         {amountHint && <span className="text-center text-[13px] text-loss">{amountHint}</span>}
       </div>

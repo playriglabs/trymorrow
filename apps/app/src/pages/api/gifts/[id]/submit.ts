@@ -1,6 +1,7 @@
 import { findGiftAddress, findGiftCardAddress, USDC } from '@morrow/sdk'
 import { PublicKey } from '@solana/web3.js'
 import { z } from 'astro/zod'
+import { match } from 'ts-pattern'
 import { CASH_MINT } from '@/lib/gifts'
 import { findGiftAsset } from '@/lib/server/catalog'
 import { isFeeTransfer } from '@/lib/server/fees'
@@ -105,50 +106,49 @@ export const POST = route(async ({ params, request }) => {
     const label = await giftLabel(sent)
     // A take-back doesn't notify: the sender did it themselves and sees the result on screen,
     // and notify only buzzes for things that happened while someone was away
-    const rows: NotificationInput[] =
-      action === 'createGift' || action === 'createGiftCard'
-        ? [
-            {
-              userId: sent.sender_id,
-              kind: 'gift_sent',
-              title: `You sent ${label}`,
-              body:
-                action === 'createGiftCard'
-                  ? 'Anyone with the code can add it to their account. Not redeemed in 30 days? It comes back to you.'
-                  : 'They have 30 days to open it, or it comes back to you.',
-              giftId: sent.id,
-              url: `/gift/${sent.id}`,
-            },
-            ...(sent.recipient_id
-              ? [
-                  {
-                    userId: sent.recipient_id,
-                    kind: 'gift_received' as const,
-                    title: `${viewer.name ?? 'Someone'} sent you ${label}`,
-                    body: sent.gift_items.some((item) => item.mint === CASH_MINT)
-                      ? 'Open it to keep it.'
-                      : 'Open it to keep the shares.',
-                    giftId: sent.id,
-                    url: `/gift/${sent.id}`,
-                  },
-                ]
-              : []),
-          ]
-        : action === 'claimGift' || action === 'claimGiftCard'
+    const rows = match(action)
+      .returnType<NotificationInput[]>()
+      .with('createGift', 'createGiftCard', () => [
+        {
+          userId: sent.sender_id,
+          kind: 'gift_sent',
+          title: `You sent ${label}`,
+          body:
+            action === 'createGiftCard'
+              ? 'Anyone with the code can add it to their account. Not redeemed in 30 days? It comes back to you.'
+              : 'They have 30 days to open it, or it comes back to you.',
+          giftId: sent.id,
+          url: `/gift/${sent.id}`,
+        },
+        ...(sent.recipient_id
           ? [
               {
-                userId: sent.sender_id,
-                kind: 'gift_opened',
-                title:
-                  action === 'claimGiftCard'
-                    ? `${viewer.name ?? 'Someone'} redeemed your gift card`
-                    : `${viewer.name ?? 'They'} claimed your gift`,
-                body: label,
+                userId: sent.recipient_id,
+                kind: 'gift_received' as const,
+                title: `${viewer.name ?? 'Someone'} sent you ${label}`,
+                body: sent.gift_items.some((item) => item.mint === CASH_MINT)
+                  ? 'Open it to keep it.'
+                  : 'Open it to keep the shares.',
                 giftId: sent.id,
                 url: `/gift/${sent.id}`,
               },
             ]
-          : []
+          : []),
+      ])
+      .with('claimGift', 'claimGiftCard', () => [
+        {
+          userId: sent.sender_id,
+          kind: 'gift_opened',
+          title:
+            action === 'claimGiftCard'
+              ? `${viewer.name ?? 'Someone'} redeemed your gift card`
+              : `${viewer.name ?? 'They'} claimed your gift`,
+          body: label,
+          giftId: sent.id,
+          url: `/gift/${sent.id}`,
+        },
+      ])
+      .otherwise(() => [])
     await notify(rows)
   } catch (notifyError) {
     console.error('Gift notification failed', notifyError)

@@ -1,4 +1,5 @@
 import { type ComponentType, lazy, Suspense, useEffect } from 'react'
+import { match, P } from 'ts-pattern'
 import { Providers } from '@/components/providers'
 import { Loading } from '@/components/ui'
 
@@ -64,15 +65,13 @@ function preload(href: string) {
   const path = url.pathname.replace(/\/$/, '') || '/'
   const screen =
     routes[path] ??
-    (path.startsWith('/trade/')
-      ? 'trade-screen'
-      : path.startsWith('/holding/')
-        ? 'holding-screen'
-        : path.startsWith('/gift/')
-          ? 'gift-screen'
-          : path.startsWith('/fund/')
-            ? 'fund-screen'
-            : null)
+    match(path)
+      .returnType<ScreenName | null>()
+      .with(P.string.startsWith('/trade/'), () => 'trade-screen')
+      .with(P.string.startsWith('/holding/'), () => 'holding-screen')
+      .with(P.string.startsWith('/gift/'), () => 'gift-screen')
+      .with(P.string.startsWith('/fund/'), () => 'fund-screen')
+      .otherwise(() => null)
   if (screen) void loaders[screen]().catch(() => {})
 }
 

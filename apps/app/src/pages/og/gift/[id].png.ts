@@ -1,4 +1,5 @@
 import type { APIRoute } from 'astro'
+import { match } from 'ts-pattern'
 import { formatUsd } from '@/lib/format'
 import { findGiftAsset } from '@/lib/server/catalog'
 import { isGiftId } from '@/lib/server/gifts'
@@ -54,8 +55,9 @@ export const GET: APIRoute = async ({ params }) => {
     return giftOgImage({
       senderName: short(sender?.name ?? 'Someone', 24),
       recipientName: recipient?.name ? short(recipient.name, 22) : null,
-      status:
-        gift.status === 'claimed' ? 'claimed' : gift.status === 'refunded' ? 'refunded' : 'pending',
+      status: match(gift.status)
+        .with('claimed', 'refunded', (status) => status)
+        .otherwise(() => 'pending' as const),
       codeCard: gift.code_hash != null,
       totalValue: total == null ? null : formatUsd(total),
       assets,

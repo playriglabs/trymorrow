@@ -1,6 +1,7 @@
 import { CheckIcon, MagnifyingGlassIcon, XIcon } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { useEffect, useState } from 'react'
+import { match } from 'ts-pattern'
 import { CashLogo, StockLogo } from '@/components/stock-logo'
 import { Button, Card } from '@/components/ui'
 import { formatUsd } from '@/lib/format'
@@ -170,11 +171,13 @@ export function AssetPickerSheet({
             </div>
           </Card>
           <p className="shrink-0 px-1 pt-2 text-[13px] text-stone">
-            {full
-              ? `Maximum ${MAX_GIFT_STOCKS} selected. Remove one to choose another.`
-              : draft.length === 1
-                ? 'Keep at least one selected.'
-                : 'The gift is split evenly between your selections.'}
+            {match({ full, single: draft.length === 1 })
+              .with(
+                { full: true },
+                () => `Maximum ${MAX_GIFT_STOCKS} selected. Remove one to choose another.`,
+              )
+              .with({ single: true }, () => 'Keep at least one selected.')
+              .otherwise(() => 'The gift is split evenly between your selections.')}
           </p>
         </div>
 

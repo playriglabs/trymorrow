@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { match, P } from 'ts-pattern'
 import { CASH_MINT, giftAmountLabel } from '@/lib/gifts'
 import { CODE_LENGTH, normalizeCode } from '@/lib/redeem-code'
 import { getStocks } from '@/lib/server/catalog'
@@ -105,11 +106,13 @@ export async function toGiftViews(gifts: GiftRow[], viewer: UserRow | null): Pro
     const recipient = gift.recipient_id ? users.get(gift.recipient_id) : undefined
     const role = viewerRole(gift, viewer)
     const codeCard = gift.code_hash != null
-    const recipientLabel = codeCard
-      ? (recipient?.name ?? 'Anyone with the code')
-      : recipient?.handle
-        ? (recipient.name ?? `@${recipient.handle}`)
-        : maskEmail(gift.recipient_email ?? '')
+    const recipientLabel = match({ codeCard, recipient })
+      .with({ codeCard: true }, () => recipient?.name ?? 'Anyone with the code')
+      .with(
+        { recipient: { handle: P.string.minLength(1) } },
+        ({ recipient }) => recipient.name ?? `@${recipient.handle}`,
+      )
+      .otherwise(() => maskEmail(gift.recipient_email ?? ''))
 
     const items: GiftItemView[] = [...gift.gift_items]
       .sort((a, b) => (toUsd(b.usd_value) ?? 0) - (toUsd(a.usd_value) ?? 0))

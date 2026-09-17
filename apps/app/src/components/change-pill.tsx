@@ -1,4 +1,5 @@
 import clsx from 'clsx'
+import { match } from 'ts-pattern'
 
 /** Price change in green or red; market data only, never used for brand accents */
 export function ChangePill({ value, suffix }: { value: number; suffix?: string }) {
@@ -12,7 +13,10 @@ export function ChangePill({ value, suffix }: { value: number; suffix?: string }
         'bg-loss-wash text-loss': !flat && value < 0,
       })}
     >
-      {flat ? '' : value > 0 ? '+' : '−'}
+      {match({ flat, up: value > 0 })
+        .with({ flat: true }, () => '')
+        .with({ up: true }, () => '+')
+        .otherwise(() => '−')}
       {Math.abs(value).toFixed(1)}%{suffix ? ` ${suffix}` : ''}
     </span>
   )

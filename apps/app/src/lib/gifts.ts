@@ -1,3 +1,4 @@
+import { match } from 'ts-pattern'
 import { formatUsd } from '@/lib/format'
 
 /**
@@ -33,5 +34,8 @@ export function giftAmountLabel(usd: number | null, items: GiftAssetName[]): str
 export function giftContentsLabel(items: { isCash?: boolean }[]): string {
   const hasCash = items.some((item) => item.isCash)
   const hasStocks = items.some((item) => !item.isCash)
-  return hasCash && hasStocks ? 'stocks and cash' : hasCash ? 'cash' : 'stocks'
+  return match({ hasCash, hasStocks })
+    .with({ hasCash: true, hasStocks: true }, () => 'stocks and cash')
+    .with({ hasCash: true }, () => 'cash')
+    .otherwise(() => 'stocks')
 }
