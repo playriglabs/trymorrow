@@ -48,7 +48,7 @@ export function GiftRow({ gift, sent }: { gift: GiftView; sent: boolean }) {
         className={clsx(
           'shrink-0',
           isOpen
-            ? 'flex h-11 items-center rounded-button bg-orange px-4 text-[15px] font-medium text-white'
+            ? 'button-shiny flex h-11 items-center rounded-button bg-orange px-4 text-[15px] font-medium text-white'
             : 'rounded-link px-2.5 text-[13px]',
           {
             'bg-gain-wash text-gain': !isOpen && gift.status === 'claimed',

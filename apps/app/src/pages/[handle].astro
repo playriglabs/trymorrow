@@ -1,5 +1,6 @@
 ---
 import { ArrowRightIcon, GiftIcon, HeartIcon, LinkBreakIcon, LockIcon } from '@phosphor-icons/react'
+import { LinkButton } from '@/components/ui'
 import AppLayout from '@/layouts/app-layout.astro'
 import { HANDLE_PATTERN } from '@/lib/handles'
 import { MAX_NOTE } from '@/lib/notes'
@@ -202,16 +203,13 @@ if (cash != null) sendParams.set('cash', String(cash))
             )}
           </div>
 
-          <a
-            href={`/send?${sendParams.toString()}`}
-            class="mt-6 inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-button bg-orange px-4 py-3 font-sans text-[17px] font-medium text-white transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ink"
-          >
+          <LinkButton href={`/send?${sendParams.toString()}`} className="mt-6 w-full">
             <GiftIcon className="size-5 shrink-0" aria-hidden="true" />
             <span class="min-w-0 wrap-anywhere">
               {asking ? `Send it to ${firstName}` : `Send ${firstName} a gift`}
             </span>
             <ArrowRightIcon className="size-5 shrink-0" aria-hidden="true" />
-          </a>
+          </LinkButton>
           <p class="mt-3 flex items-center justify-center gap-1.5 text-[12px] text-stone">
             <LockIcon className="size-3.5 shrink-0" aria-hidden="true" /> Only {firstName} can open
             your gift
@@ -227,7 +225,7 @@ if (cash != null) sendParams.set('cash', String(cash))
         <p class="text-[14px] text-stone">This gift link isn’t taken. Grab it when you sign up.</p>
         <a
           href="/login"
-          class="mt-3 inline-flex h-14 w-full items-center justify-center rounded-button bg-orange px-5 font-sans text-[17px] font-medium text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ink"
+          class="button-shiny mt-3 inline-flex h-14 w-full items-center justify-center rounded-button bg-orange px-5 font-sans text-[17px] font-medium text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ink"
         >
           Get started
         </a>
