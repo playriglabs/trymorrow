@@ -8,6 +8,15 @@ export async function GET() {
   <url>
     <loc>${new URL('/', siteUrl).href}</loc>
   </url>
+  <url>
+    <loc>${new URL('/how-it-works', siteUrl).href}</loc>
+  </url>
+  <url>
+    <loc>${new URL('/privacy-policy', siteUrl).href}</loc>
+  </url>
+  <url>
+    <loc>${new URL('/terms-conditions', siteUrl).href}</loc>
+  </url>
 </urlset>
 `
   return new Response(body, { headers: { 'content-type': 'application/xml' } })
