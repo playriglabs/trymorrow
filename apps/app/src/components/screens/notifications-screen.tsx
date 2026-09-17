@@ -2,6 +2,7 @@ import {
   ArrowFatDownIcon,
   ArrowLineUpRightIcon,
   ArrowUUpLeftIcon,
+  BellIcon,
   ConfettiIcon,
   CurrencyDollarIcon,
   GearIcon,
@@ -15,7 +16,7 @@ import {
 import { useEffect } from 'react'
 import { match } from 'ts-pattern'
 import { withProviders } from '@/components/providers'
-import { Card, Loading, Screen } from '@/components/ui'
+import { Card, LinkButton, Loading, Screen } from '@/components/ui'
 import { useMarkNotificationsReadMutation, useNotificationsQuery } from '@/lib/client/queries'
 import { useSession } from '@/lib/client/session'
 import { formatDayLabel } from '@/lib/format'
@@ -95,10 +96,22 @@ function Notifications() {
           )),
     )
     .otherwise(() => (
-      <Card className="flex flex-col gap-2 p-5">
-        <h2 className="font-sans text-lg font-medium">You’re all caught up</h2>
-        <p className="text-[15px] text-stone">Gift moments land here.</p>
-      </Card>
+      <div className="flex flex-1 items-center justify-center py-12">
+        <div className="flex w-full max-w-sm flex-col items-center gap-3 text-center">
+          <span className="flex size-20 items-center justify-center rounded-full bg-orange-wash">
+            <BellIcon className="size-10 text-orange" weight="duotone" />
+          </span>
+          <h2 className="mt-2 font-sans text-2xl font-medium tracking-[-0.02em]">
+            You’re all caught up
+          </h2>
+          <p className="text-[15px] leading-[1.45] text-stone">
+            Gifts, trades and updates on your funds show up here.
+          </p>
+          <LinkButton href="/send" size="md" className="mt-2 w-full">
+            Send a gift
+          </LinkButton>
+        </div>
+      </div>
     ))
 
   return (
