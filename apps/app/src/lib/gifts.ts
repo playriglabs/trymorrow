@@ -12,16 +12,16 @@ export const MAX_GIFT_STOCKS = 3
 /** Each person gets their own gift and link, so one send can cover a few people */
 export const MAX_GIFT_RECIPIENTS = 5
 
-type GiftAssetName = { name: string; isCash?: boolean }
+type GiftAssetName = { name: string; ticker?: string; isCash?: boolean }
 
-/** "Nvidia", "Nvidia & Apple", "Nvidia, Apple & cash"; cash reads lowercase inside a name list */
+/** "NVDA", "NVDA & AAPL", "NVDA, AAPL & cash"; cash reads lowercase inside a name list */
 export function giftAssetsLabel(items: GiftAssetName[]): string {
-  const names = items.map((item) => (item.isCash ? 'cash' : item.name))
+  const names = items.map((item) => (item.isCash ? 'cash' : (item.ticker ?? item.name)))
   if (names.length <= 1) return names[0] ?? 'a gift'
   return `${names.slice(0, -1).join(', ')} & ${names.at(-1)}`
 }
 
-/** "$25 of Nvidia", "$25 in cash", "$25 of Nvidia & cash" — how a gift is named next to its value */
+/** "$25 of NVDA", "$25 in cash", "$25 of NVDA & cash" — how a gift is named next to its value */
 export function giftAmountLabel(usd: number | null, items: GiftAssetName[]): string {
   const value = formatUsd(usd ?? 0)
   if (items.length === 0) return value
