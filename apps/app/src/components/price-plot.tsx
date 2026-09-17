@@ -48,7 +48,7 @@ export function PricePlot({
     const node = frame.current
     if (!node) return
     const observer = new ResizeObserver(([entry]) => {
-      if (entry) setWidth(Math.max(200, Math.round(entry.contentRect.width)))
+      if (entry) setWidth(Math.max(1, Math.round(entry.contentRect.width)))
     })
     observer.observe(node)
     return () => observer.disconnect()
@@ -78,16 +78,64 @@ export function PricePlot({
 
   const activeCoord = geometry ? geometry.coords[hover ?? geometry.coords.length - 1] : undefined
 
-  const onPointer = (event: PointerEvent<SVGSVGElement>) => {
-    if (!geometry) return
+  const onPointer = (event: PointerEvent<HTMLDivElement>) => {
+    if (!geometry || pending || error || !event.isPrimary) return
     const bounds = event.currentTarget.getBoundingClientRect()
+    if (bounds.width <= 0) return
     const ratio = Math.min(1, Math.max(0, (event.clientX - bounds.left) / bounds.width))
     onHover(Math.round(ratio * (points.length - 1)))
   }
 
   return (
     <>
-      <div ref={frame} className="relative" style={{ height: HEIGHT }}>
+      <div
+        ref={frame}
+        className="relative w-full min-w-0 cursor-crosshair touch-pan-y touch-pinch-zoom select-none"
+        style={{ height: HEIGHT }}
+        role="slider"
+        aria-label={ariaLabel}
+        aria-orientation="horizontal"
+        aria-valuemin={0}
+        aria-valuemax={Math.max(0, points.length - 1)}
+        aria-valuenow={hover ?? Math.max(0, points.length - 1)}
+        aria-valuetext={formatUsd(points[hover ?? points.length - 1]?.price ?? null)}
+        aria-disabled={pending || Boolean(error) || !geometry}
+        tabIndex={!pending && !error && geometry ? 0 : -1}
+        onPointerDown={(event) => {
+          if (!geometry || pending || error || !event.isPrimary || event.button !== 0) return
+          event.currentTarget.setPointerCapture(event.pointerId)
+          onPointer(event)
+        }}
+        onPointerMove={onPointer}
+        onPointerUp={(event) => {
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId)
+          }
+          if (event.pointerType !== 'mouse') onHover(null)
+        }}
+        onPointerCancel={() => onHover(null)}
+        onPointerLeave={(event) => {
+          if (!event.currentTarget.hasPointerCapture(event.pointerId)) onHover(null)
+        }}
+        onLostPointerCapture={() => onHover(null)}
+        onBlur={() => onHover(null)}
+        onKeyDown={(event) => {
+          if (!geometry || pending || error) return
+          const index = hover ?? points.length - 1
+          const next = match(event.key)
+            .with('ArrowLeft', 'ArrowDown', () => Math.max(0, index - 1))
+            .with('ArrowRight', 'ArrowUp', () => Math.min(points.length - 1, index + 1))
+            .with('Home', () => 0)
+            .with('End', () => points.length - 1)
+            .otherwise(() => null)
+          if (next != null) {
+            event.preventDefault()
+            onHover(next)
+          } else if (event.key === 'Escape') {
+            onHover(null)
+          }
+        }}
+      >
         {match({ pending, error, geometry })
           .with({ pending: true }, () => (
             <div className="h-full animate-pulse rounded-card bg-orange-wash motion-reduce:animate-none" />
@@ -105,15 +153,12 @@ export function PricePlot({
           .with({ geometry: P.nonNullable }, ({ geometry: shape }) => (
             <>
               <svg
-                width={width}
+                width="100%"
                 height={HEIGHT}
                 viewBox={`0 0 ${width} ${HEIGHT}`}
-                className="block touch-pan-y overflow-visible"
-                role="img"
-                aria-label={ariaLabel}
-                onPointerMove={onPointer}
-                onPointerDown={onPointer}
-                onPointerLeave={() => onHover(null)}
+                preserveAspectRatio="none"
+                className="pointer-events-none block h-full w-full overflow-visible"
+                aria-hidden="true"
               >
                 <defs>
                   <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
@@ -184,7 +229,7 @@ export function PricePlot({
               onRangeChange(option)
               onHover(null)
             }}
-            className={clsx('h-9 rounded-link font-sans text-[13px] font-medium', {
+            className={clsx('h-11 rounded-link font-sans text-[13px] font-medium', {
               'bg-orange-wash text-ink': range === option,
               'text-stone': range !== option,
             })}
