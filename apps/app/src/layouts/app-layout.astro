@@ -24,9 +24,9 @@ const {
 } = Astro.props
 const url = new URL(Astro.url.pathname, PUBLIC_APP_URL).href
 const siteUrl = new URL('/', PUBLIC_APP_URL).href
-const imageUrl = new URL(image || '/og-image.png', siteUrl).href
-const width = imageWidth ?? (!image ? 1731 : undefined)
-const height = imageHeight ?? (!image ? 909 : undefined)
+const imageUrl = new URL(image || '/og-image.jpg', siteUrl).href
+const width = imageWidth ?? (!image ? 1200 : undefined)
+const height = imageHeight ?? (!image ? 630 : undefined)
 const structuredData = JSON.stringify({
   '@context': 'https://schema.org',
   '@graph': [
@@ -78,6 +78,7 @@ const structuredData = JSON.stringify({
     <meta property="og:description" content={description} />
     <meta property="og:url" content={url} />
     <meta property="og:image" content={imageUrl} />
+    {!image && <meta property="og:image:type" content="image/jpeg" />}
     <meta property="og:image:alt" content={imageAlt} />
     {width && <meta property="og:image:width" content={String(width)} />}
     {height && <meta property="og:image:height" content={String(height)} />}

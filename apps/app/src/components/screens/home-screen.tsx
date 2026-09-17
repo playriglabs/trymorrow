@@ -118,12 +118,12 @@ function House() {
           </div>
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
-              <h1
+              <h2
                 className="font-sans leading-[1.05] font-medium tracking-[-0.02em] break-all"
                 style={{ fontSize: balanceFontSize }}
               >
                 {balanceLabel}
-              </h1>
+              </h2>
               {portfolio.data?.stocksPnl24hUsd != null && !balanceHidden && (
                 <p
                   className={clsx('text-[14px] whitespace-nowrap', {
