@@ -414,13 +414,24 @@ export function useWithdrawFundMutation(fundId: string) {
 
 // Mutations
 
+/**
+ * Every profile mutation returns the full row, so it goes straight into the cache. Invalidating
+ * instead leaves the old profile in place while the refetch runs, and the app shell keeps its
+ * cache across pages: Home would read `onboarded: false` right after Finish and bounce back to
+ * onboarding for a frame.
+ */
+function useStoreProfile() {
+  const queryClient = useQueryClient()
+  return (profile: Profile) => queryClient.setQueriesData({ queryKey: ['profile'] }, profile)
+}
+
 export function useSyncProfileMutation() {
   const api = useApi()
-  const queryClient = useQueryClient()
+  const storeProfile = useStoreProfile()
   return useMutation({
     mutationFn: () =>
       api<{ profile: Profile }>('/api/me', { method: 'POST' }).then((data) => data.profile),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['profile'] }),
+    onSuccess: storeProfile,
   })
 }
 
@@ -433,19 +444,19 @@ export type ProfileUpdate = {
 
 export function useUpdateProfileMutation() {
   const api = useApi()
-  const queryClient = useQueryClient()
+  const storeProfile = useStoreProfile()
   return useMutation({
     mutationFn: (update: ProfileUpdate) =>
       api<{ profile: Profile }>('/api/me', { method: 'PATCH', body: update }).then(
         (data) => data.profile,
       ),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['profile'] }),
+    onSuccess: storeProfile,
   })
 }
 
 export function useUploadAvatarMutation() {
   const api = useApi()
-  const queryClient = useQueryClient()
+  const storeProfile = useStoreProfile()
   return useMutation({
     mutationFn: (photo: Blob) => {
       const form = new FormData()
@@ -454,7 +465,7 @@ export function useUploadAvatarMutation() {
         (data) => data.profile,
       )
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['profile'] }),
+    onSuccess: storeProfile,
   })
 }
 
