@@ -7,15 +7,35 @@ export default defineConfig({
   // Gift and profile links render on the server so chat apps get real previews
   output: 'server',
   prefetch: { defaultStrategy: 'hover' },
+  // Vite 8 answers the toolbar's `/@id/` script with 504 "Outdated Optimize Dep" on every page,
+  // even right after a clean start. The app never used the toolbar.
+  devToolbar: { enabled: false },
   adapter: vercel({ maxDuration: 120 }),
   integrations: [react()],
   vite: {
     plugins: [tailwindcss()],
-    // Every page is a client-only React island. Pre-bundle Privy's entry points up front so
-    // Vite does not discover `/solana` after the first page has already loaded and invalidate
-    // the main Privy chunk with a 504 "Outdated Optimize Dep" response.
+    // Every page is a client-only React island, and screens load lazily, so Vite's startup scan
+    // misses their dependencies. One found after the first page loads re-bundles everything and
+    // the page already running gets a 504 "Outdated Optimize Dep". List every package the
+    // browser imports so the bundle is complete before the first request.
     optimizeDeps: {
-      include: ['@privy-io/react-auth', '@privy-io/react-auth/solana'],
+      include: [
+        '@phosphor-icons/react',
+        '@privy-io/react-auth',
+        '@privy-io/react-auth/solana',
+        '@tanstack/react-query',
+        'clsx',
+        'ldrs/react',
+        'qrcode',
+        'react',
+        'react-confetti',
+        'react-dom',
+        'react-dom/client',
+        'react-easy-crop',
+        'react/jsx-dev-runtime',
+        'react/jsx-runtime',
+        'ts-pattern',
+      ],
     },
   },
   env: {
