@@ -1,3 +1,4 @@
+import { navigate } from 'astro:transitions/client'
 import { usePrivy } from '@privy-io/react-auth'
 import { useEffect } from 'react'
 import { useProfileQuery } from '@/lib/client/queries'
@@ -17,8 +18,9 @@ export function useSession({ required = true }: { required?: boolean } = {}) {
 
   useEffect(() => {
     if (!required || !ready) return
-    if (!authenticated) location.replace(`/login?next=${here()}`)
-    else if (me.data && !me.data.onboarded) location.replace(`/onboarding?next=${here()}`)
+    if (!authenticated) void navigate(`/login?next=${here()}`, { history: 'replace' })
+    else if (me.data && !me.data.onboarded)
+      void navigate(`/onboarding?next=${here()}`, { history: 'replace' })
   }, [required, ready, authenticated, me.data])
 
   const loaded = ready && (!authenticated || me.isSuccess || me.isError)

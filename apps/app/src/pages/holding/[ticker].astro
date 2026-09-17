@@ -1,5 +1,5 @@
 ---
-import HoldingScreen from '@/components/screens/holding-screen'
+import AppScreen from '@/components/app-screen'
 import AppLayout from '@/layouts/app-layout.astro'
 import { findStockByTicker } from '@/lib/server/catalog'
 
@@ -8,10 +8,11 @@ if (!stock) return Astro.redirect('/stocks')
 ---
 
 <AppLayout title={`Your ${stock.name} shares — Morrow`} image={stock.iconUrl}>
-  <HoldingScreen
+  <AppScreen
     client:only="react"
-    mint={stock.mint.toBase58()}
-    ticker={stock.ticker}
-    name={stock.name}
+    transition:persist="morrow-app"
+    screen="holding-screen"
+    screenProps={{ mint: stock.mint.toBase58(), ticker: stock.ticker, name: stock.name }}
+    routeKey={Astro.url.pathname + Astro.url.search}
   />
 </AppLayout>

@@ -1,3 +1,4 @@
+import { navigate } from 'astro:transitions/client'
 import { CaretDownIcon, CheckIcon, ShieldCheckIcon, XIcon } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { type ReactNode, useEffect, useState } from 'react'
@@ -110,8 +111,8 @@ function Onboarding() {
 
   useEffect(() => {
     if (!session.ready) return
-    if (!session.authenticated) location.replace('/login')
-    else if (session.profile?.onboarded) location.replace(next)
+    if (!session.authenticated) navigate('/login', { history: 'replace' })
+    else if (session.profile?.onboarded) navigate(next, { history: 'replace' })
     else if (session.profile) {
       setProfile(session.profile)
       setName((value) => value || session.profile?.name || '')
@@ -268,7 +269,9 @@ function Onboarding() {
           disabled={!name.trim() || !handleReady}
           loading={saving}
           onClick={() =>
-            save({ name: name.trim(), handle: cleanHandle }, () => location.replace(next))
+            save({ name: name.trim(), handle: cleanHandle }, () =>
+              navigate(next, { history: 'replace' }),
+            )
           }
         >
           Finish

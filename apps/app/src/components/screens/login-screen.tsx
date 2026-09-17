@@ -1,3 +1,4 @@
+import { navigate } from 'astro:transitions/client'
 import { CurrencyDollarIcon, EnvelopeIcon, WalletIcon } from '@phosphor-icons/react'
 import { useLoginWithOAuth, usePrivy } from '@privy-io/react-auth'
 import { useEffect, useState } from 'react'
@@ -39,7 +40,9 @@ function Login() {
     const next = safeNext(new URLSearchParams(location.search).get('next'))
     syncProfile(undefined, {
       onSuccess: (profile) =>
-        location.replace(profile.onboarded ? next : `/onboarding?next=${encodeURIComponent(next)}`),
+        navigate(profile.onboarded ? next : `/onboarding?next=${encodeURIComponent(next)}`, {
+          history: 'replace',
+        }),
       onError: () => setOauthError('We couldn’t load your account. Try again.'),
     })
   }, [ready, authenticated, wallet.ready, syncProfile])

@@ -1,8 +1,14 @@
 ---
-import AddCashScreen from '@/components/screens/add-cash-screen'
+import AppScreen from '@/components/app-screen'
 import AppLayout from '@/layouts/app-layout.astro'
 ---
 
 <AppLayout title="Add cash — Morrow">
-  <AddCashScreen client:only="react" />
+  <AppScreen
+    client:only="react"
+    transition:persist="morrow-app"
+    screen="add-cash-screen"
+    screenProps={{}}
+    routeKey={Astro.url.pathname + Astro.url.search}
+  />
 </AppLayout>

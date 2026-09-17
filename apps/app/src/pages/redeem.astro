@@ -1,8 +1,14 @@
 ---
-import RedeemScreen from '@/components/screens/redeem-screen'
+import AppScreen from '@/components/app-screen'
 import AppLayout from '@/layouts/app-layout.astro'
 ---
 
 <AppLayout title="Redeem a gift card — Morrow">
-  <RedeemScreen client:only="react" />
+  <AppScreen
+    client:only="react"
+    transition:persist="morrow-app"
+    screen="redeem-screen"
+    screenProps={{}}
+    routeKey={Astro.url.pathname + Astro.url.search}
+  />
 </AppLayout>

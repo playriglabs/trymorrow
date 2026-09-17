@@ -1,5 +1,5 @@
 ---
-import TradeScreen from '@/components/screens/trade-screen'
+import AppScreen from '@/components/app-screen'
 import AppLayout from '@/layouts/app-layout.astro'
 import { findStockByTicker } from '@/lib/server/catalog'
 
@@ -10,5 +10,11 @@ const side = Astro.url.searchParams.get('side') === 'sell' ? 'sell' : 'buy'
 ---
 
 <AppLayout title={`${stock.name} — Morrow`} image={stock.iconUrl}>
-  <TradeScreen client:only="react" ticker={stock.ticker} side={side} />
+  <AppScreen
+    client:only="react"
+    transition:persist="morrow-app"
+    screen="trade-screen"
+    screenProps={{ ticker: stock.ticker, side: side }}
+    routeKey={Astro.url.pathname + Astro.url.search}
+  />
 </AppLayout>

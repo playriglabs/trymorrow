@@ -18,6 +18,7 @@ export function TabBar({ active }: { active: Tab }) {
           <a
             key={href}
             href={href}
+            data-astro-prefetch="hover"
             aria-current={active === href ? 'page' : undefined}
             className={clsx(
               'flex h-12 flex-1 flex-col items-center justify-center gap-0.5 rounded-link text-[12px]',

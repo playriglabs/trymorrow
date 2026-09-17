@@ -1,7 +1,32 @@
 import { PUBLIC_PRIVY_APP_ID, PUBLIC_PRIVY_CLIENT_ID } from 'astro:env/client'
-import { PrivyProvider } from '@privy-io/react-auth'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { type ComponentType, type ReactNode, useState } from 'react'
+import { PrivyProvider, usePrivy } from '@privy-io/react-auth'
+import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query'
+import {
+  type ComponentType,
+  createContext,
+  type ReactNode,
+  useContext,
+  useEffect,
+  useState,
+} from 'react'
+import { Loading } from '@/components/ui'
+
+const ProviderScope = createContext(false)
+
+/** Private queries are shared across pages, but never across signed-in accounts. */
+function SessionCache({ children }: { children: ReactNode }) {
+  const { ready, authenticated, user } = usePrivy()
+  const queryClient = useQueryClient()
+  const identity = ready ? (authenticated ? user?.id : null) : undefined
+  const [account, setAccount] = useState<string | null | undefined>(undefined)
+  useEffect(() => {
+    if (identity === undefined || account === identity) return
+    queryClient.clear()
+    setAccount(identity)
+  }, [identity, account, queryClient])
+  if (identity === undefined || account !== identity) return <Loading />
+  return children
+}
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -30,14 +55,20 @@ export function Providers({ children }: { children: ReactNode }) {
         },
       }}
     >
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <QueryClientProvider client={queryClient}>
+        <ProviderScope.Provider value={true}>
+          <SessionCache>{children}</SessionCache>
+        </ProviderScope.Provider>
+      </QueryClientProvider>
     </PrivyProvider>
   )
 }
 
-/** Each Astro page mounts one island; this gives it Privy + React Query */
+/** Screens reuse the app shell; standalone mounts still get their own providers. */
 export function withProviders<P extends object>(Screen: ComponentType<P>) {
   return function WithProviders(props: P) {
+    const provided = useContext(ProviderScope)
+    if (provided) return <Screen {...props} />
     return (
       <Providers>
         <Screen {...props} />

@@ -1,6 +1,7 @@
 ---
 import '@/styles/global.css'
 import { PUBLIC_APP_URL } from 'astro:env/client'
+import { ClientRouter } from 'astro:transitions'
 import { InstallPrompt } from '@/components/install-prompt'
 
 type Props = {
@@ -63,6 +64,7 @@ const structuredData = JSON.stringify({
 <!doctype html>
 <html lang="en">
   <head>
+    <ClientRouter fallback="swap" />
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#fff7e9" />
@@ -110,7 +112,7 @@ const structuredData = JSON.stringify({
   </head>
   <body class="min-h-dvh bg-cream text-ink">
     <main class="mx-auto flex min-h-dvh w-full max-w-107.5 flex-col">
-      <InstallPrompt client:only="react" />
+      <InstallPrompt client:only="react" transition:persist="morrow-install" />
       <slot />
     </main>
     <script is:inline>

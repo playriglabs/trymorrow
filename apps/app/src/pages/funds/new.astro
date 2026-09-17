@@ -1,8 +1,14 @@
 ---
-import CreateFundScreen from '@/components/screens/create-fund-screen'
+import AppScreen from '@/components/app-screen'
 import AppLayout from '@/layouts/app-layout.astro'
 ---
 
 <AppLayout title="Start a fund — Morrow">
-  <CreateFundScreen client:only="react" />
+  <AppScreen
+    client:only="react"
+    transition:persist="morrow-app"
+    screen="create-fund-screen"
+    screenProps={{}}
+    routeKey={Astro.url.pathname + Astro.url.search}
+  />
 </AppLayout>

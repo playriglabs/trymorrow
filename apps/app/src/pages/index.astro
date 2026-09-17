@@ -1,9 +1,15 @@
 ---
-import HomeScreen from '@/components/screens/home-screen'
+import AppScreen from '@/components/app-screen'
 import AppLayout from '@/layouts/app-layout.astro'
 ---
 
 <AppLayout>
   <h1 class="sr-only">Morrow — Gift stocks and cash</h1>
-  <HomeScreen client:only="react" />
+  <AppScreen
+    client:only="react"
+    transition:persist="morrow-app"
+    screen="home-screen"
+    screenProps={{}}
+    routeKey={Astro.url.pathname + Astro.url.search}
+  />
 </AppLayout>

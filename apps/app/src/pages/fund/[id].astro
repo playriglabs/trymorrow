@@ -1,5 +1,5 @@
 ---
-import FundScreen from '@/components/screens/fund-screen'
+import AppScreen from '@/components/app-screen'
 import AppLayout from '@/layouts/app-layout.astro'
 import { formatUnlock } from '@/lib/funds'
 import { findStock } from '@/lib/server/catalog'
@@ -36,5 +36,11 @@ const description = found
 ---
 
 <AppLayout title={title} description={description} image={stocks[0]?.iconUrl}>
-  <FundScreen client:only="react" fundId={id} />
+  <AppScreen
+    client:only="react"
+    transition:persist="morrow-app"
+    screen="fund-screen"
+    screenProps={{ fundId: id }}
+    routeKey={Astro.url.pathname + Astro.url.search}
+  />
 </AppLayout>

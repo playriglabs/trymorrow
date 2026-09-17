@@ -6,6 +6,7 @@ import { defineConfig, envField } from 'astro/config'
 export default defineConfig({
   // Gift and profile links render on the server so chat apps get real previews
   output: 'server',
+  prefetch: { defaultStrategy: 'hover' },
   adapter: vercel({ maxDuration: 120 }),
   integrations: [react()],
   vite: {

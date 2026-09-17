@@ -1,8 +1,14 @@
 ---
-import NotificationSettingsScreen from '@/components/screens/notifications-settings-screen'
+import AppScreen from '@/components/app-screen'
 import AppLayout from '@/layouts/app-layout.astro'
 ---
 
 <AppLayout title="Notification settings — Morrow">
-  <NotificationSettingsScreen client:only="react" />
+  <AppScreen
+    client:only="react"
+    transition:persist="morrow-app"
+    screen="notifications-settings-screen"
+    screenProps={{}}
+    routeKey={Astro.url.pathname + Astro.url.search}
+  />
 </AppLayout>

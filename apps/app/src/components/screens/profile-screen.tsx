@@ -1,3 +1,4 @@
+import { navigate } from 'astro:transitions/client'
 import {
   ArrowLineUpRightIcon,
   CaretRightIcon,
@@ -88,7 +89,7 @@ function ProfilePage() {
         <Button
           variant="danger"
           size="sm"
-          onClick={() => session.logout().then(() => location.replace('/login'))}
+          onClick={() => session.logout().then(() => navigate('/login', { history: 'replace' }))}
         >
           <SignOutIcon className="size-4" />
           Sign out

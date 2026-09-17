@@ -1,6 +1,6 @@
 ---
 import { PUBLIC_APP_URL } from 'astro:env/client'
-import GiftScreen from '@/components/screens/gift-screen'
+import AppScreen from '@/components/app-screen'
 import AppLayout from '@/layouts/app-layout.astro'
 import { giftContentsLabel } from '@/lib/gifts'
 import { findGiftAsset } from '@/lib/server/catalog'
@@ -85,5 +85,11 @@ const image = found ? new URL(`/og/gift/${id}.png`, PUBLIC_APP_URL).href : undef
   imageHeight={found ? 630 : undefined}
   robots="noindex, follow"
 >
-  <GiftScreen client:only="react" giftId={id} />
+  <AppScreen
+    client:only="react"
+    transition:persist="morrow-app"
+    screen="gift-screen"
+    screenProps={{ giftId: id }}
+    routeKey={Astro.url.pathname + Astro.url.search}
+  />
 </AppLayout>
