@@ -102,7 +102,6 @@ function Onboarding() {
   const [step, setStep] = useState<1 | 2>(1)
   const [country, setCountry] = useState('ID')
   const [countryPickerOpen, setCountryPickerOpen] = useState(false)
-  const [notUs, setNotUs] = useState(false)
   const [terms, setTerms] = useState(false)
   const [name, setName] = useState('')
   const [handle, setHandle] = useState('')
@@ -135,17 +134,14 @@ function Onboarding() {
   const error = update.isError ? errorMessage(update.error) : null
 
   if (step === 1) {
-    const blocked = country === 'US'
     return (
       <Screen
         back="/login"
         footer={
           <Button
-            disabled={blocked || !notUs || !terms}
+            disabled={!terms}
             loading={saving}
-            onClick={() =>
-              save({ country, notUsPerson: true, acceptTerms: true }, () => setStep(2))
-            }
+            onClick={() => save({ country, acceptTerms: true }, () => setStep(2))}
           >
             Continue
           </Button>
@@ -156,7 +152,7 @@ function Onboarding() {
           <h1 className="font-sans text-[30px] leading-[1.12] font-medium tracking-[-0.02em]">
             One quick check
           </h1>
-          <p className="text-stone">Morrow isn’t available everywhere yet.</p>
+          <p className="text-stone">Tell us where you live, then you’re nearly in.</p>
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="country">Where do you live?</Label>
@@ -173,26 +169,19 @@ function Onboarding() {
             <CaretDownIcon aria-hidden className="size-5 text-stone" />
           </button>
         </div>
-        {blocked ? (
-          <Notice tone="warning">Morrow isn’t available in the United States yet.</Notice>
-        ) : (
-          <div className="flex flex-col divide-y divide-line rounded-card border border-line bg-surface px-4">
-            <Checkbox checked={notUs} onChange={setNotUs}>
-              I’m not a citizen or resident of the United States.
-            </Checkbox>
-            <Checkbox checked={terms} onChange={setTerms}>
-              I agree to the{' '}
-              <a href="/terms" className="underline">
-                Terms
-              </a>{' '}
-              and{' '}
-              <a href="/privacy" className="underline">
-                Privacy Policy
-              </a>
-              .
-            </Checkbox>
-          </div>
-        )}
+        <div className="flex flex-col divide-y divide-line rounded-card border border-line bg-surface px-4">
+          <Checkbox checked={terms} onChange={setTerms}>
+            I agree to the{' '}
+            <a href="https://trymorrow.money/terms-conditions" className="underline">
+              Terms
+            </a>{' '}
+            and{' '}
+            <a href="https://trymorrow.money/privacy-policy" className="underline">
+              Privacy Policy
+            </a>
+            .
+          </Checkbox>
+        </div>
         <Notice icon={<ShieldCheckIcon className="size-4.5 text-stone" />}>
           No ID or selfie needed. Your account and your money stay in your control.
         </Notice>

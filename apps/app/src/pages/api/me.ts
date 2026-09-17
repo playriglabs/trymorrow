@@ -1,5 +1,5 @@
 import { z } from 'astro/zod'
-import { conflict, forbidden, json, readBody, route } from '@/lib/server/http'
+import { conflict, json, readBody, route } from '@/lib/server/http'
 import { requirePrivyId } from '@/lib/server/privy'
 import { db, UNIQUE_VIOLATION } from '@/lib/server/supabase'
 import {
@@ -22,7 +22,6 @@ const updateSchema = z.object({
   name: z.string().trim().min(1).max(60).optional(),
   handle: z.string().trim().toLowerCase().regex(HANDLE_PATTERN).optional(),
   country: z.string().length(2).toUpperCase().optional(),
-  notUsPerson: z.literal(true).optional(),
   acceptTerms: z.literal(true).optional(),
 })
 
@@ -30,9 +29,6 @@ export const PATCH = route(async ({ request }) => {
   const user = await requireUser(request)
   const body = await readBody(request, updateSchema)
 
-  if (body.country === 'US') {
-    throw forbidden('Morrow isn’t available in the United States yet.', 'region_blocked')
-  }
   if (body.handle && RESERVED_HANDLES.has(body.handle)) {
     throw conflict('That gift link is taken. Try another.', 'handle_taken')
   }
@@ -41,7 +37,6 @@ export const PATCH = route(async ({ request }) => {
   if (body.name) patch.name = body.name
   if (body.handle) patch.handle = body.handle
   if (body.country) patch.country = body.country
-  if (body.notUsPerson) patch.not_us_person = true
   if (body.acceptTerms) patch.terms_accepted_at = new Date().toISOString()
 
   const { data, error } = await db
