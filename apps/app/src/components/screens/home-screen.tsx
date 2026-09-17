@@ -62,7 +62,7 @@ function HomeFunds({ funds }: { funds: FundCardView[] }) {
     >
       <div
         ref={track}
-        className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain scrollbar-none [&::-webkit-scrollbar]:hidden"
+        className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain"
         onScroll={(event) => {
           const container = event.currentTarget
           setActive(Math.round(container.scrollLeft / (container.clientWidth + 12)))

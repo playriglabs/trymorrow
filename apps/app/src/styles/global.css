@@ -8,6 +8,14 @@
   body {
     font-variant-numeric: tabular-nums;
   }
+
+  /* It's a phone app: nothing shows a scrollbar, scrolling itself is untouched */
+  * {
+    scrollbar-width: none;
+  }
+  *::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 /* Success moment: the circle pops in, the check draws itself, a soft ring ripples out */

@@ -100,7 +100,7 @@ function BuyList() {
         />
       </label>
 
-      <div className="scrollbar-none -mx-5 -mt-2 flex gap-2 overflow-x-auto px-5 pb-1 [&::-webkit-scrollbar]:hidden">
+      <div className="-mx-5 -mt-2 flex gap-2 overflow-x-auto px-5 pb-1">
         {[{ id: 'all' as const, label: 'All' }, ...STOCK_CATEGORIES].map((option) => (
           <button
             key={option.id}
@@ -149,7 +149,7 @@ function BuyList() {
                 : 'Nothing is down today in this category.'}
             </p>
           ) : (
-            <ol className="scrollbar-none -mx-5 flex gap-2 overflow-x-auto px-5 pb-1 [&::-webkit-scrollbar]:hidden">
+            <ol className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1">
               {movers[moverTab].map((stock, index) => (
                 <li key={stock.mint} className="shrink-0">
                   <a
