@@ -15,6 +15,7 @@ import { FundCard } from '@/components/fund-card'
 import { GiftRow } from '@/components/gift-row'
 import { byValue, HoldingRow } from '@/components/holding-row'
 import { withProviders } from '@/components/providers'
+import { PullIndicator, usePullToRefresh } from '@/components/pull-to-refresh'
 import { CashLogo, StockLogo } from '@/components/stock-logo'
 import { TabBar } from '@/components/tab-bar'
 import { Avatar, Card, LinkButton, Loading } from '@/components/ui'
@@ -133,6 +134,18 @@ function House() {
   const sent = useGiftsQuery('sent', { enabled })
   const feed = useNotificationsQuery({ enabled })
   const funds = useFundsQuery({ enabled })
+  // Everything home shows, so a pull brings the balance, stocks, gifts, funds and badge up to
+  // date. Not before sign-in settles: refetch ignores `enabled` and would go out without a session
+  const pullToRefresh = usePullToRefresh(async () => {
+    if (!enabled) return
+    await Promise.all([
+      portfolio.refetch(),
+      received.refetch(),
+      sent.refetch(),
+      feed.refetch(),
+      funds.refetch(),
+    ])
+  })
 
   const total = portfolio.data ? portfolio.data.cashUsd + portfolio.data.stocksUsd : null
   const shownTotal = useAnimatedNumber(total)
@@ -179,6 +192,7 @@ function House() {
 
   return (
     <div className="flex min-h-dvh flex-col">
+      <PullIndicator {...pullToRefresh} />
       <div className="flex flex-1 flex-col gap-6 px-5 pt-4 pb-6">
         <header
           className={clsx(
