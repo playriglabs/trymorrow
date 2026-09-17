@@ -5,12 +5,10 @@ import { vitePreprocess } from '@sveltejs/vite-plugin-svelte'
 const config = {
   preprocess: vitePreprocess(),
   kit: {
-    // Landing pages are static HTML at build time for SEO
-    adapter: adapter({
-      pages: 'build',
-      assets: 'build',
-      strict: true,
-    }),
+    // Landing pages are static HTML at build time for SEO. No options: the defaults write to
+    // `build` locally, and on Vercel any option turns off zero-config, which leaves the
+    // deployment empty
+    adapter: adapter(),
   },
 }
 

@@ -29,17 +29,19 @@ Program: needs the Solana CLI and Anchor 0.32.1. `pnpm build:program` uses platf
 
 ## Commands
 
-| Command              | Does                                                 |
-| -------------------- | ---------------------------------------------------- |
-| `pnpm dev`           | Run landing on :3000                                 |
-| `pnpm dev:app`       | Run the app on :4321                                 |
-| `pnpm generate`      | Static landing build to `apps/landing/build`         |
-| `pnpm build`         | Build all apps                                       |
-| `pnpm build:program` | Build the Anchor program and its IDL                 |
-| `pnpm test:program`  | Run the fund flow on a throwaway local validator     |
-| `pnpm typecheck`     | `svelte-check`, `astro check`, `tsc` across packages |
-| `pnpm lint`          | Biome check + Prettier check                         |
-| `pnpm format`        | Biome + Prettier write                               |
+| Command               | Does                                                 |
+| --------------------- | ---------------------------------------------------- |
+| `pnpm dev`            | Run landing on :3000                                 |
+| `pnpm dev:app`        | Run the app on :4321                                 |
+| `pnpm generate`       | Static landing build to `apps/landing/build`         |
+| `pnpm build`          | Build all apps                                       |
+| `pnpm deploy:app`     | Deploy the app to Vercel (preview; add `--prod`)     |
+| `pnpm deploy:landing` | Deploy landing to Vercel (preview; add `--prod`)     |
+| `pnpm build:program`  | Build the Anchor program and its IDL                 |
+| `pnpm test:program`   | Run the fund flow on a throwaway local validator     |
+| `pnpm typecheck`      | `svelte-check`, `astro check`, `tsc` across packages |
+| `pnpm lint`           | Biome check + Prettier check                         |
+| `pnpm format`         | Biome + Prettier write                               |
 
 ## How money moves
 

@@ -10,6 +10,8 @@
     "dev": "pnpm --filter @morrow/landing dev",
     "dev:app": "pnpm --filter @morrow/app dev",
     "build": "pnpm --filter './apps/*' build",
+    "deploy:app": "scripts/deploy.sh app",
+    "deploy:landing": "scripts/deploy.sh landing",
     "build:program": "cd programs && anchor build --no-idl -- --tools-version v1.51 && anchor idl build -o target/idl/morrow.json",
     "test:program": "pnpm --filter @morrow/sdk test:program",
     "generate": "pnpm --filter @morrow/landing build",
