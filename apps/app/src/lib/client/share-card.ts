@@ -435,12 +435,13 @@ async function renderGiftCard(
     ctx.save()
     ctx.beginPath()
     ctx.arc(iconX + 12, iconY + 12, 12, 0, Math.PI * 2)
-    ctx.fillStyle = content.isCash || !content.logo ? COLORS.cream : COLORS.surface
+    // Cash gets a solid orange tile so it stands out from company logos on the receipt
+    ctx.fillStyle = content.isCash ? COLORS.orange : content.logo ? COLORS.surface : COLORS.cream
     ctx.fill()
     ctx.clip()
     if (content.logo) ctx.drawImage(content.logo, iconX, iconY, 24, 24)
     else {
-      ctx.fillStyle = content.isCash ? COLORS.ink : COLORS.orange
+      ctx.fillStyle = content.isCash ? COLORS.white : COLORS.orange
       ctx.font = `500 ${content.isCash ? 17 : content.ticker.length > 4 ? 7 : 8}px ${SANS}`
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'

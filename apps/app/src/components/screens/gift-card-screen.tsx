@@ -314,7 +314,7 @@ function GiftCardScreen() {
               loading={create.isPending}
               onClick={createCard}
             >
-              {create.isPending ? 'Making…' : 'Make gift card'}
+              {create.isPending ? 'Making it…' : 'Make gift card'}
             </Button>
           </div>
         </>
