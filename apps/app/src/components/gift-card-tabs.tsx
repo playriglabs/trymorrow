@@ -17,7 +17,8 @@ export function GiftCardTabs({ active }: { active: 'create' | 'redeem' }) {
           className={clsx(
             'flex h-11 items-center justify-center rounded-link font-sans text-[15px] font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink',
             {
-              'bg-orange-wash text-ink': active === tab.key,
+              // Same orange glass as the active tab in the bottom bar
+              'glass-active text-white': active === tab.key,
               'text-stone hover:bg-orange-wash hover:text-ink': active !== tab.key,
             },
           )}
