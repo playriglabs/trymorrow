@@ -190,20 +190,25 @@ function GiftCardScreen() {
     return (
       <Screen title="Gift card" back="/profile">
         <GiftCardTabs active="create" />
-        <Card className="flex flex-col gap-3 p-5">
-          <h2 className="font-sans text-lg font-medium">You don’t have anything to gift yet</h2>
-          <p className="text-[15px] text-stone">
-            Gift cards are made from stocks or cash you own. Add one first, then come back here.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <LinkButton href="/buy" variant="soft" size="md">
+        <div className="flex flex-1 items-center justify-center py-12">
+          <div className="flex w-full max-w-sm flex-col items-center gap-3 text-center">
+            <span className="flex size-20 items-center justify-center rounded-full bg-orange-wash">
+              <GiftIcon className="size-10 text-orange" weight="duotone" />
+            </span>
+            <h2 className="mt-2 font-sans text-2xl font-medium tracking-[-0.02em]">
+              Nothing to gift yet
+            </h2>
+            <p className="text-[15px] leading-[1.45] text-stone">
+              Gift cards are made from stocks or cash you own. Add some first, then come back here.
+            </p>
+            <LinkButton href="/buy" size="md" className="mt-2 w-full">
               Buy stocks
             </LinkButton>
-            <LinkButton href="/add-cash" variant="ghost" size="md">
-              Add cash
+            <LinkButton href="/add-cash" variant="ghost" size="sm">
+              Or add cash
             </LinkButton>
           </div>
-        </Card>
+        </div>
       </Screen>
     )
   }
