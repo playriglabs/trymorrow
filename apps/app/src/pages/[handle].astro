@@ -1,6 +1,5 @@
 ---
-import { LinkBreakIcon } from '@phosphor-icons/react'
-import clsx from 'clsx'
+import { ArrowRightIcon, GiftIcon, HeartIcon, LinkBreakIcon, LockIcon } from '@phosphor-icons/react'
 import AppLayout from '@/layouts/app-layout.astro'
 import { HANDLE_PATTERN } from '@/lib/handles'
 import { MAX_NOTE } from '@/lib/notes'
@@ -60,66 +59,188 @@ if (cash != null) sendParams.set('cash', String(cash))
     person
       ? asking
         ? `${firstName} is asking for ${wish} on Morrow.`
-        : `Give ${name} a piece of a real company.`
+        : `Send ${name} a thoughtful gift of cash or shares on Morrow.`
       : 'No one has this gift link yet.'
   }
   image={asked?.iconUrl ?? photo ?? undefined}
 >
-  <div
-    class={clsx(
-      'flex flex-1 flex-col items-center justify-center px-5 py-10 text-center',
-      person && photo ? 'gap-6' : 'gap-2',
-    )}
-  >
+  <header class="flex items-center justify-between px-6 pt-6 pb-4">
+    <a
+      href="/"
+      aria-label="Morrow home"
+      class="flex min-h-11 items-center gap-2.5 rounded-link focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ink"
+    >
+      <img src="/favicon.svg" alt="" width="28" height="28" />
+      <span class="font-sans text-[23px] font-medium tracking-[-0.04em]">morrow</span>
+    </a>
+    <span class="hidden rounded-link border border-line px-3 py-1.5 text-[12px] text-stone min-[380px]:inline-flex">
+      A little giving. A lot of good.
+    </span>
+  </header>
+
+  <div class="flex flex-1 flex-col justify-center px-5 py-8 sm:py-12">
     {person ? (
-      <>
-        {photo ? (
-          <img src={photo} alt="" class="size-24 rounded-full object-cover" />
-        ) : (
-          <span class="flex size-24 items-center justify-center rounded-full bg-orange-wash font-sans text-[32px] font-medium">
-            {initials}
-          </span>
-        )}
-        <div class="flex flex-col gap-1">
-          <h1 class="font-sans text-[30px] leading-[1.15] font-medium tracking-[-0.02em] text-balance">
-            {asking ? `${firstName} would love ${wish}` : name}
-          </h1>
-          <p class="text-stone">@{person.handle}</p>
-          {note && <p class="text-stone">“{note}”</p>}
-        </div>
-        {asked && (
-          <div class="flex items-center gap-3 rounded-card border border-line bg-surface px-4 py-3">
-            <img
-              src={asked.iconUrl}
-              alt=""
-              width="36"
-              height="36"
-              class="size-9 rounded-full border border-line object-cover"
-            />
-            <span class="text-left">${asked.ticker}</span>
-          </div>
-        )}
-        <a
-          href={`/send?${sendParams.toString()}`}
-          class="inline-flex h-14 w-full items-center justify-center rounded-button bg-orange px-5 font-sans text-[17px] font-medium text-white"
+      <section
+        aria-labelledby="gift-heading"
+        class="rise-in overflow-hidden rounded-sheet border border-line bg-surface shadow-elevated"
+      >
+        <div
+          class="relative flex h-52 items-center justify-center overflow-hidden border-b border-line bg-orange-wash"
+          aria-hidden="true"
         >
-          {asking ? `Send it to ${firstName}` : `Send ${firstName} a gift`}
-        </a>
-      </>
+          <svg viewBox="0 0 360 208" class="h-full w-full" fill="none">
+            <circle cx="180" cy="114" r="87" fill="var(--color-cream)" />
+            <path
+              d="M58 62v16m-8-8h16M294 129v14m-7-7h14"
+              stroke="var(--color-orange)"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+            <circle cx="284" cy="54" r="4" fill="var(--color-sun)" />
+            <circle cx="79" cy="157" r="3" fill="var(--color-orange)" />
+            <path
+              d="m265 80 6-10m-183 43-8-5"
+              stroke="var(--color-stone)"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+            <g transform="rotate(-9 180 110)">
+              <rect x="108" y="68" width="150" height="114" rx="12" fill="var(--color-orange)" />
+              <rect
+                x="122"
+                y="34"
+                width="123"
+                height="121"
+                rx="10"
+                fill="var(--color-surface)"
+                stroke="var(--color-line)"
+              />
+              <path
+                d="M183 93s-25-15-25-29c0-12 17-16 25-4 8-12 25-8 25 4 0 14-25 29-25 29Z"
+                fill="var(--color-orange)"
+              />
+              <path
+                d="M160 111h46m-36 10h26"
+                stroke="var(--color-line)"
+                stroke-width="3"
+                stroke-linecap="round"
+              />
+              <path
+                d="m109 85 74 55 74-55v85c0 7-5 12-12 12H120c-7 0-12-5-12-12V85Z"
+                fill="var(--color-orange)"
+              />
+              <path
+                d="m109 171 56-44m92 44-56-44"
+                stroke="var(--color-cream)"
+                stroke-opacity=".4"
+                stroke-width="1.5"
+              />
+              <circle cx="183" cy="144" r="15" fill="var(--color-sun)" />
+              <path
+                d="m177 144 4 4 8-8"
+                stroke="var(--color-ink)"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </g>
+          </svg>
+          <span class="absolute right-4 bottom-4 flex items-center gap-1.5 rounded-link bg-surface px-3 py-1.5 text-[12px] text-stone">
+            <HeartIcon className="size-3.5" weight="fill" /> Made to make their day
+          </span>
+        </div>
+
+        <div class="flex flex-col items-center px-6 pt-7 pb-6 text-center">
+          {photo ? (
+            <img
+              src={photo}
+              alt=""
+              width="64"
+              height="64"
+              class="size-16 rounded-full border border-line object-cover"
+            />
+          ) : (
+            <span class="flex size-16 items-center justify-center rounded-full bg-orange-wash font-sans text-[24px] font-medium">
+              {initials}
+            </span>
+          )}
+          <h1
+            id="gift-heading"
+            class="mt-3 max-w-full font-sans text-[30px] leading-[1.15] font-medium tracking-[-0.02em] text-balance wrap-anywhere"
+          >
+            {name}
+          </h1>
+          <p class="mt-1 text-[14px] text-stone">@{person.handle}</p>
+
+          <div class="mt-6 w-full border-t border-line pt-5">
+            <h2 class="font-sans text-[22px] leading-tight font-medium tracking-[-0.02em] text-balance">
+              {asking ? `${firstName} would love ${wish}` : 'Make their day, your way.'}
+            </h2>
+            <p class="mt-2 text-[14px] leading-relaxed text-stone text-balance">
+              {asking
+                ? 'A little something they’ve been wishing for.'
+                : 'A little cash. A piece of a company. A thoughtful gift, just for them.'}
+            </p>
+            {note && (
+              <blockquote class="mt-4 rounded-button bg-cream px-4 py-3 text-[14px] text-stone wrap-anywhere">
+                “{note}”
+              </blockquote>
+            )}
+            {asked && (
+              <div class="mt-4 flex items-center justify-center gap-2.5 text-[14px]">
+                <img
+                  src={asked.iconUrl}
+                  alt=""
+                  width="28"
+                  height="28"
+                  class="size-7 rounded-full border border-line object-cover"
+                />
+                <span>
+                  {asked.name} <span class="text-stone">· ${asked.ticker}</span>
+                </span>
+              </div>
+            )}
+          </div>
+
+          <a
+            href={`/send?${sendParams.toString()}`}
+            class="mt-6 inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-button bg-orange px-4 py-3 font-sans text-[17px] font-medium text-white transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ink"
+          >
+            <GiftIcon className="size-5 shrink-0" aria-hidden="true" />
+            <span class="min-w-0 wrap-anywhere">
+              {asking ? `Send it to ${firstName}` : `Send ${firstName} a gift`}
+            </span>
+            <ArrowRightIcon className="size-5 shrink-0" aria-hidden="true" />
+          </a>
+          <p class="mt-3 flex items-center justify-center gap-1.5 text-[12px] text-stone">
+            <LockIcon className="size-3.5 shrink-0" aria-hidden="true" /> Only {firstName} can open
+            your gift
+          </p>
+        </div>
+      </section>
     ) : (
-      <>
+      <section class="flex flex-col items-center gap-3 rounded-sheet border border-line bg-surface px-6 py-10 text-center shadow-elevated">
         <span class="flex size-20 items-center justify-center rounded-full bg-orange-wash text-orange">
           <LinkBreakIcon className="size-10" weight="duotone" aria-hidden="true" />
         </span>
         <h1 class="font-sans text-[30px] font-medium tracking-[-0.02em]">No one’s here yet</h1>
-        <p class="text-stone">This gift link isn’t taken. Grab it when you sign up.</p>
+        <p class="text-[14px] text-stone">This gift link isn’t taken. Grab it when you sign up.</p>
         <a
           href="/login"
-          class="inline-flex h-14 w-full items-center mt-5 justify-center rounded-button bg-orange px-5 font-sans text-[17px] font-medium text-white"
+          class="mt-3 inline-flex h-14 w-full items-center justify-center rounded-button bg-orange px-5 font-sans text-[17px] font-medium text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ink"
         >
           Get started
         </a>
-      </>
+      </section>
     )}
   </div>
+
+  <footer class="px-6 pt-2 pb-7 text-center">
+    <a
+      href="/login"
+      class="mt-1 inline-flex min-h-11 items-center gap-1.5 rounded-link font-sans text-[13px] font-medium underline decoration-line underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ink"
+    >
+      Get your own Morrow gift link <ArrowRightIcon className="size-3.5" aria-hidden="true" />
+    </a>
+  </footer>
 </AppLayout>
