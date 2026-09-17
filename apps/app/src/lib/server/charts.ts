@@ -4,38 +4,25 @@ import { db } from '@/lib/server/supabase'
 import type { ChartRange, PriceChart, PricePoint } from '@/lib/types'
 
 /**
- * Price history from GeckoTerminal (free, keyless). The free tier allows only a handful of calls a
- * minute, so pools are cached in memory and every candle we fetch is kept in `price_candles`.
- * That cache is shared across serverless instances, answers while we're rate-limited, and lets
- * daily history grow past the six months the free tier will still hand back.
+ * Price history from Jupiter's chart API (keyless). Its candles are per share as people see it,
+ * with splits and dividends from the scaled-amount multiplier already folded in, so xStocks and
+ * PreStocks line up with the prices we show. Charts are still cached in memory and every candle is
+ * kept in `price_candles`, which is shared across serverless instances and answers while the
+ * source is rate-limited or down.
  */
-const GECKO_API = 'https://api.geckoterminal.com/api/v2/networks/solana'
-const POOL_CACHE_MS = 60 * 60_000
+const CHARTS_API = 'https://datapi.jup.ag/v2/charts'
 
-const STABLE_QUOTES = new Set([
-  'solana_EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', // USDC
-  'solana_Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB', // USDT
-])
-
-/** Only pools priced against real money give a clean USD history; meme pairs can be junk */
-const TRUSTED_QUOTES = new Set([
-  ...STABLE_QUOTES,
-  'solana_So11111111111111111111111111111111111111112', // SOL
-])
-
-/** A history whose latest price is this far from the market price is from a bad pool */
+/** A history whose latest price is this far from the market price is not to be trusted */
 const MAX_REFERENCE_GAP = 0.25
-const MAX_POOLS_TRIED = 3
 
 type RangeSpec = {
-  timeframe: 'minute' | 'hour' | 'day'
-  aggregate: number
+  interval: '15_MINUTE' | '1_HOUR' | '4_HOUR' | '12_HOUR' | '1_DAY'
   limit: number
   cacheMs: number
   /** Candle size as stored in `price_candles`, so ranges sharing a size share the rows */
   timeframeKey: string
   /**
-   * The range's real time span. Thin pools skip empty candles, so a fixed candle count can reach
+   * The range's real time span. Thin markets skip empty candles, so a fixed candle count can reach
    * much further back; cutting to the span keeps "1D" meaning the last 24 hours.
    */
   windowSeconds: number | null
@@ -46,48 +33,42 @@ const DAY = 24 * HOUR
 
 const RANGES: Record<ChartRange, RangeSpec> = {
   '1D': {
-    timeframe: 'minute',
-    aggregate: 15,
+    interval: '15_MINUTE',
     limit: 96,
     cacheMs: 60_000,
     timeframeKey: '15m',
     windowSeconds: DAY,
   },
   '3D': {
-    timeframe: 'hour',
-    aggregate: 1,
+    interval: '1_HOUR',
     limit: 72,
     cacheMs: 5 * 60_000,
     timeframeKey: '1h',
     windowSeconds: 3 * DAY,
   },
   '1W': {
-    timeframe: 'hour',
-    aggregate: 4,
+    interval: '4_HOUR',
     limit: 42,
     cacheMs: 10 * 60_000,
     timeframeKey: '4h',
     windowSeconds: 7 * DAY,
   },
   '1M': {
-    timeframe: 'hour',
-    aggregate: 12,
+    interval: '12_HOUR',
     limit: 60,
     cacheMs: 30 * 60_000,
     timeframeKey: '12h',
     windowSeconds: 30 * DAY,
   },
   '1Y': {
-    timeframe: 'day',
-    aggregate: 1,
+    interval: '1_DAY',
     limit: 365,
     cacheMs: 60 * 60_000,
     timeframeKey: '1d',
     windowSeconds: 365 * DAY,
   },
   ALL: {
-    timeframe: 'day',
-    aggregate: 1,
+    interval: '1_DAY',
     limit: 1000,
     cacheMs: 60 * 60_000,
     timeframeKey: '1d',
@@ -98,71 +79,35 @@ const RANGES: Record<ChartRange, RangeSpec> = {
 /** Sub-daily candles are only ever shown inside their window; daily ones are kept forever */
 const PRUNE_AFTER_WINDOWS = 2
 
-const pools = new Map<string, { addresses: string[]; at: number }>()
 const charts = new Map<string, { chart: PriceChart; at: number }>()
 
 class RateLimited extends Error {}
 
-async function gecko<T>(path: string): Promise<T> {
-  const response = await fetch(`${GECKO_API}${path}`, { headers: { accept: 'application/json' } })
-  if (response.status === 429) throw new RateLimited()
-  if (!response.ok) throw new Error(`GeckoTerminal ${response.status} for ${path}`)
-  return (await response.json()) as T
-}
+type ChartsResponse = { candles?: { time?: number; close?: number }[] }
 
-type PoolsResponse = {
-  data?: {
-    attributes: { address: string; reserve_in_usd: string | null }
-    relationships: { base_token: { data: { id: string } }; quote_token: { data: { id: string } } }
-  }[]
-}
-
-/** Pools where this stock is the base token against USDC/USDT/SOL, dollar pools first */
-async function poolsFor(mint: string): Promise<string[]> {
-  const cached = pools.get(mint)
-  if (cached && Date.now() - cached.at < POOL_CACHE_MS) return cached.addresses
-
-  const { data = [] } = await gecko<PoolsResponse>(`/tokens/${mint}/pools?page=1`)
-  const addresses = data
-    .filter(
-      (pool) =>
-        pool.relationships.base_token.data.id === `solana_${mint}` &&
-        TRUSTED_QUOTES.has(pool.relationships.quote_token.data.id),
-    )
-    // Dollar-quoted pools first: SOL pools convert through a second price and can be mispriced
-    .sort((a, b) => {
-      const aStable = STABLE_QUOTES.has(a.relationships.quote_token.data.id) ? 1 : 0
-      const bStable = STABLE_QUOTES.has(b.relationships.quote_token.data.id) ? 1 : 0
-      if (aStable !== bStable) return bStable - aStable
-      return Number(b.attributes.reserve_in_usd ?? 0) - Number(a.attributes.reserve_in_usd ?? 0)
-    })
-    .slice(0, MAX_POOLS_TRIED)
-    .map((pool) => pool.attributes.address)
-  if (addresses.length === 0) {
-    throw new HttpError(404, 'no_chart', 'There’s no price history for this stock yet.')
-  }
-
-  pools.set(mint, { addresses, at: Date.now() })
-  return addresses
-}
-
-type OhlcvResponse = { data?: { attributes: { ohlcv_list: number[][] } } }
-
-async function candles(pool: string, mint: string, spec: RangeSpec): Promise<PricePoint[]> {
+async function candles(mint: string, spec: RangeSpec): Promise<PricePoint[]> {
   const params = new URLSearchParams({
-    aggregate: String(spec.aggregate),
-    limit: String(spec.limit),
-    currency: 'usd',
-    token: mint,
+    interval: spec.interval,
+    to: String(Date.now()),
+    candles: String(spec.limit),
+    type: 'price',
+    quote: 'usd',
   })
-  const body = await gecko<OhlcvResponse>(`/pools/${pool}/ohlcv/${spec.timeframe}?${params}`)
+  const response = await fetch(`${CHARTS_API}/${mint}?${params}`, {
+    headers: { accept: 'application/json' },
+  })
+  if (response.status === 429) throw new RateLimited()
+  if (!response.ok) throw new Error(`Jupiter charts ${response.status} for ${mint}`)
+  const body = (await response.json()) as ChartsResponse
+
   const cutoff = spec.windowSeconds ? Date.now() / 1000 - spec.windowSeconds : 0
-  // Rows are [time, open, high, low, close, volume], newest first
-  return (body.data?.attributes.ohlcv_list ?? [])
-    .filter((row) => Number.isFinite(row[0]) && Number.isFinite(row[4]) && (row[4] as number) > 0)
-    .filter((row) => (row[0] as number) >= cutoff)
-    .map((row) => ({ t: row[0] as number, price: row[4] as number }))
-    .reverse()
+  return (body.candles ?? [])
+    .flatMap(({ time, close }) =>
+      typeof time === 'number' && typeof close === 'number' && close > 0 && time >= cutoff
+        ? [{ t: time, price: close }]
+        : [],
+    )
+    .sort((a, b) => a.t - b.t)
 }
 
 /** True when the latest price is close enough to the market price to trust the history */
@@ -217,7 +162,7 @@ async function storeCandles(mint: string, spec: RangeSpec, points: PricePoint[])
 
     // Sub-daily candles never show again once they leave their window; daily ones are the
     // long history we're accumulating, so they stay
-    if (spec.timeframe !== 'day' && spec.windowSeconds) {
+    if (spec.interval !== '1_DAY' && spec.windowSeconds) {
       await db
         .from('price_candles')
         .delete()
@@ -230,7 +175,7 @@ async function storeCandles(mint: string, spec: RangeSpec, points: PricePoint[])
   }
 }
 
-/** Fresh candles win, stored ones fill in what the free tier no longer reaches back to */
+/** Fresh candles win, stored ones fill in anything the source no longer reaches back to */
 function merge(stored: PricePoint[], fresh: PricePoint[]): PricePoint[] {
   const byTime = new Map(stored.map((point) => [point.t, point]))
   for (const point of fresh) byTime.set(point.t, point)
@@ -255,7 +200,7 @@ function toChart(
 
 /**
  * Ranges a day's worth of candles can honestly fill. 1D and 3D can't: the only intraday data
- * we can reach is the pool's, so a day with no pool trades stays a day with no chart.
+ * we can reach is on-chain trading, so a day with no trades stays a day with no chart.
  */
 const MARKET_FALLBACK_RANGES = new Set<ChartRange>(['1W', '1M', '1Y', 'ALL'])
 
@@ -269,8 +214,8 @@ export async function getPriceChart(
   const spec = RANGES[range]
 
   /**
-   * The pool had nothing to draw. The listed stock's daily closes are a real answer for the
-   * longer ranges, as long as this stock trades near the listed one — if the pool is miles off,
+   * Jupiter had nothing to draw. The listed stock's daily closes are a real answer for the
+   * longer ranges, as long as this stock trades near the listed one — if it is miles off,
    * the market's line next to our price would mislead rather than inform.
    */
   const fromMarket = async (): Promise<PriceChart | null> => {
@@ -299,14 +244,8 @@ export async function getPriceChart(
   }
 
   try {
-    let points: PricePoint[] | null = null
-    for (const pool of await poolsFor(mint)) {
-      const history = await candles(pool, mint, spec)
-      if (history.length >= 2 && matchesReference(history, referencePrice)) {
-        points = history
-        break
-      }
-    }
+    const history = await candles(mint, spec)
+    const points = history.length >= 2 && matchesReference(history, referencePrice) ? history : null
     if (!points) {
       // Don't remember a stale answer: the next request should try the pools again
       if (stored && storedIsSane) return { ...toChart(range, stored.points), stale: true }
@@ -322,7 +261,7 @@ export async function getPriceChart(
     if (error instanceof HttpError) throw error
     if (cached && cachedIsSane) return { ...cached.chart, stale: true }
     if (stored && storedIsSane) return { ...toChart(range, stored.points), stale: true }
-    // Rate-limited or the pool source is down: the listed stock still has a line to draw
+    // Rate-limited or the chart source is down: the listed stock still has a line to draw
     const market = await fromMarket()
     if (market) return remember(market.points, 'market')
     if (error instanceof RateLimited) {

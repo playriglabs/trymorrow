@@ -94,9 +94,9 @@ A fund is a long-term pot for someone ("Aisyah's college fund"): locked until a 
 - [ ] **Move Jupiter Ultra to Swap V2** (needs an API key). Parked 2026-09-15: Ultra is what carries
       gasless (JupiterZ), which the whole fee-with-fallback rule depends on, and Swap V2 has no
       gasless. Revisit with a key and a plan for the fee
-- [x] **Charts**: candles are cached in `price_candles`, shared across serverless instances, served
-      while rate-limited, and daily candles accumulate past the six months GeckoTerminal still
-      returns. 1Y still equals ALL until enough days have been collected
+- [x] **Charts**: candles come from Jupiter's chart API (per share, split-adjusted, full history)
+      and are cached in `price_candles`, shared across serverless instances and served while
+      rate-limited
 - [x] **Trade screen**: `?side=sell` opens at the full position
 - [ ] **Landing site** (`apps/landing`): basic homepage is in place; expand it into a full marketing page
 - [x] **PWA polish**: install prompt on Home (iOS gets the manual steps), offline shell via
