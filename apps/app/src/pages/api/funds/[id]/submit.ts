@@ -14,6 +14,7 @@ import {
   vaultBalances,
 } from '@/lib/server/funds'
 import { badRequest, forbidden, json, readBody, route } from '@/lib/server/http'
+import { captureServerEvent } from '@/lib/server/posthog'
 import {
   fundInstructions,
   morrowInstructionCount,
@@ -83,6 +84,12 @@ export const POST = route(async ({ params, request }) => {
       .select(FUND_COLUMNS)
       .single()
     if (error) throw error
+    await captureServerEvent({
+      request,
+      distinctId: viewer.privy_id,
+      event: 'fund_created',
+      properties: { source: 'api', allocation_count: Object.keys(fund.allocations).length },
+    })
     return json({ fund: await toFundView(data as FundRow, viewer) })
   }
 
@@ -134,6 +141,12 @@ export const POST = route(async ({ params, request }) => {
     }).catch((cause: unknown) =>
       console.error('Fund contribution notification failed', fund.id, cause),
     )
+    await captureServerEvent({
+      request,
+      distinctId: viewer.privy_id,
+      event: 'fund_contributed',
+      properties: { source: 'api', item_count: rows.length },
+    })
 
     return json({ fund: await toFundView(fund, viewer), signature })
   }
@@ -179,6 +192,12 @@ export const POST = route(async ({ params, request }) => {
       .select(FUND_COLUMNS)
       .single()
     if (error) throw error
+    await captureServerEvent({
+      request,
+      distinctId: viewer.privy_id,
+      event: 'fund_withdrawn',
+      properties: { source: 'api', item_count: asked.length, fund_emptied: emptied },
+    })
     return json({ fund: await toFundView(data as FundRow, viewer) })
   }
 

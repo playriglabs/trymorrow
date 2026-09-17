@@ -74,6 +74,7 @@ Server modules in `src/lib/server`:
 | `notify.ts`     | The only way into the feed: settings filter, insert, then push for what happened while away                                         |
 | `push.ts`       | Web push through VAPID; inert with no keys set, prunes subscriptions the browser dropped                                            |
 | `pnl.ts`        | Average-cost basis per stock from claimed gifts and `trade_fills`; no basis rather than a wrong one                                 |
+| `posthog.ts`    | Analytics events from the routes that moved money; no keys means a no-op, amounts only as bands, people only by Privy id            |
 
 ### Fund flow
 
@@ -110,6 +111,10 @@ The address must be on-curve and either unused or system-owned, so a pasted cash
 `renderShareCard` (`lib/client/share-card.ts`) draws every shareable image on a canvas: eyebrow, hero, subhero, a cream receipt of labelled rows, and a footer with a code to the sharer's handle page. It shares its module grid with `qr-code.tsx` through `qr-layout.ts`, so both codes look the same.
 
 **Every number on a card needs a label that says whose it is.** A bare percentage on a "Just bought" card reads as the sharer's return, and a fresh buy has none, so today's move goes in a row called "Today's move" rather than a pill. Gain and loss only work on the cream receipt; they don't pass AA on the orange panel.
+
+### Analytics
+
+PostHog, and only as much as it needs. The browser (`components/posthog.astro`) sends page views and unhandled errors; autocapture and session replay stay off because screens show balances, addresses and emails. Money events (`gift_sent`, `gift_claimed`, `gift_refunded`, `trade_completed`, `cashout_completed`, `fund_created`, `fund_contributed`, `fund_withdrawn`) come from the submit routes after the transaction lands, through `captureServerEvent`. Never send an email, handle, address or exact amount; use `usdBand`. Unset `PUBLIC_POSTHOG_PROJECT_TOKEN` or `PUBLIC_POSTHOG_HOST` turns it all off.
 
 ### Notifications
 

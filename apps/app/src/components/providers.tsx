@@ -12,6 +12,15 @@ import {
 import { match } from 'ts-pattern'
 import { Loading } from '@/components/ui'
 
+declare global {
+  interface Window {
+    posthog?: {
+      identify: (distinctId: string) => void
+      reset: () => void
+    }
+  }
+}
+
 const ProviderScope = createContext(false)
 
 /** Private queries are shared across pages, but never across signed-in accounts. */
@@ -28,6 +37,10 @@ function SessionCache({ children }: { children: ReactNode }) {
     queryClient.clear()
     setAccount(identity)
   }, [identity, account, queryClient])
+  useEffect(() => {
+    if (!ready || !authenticated || !user?.id) return
+    window.posthog?.identify(user.id)
+  }, [ready, authenticated, user?.id])
   if (identity === undefined || account !== identity) return <Loading />
   return children
 }

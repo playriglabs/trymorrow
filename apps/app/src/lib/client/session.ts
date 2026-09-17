@@ -11,7 +11,7 @@ const here = () => encodeURIComponent(location.pathname + location.search)
  * people who haven't finished setup go to onboarding.
  */
 export function useSession({ required = true }: { required?: boolean } = {}) {
-  const { ready, authenticated, logout } = usePrivy()
+  const { ready, authenticated, logout: logoutFromPrivy } = usePrivy()
   // Creates the wallet for accounts that ended up without one; the profile refetches once it exists
   const wallet = useEnsureWallet()
   const me = useProfileQuery(wallet.address, { enabled: ready && authenticated })
@@ -22,6 +22,11 @@ export function useSession({ required = true }: { required?: boolean } = {}) {
     else if (me.data && !me.data.onboarded)
       void navigate(`/onboarding?next=${here()}`, { history: 'replace' })
   }, [required, ready, authenticated, me.data])
+
+  const logout = async () => {
+    window.posthog?.reset()
+    await logoutFromPrivy()
+  }
 
   const loaded = ready && (!authenticated || me.isSuccess || me.isError)
   return {

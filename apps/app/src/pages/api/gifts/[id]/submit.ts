@@ -8,6 +8,7 @@ import { isFeeTransfer } from '@/lib/server/fees'
 import { GIFT_COLUMNS, type GiftRow, getGift, giftLabel, toGiftView } from '@/lib/server/gifts'
 import { badRequest, forbidden, json, readBody, route } from '@/lib/server/http'
 import { type NotificationInput, notify } from '@/lib/server/notify'
+import { captureServerEvent } from '@/lib/server/posthog'
 import {
   morrowActions,
   morrowInstructionCount,
@@ -101,6 +102,20 @@ export const POST = route(async ({ params, request }) => {
   if (error) throw error
 
   const sent = data as GiftRow
+  const event = match(action)
+    .with('createGift', 'createGiftCard', () => 'gift_sent')
+    .with('claimGift', 'claimGiftCard', () => 'gift_claimed')
+    .otherwise(() => 'gift_refunded')
+  await captureServerEvent({
+    request,
+    distinctId: viewer.privy_id,
+    event,
+    properties: {
+      source: 'api',
+      gift_type: gift.code_hash != null ? 'gift_card' : 'gift',
+      item_count: gift.gift_items.length,
+    },
+  })
   // The gift is on-chain by now, so nothing here may fail the request
   try {
     const label = await giftLabel(sent)

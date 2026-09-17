@@ -46,6 +46,16 @@ export default defineConfig({
         default: 'http://localhost:4321',
       }),
       PUBLIC_PRIVY_APP_ID: envField.string({ context: 'client', access: 'public' }),
+      PUBLIC_POSTHOG_PROJECT_TOKEN: envField.string({
+        context: 'client',
+        access: 'public',
+        optional: true,
+      }),
+      PUBLIC_POSTHOG_HOST: envField.string({
+        context: 'client',
+        access: 'public',
+        optional: true,
+      }),
       PUBLIC_PRIVY_CLIENT_ID: envField.string({
         context: 'client',
         access: 'public',

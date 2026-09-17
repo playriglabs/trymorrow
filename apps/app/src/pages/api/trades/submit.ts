@@ -5,6 +5,7 @@ import { findStock } from '@/lib/server/catalog'
 import { HttpError, json, readBody, route } from '@/lib/server/http'
 import type { UltraExecution } from '@/lib/server/jupiter'
 import { executeOrder } from '@/lib/server/jupiter'
+import { captureServerEvent } from '@/lib/server/posthog'
 import { db } from '@/lib/server/supabase'
 import { toUi, uiMultiplier } from '@/lib/server/tokens'
 import { assertTradeTransaction } from '@/lib/server/trades'
@@ -79,6 +80,12 @@ export const POST = route(async ({ request }) => {
     )
   }
   await recordFill(user, wallet, body.requestId, result).catch(() => undefined)
+  await captureServerEvent({
+    request,
+    distinctId: user.privy_id,
+    event: 'trade_completed',
+    properties: { source: 'api' },
+  })
   // The amount that really landed; adding to a fund moves exactly this into the vault
   return json({ signature: result.signature, outputAmountRaw: result.outputAmountResult ?? null })
 })

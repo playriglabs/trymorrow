@@ -6,6 +6,7 @@ import { CASHOUT_COLUMNS, type CashoutRow, getCashout, toCashoutView } from '@/l
 import { cashAccount, isFeeTransfer } from '@/lib/server/fees'
 import { badRequest, json, readBody, route } from '@/lib/server/http'
 import { notify } from '@/lib/server/notify'
+import { captureServerEvent, usdBand } from '@/lib/server/posthog'
 import {
   morrowInstructionCount,
   parseRelayedTransaction,
@@ -68,6 +69,12 @@ export const POST = route(async ({ request }) => {
 
   const sent = data as CashoutRow
   const view = toCashoutView(sent)
+  await captureServerEvent({
+    request,
+    distinctId: user.privy_id,
+    event: 'cashout_completed',
+    properties: { source: 'api', amount_band: usdBand(view.netUsd) },
+  })
   // The cash has moved by now, so nothing below may fail the request
   try {
     await notify([
