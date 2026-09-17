@@ -296,7 +296,7 @@ type FeeCandidate = {
   balance: bigint
   /** Base units the gifts themselves take */
   gifted: bigint
-  /** Jupiter's USD price per whole token, before any scaled-amount multiplier */
+  /** USD price per whole raw token, before any scaled-amount multiplier (`getTokenPrices`) */
   priceUsd: number | undefined
 }
 

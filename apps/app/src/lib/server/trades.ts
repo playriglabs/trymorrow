@@ -4,7 +4,7 @@ import { type PublicKey, VersionedTransaction } from '@solana/web3.js'
 import { findStock } from '@/lib/server/catalog'
 import { badRequest, HttpError } from '@/lib/server/http'
 import { getOrder, type UltraOrder } from '@/lib/server/jupiter'
-import { getPrices } from '@/lib/server/prices'
+import { getTokenPrices } from '@/lib/server/prices'
 import { toUi, uiMultiplier } from '@/lib/server/tokens'
 import { LOW_LIQUIDITY_USD } from '@/lib/stocks'
 import type { TradeQuote, TradeSide } from '@/lib/types'
@@ -97,7 +97,7 @@ export async function quoteTrade(
       allowPreview,
     ),
     uiMultiplier(stockMint),
-    getPrices([stockMint]),
+    getTokenPrices([stockMint]),
   ])
 
   const stockRaw = side === 'buy' ? order.outAmount : order.inAmount
@@ -109,7 +109,7 @@ export async function quoteTrade(
       ? toUi(order.otherAmountThreshold, stock.decimals, multiplier)
       : toUi(order.otherAmountThreshold, USDC.decimals)
 
-  // Compared per token unit (before the scaled-amount multiplier), like Jupiter's reference price.
+  // Compared per raw token (before the scaled-amount multiplier), against Jupiter's raw price.
   // The fee is taken out first: it's shown to people separately, and the check is about the
   // price itself (thin pools, bad fills), not what gasless trading costs on a small order.
   const reference = prices[stockMint]

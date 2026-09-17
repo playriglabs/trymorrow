@@ -143,9 +143,9 @@ export async function toFundView(fund: FundRow, viewer: UserRow | null): Promise
   const holdings: FundHoldingView[] = [...balances.entries()].flatMap(([mint, raw]) => {
     const stock = stockByMint.get(mint)
     if (!stock || raw === 0n) return []
-    // uiAmountString already applies the Token-2022 scaled amount, and prices are per unscaled
-    // token, so value is worked out on the raw balance instead.
-    const priceUsd = prices[mint]?.usdPrice ?? stock.priceUsd
+    // Balances here are raw, so they're valued at the raw token price. The catalog's price is per
+    // share, which is only the same thing for stocks without a scaled-amount multiplier.
+    const priceUsd = prices[mint]?.tokenPriceUsd ?? stock.priceUsd
     const tokens = Number(raw) / 10 ** stock.decimals
     return [
       {

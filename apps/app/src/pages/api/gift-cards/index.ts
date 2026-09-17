@@ -22,7 +22,7 @@ import {
   toGiftView,
 } from '@/lib/server/gifts'
 import { badRequest, forbidden, json, readBody, route } from '@/lib/server/http'
-import { getPrices } from '@/lib/server/prices'
+import { getTokenPrices } from '@/lib/server/prices'
 import { enforceRateLimit } from '@/lib/server/rate-limit'
 import { buildRelayedTransaction, relayer, tokenBalance } from '@/lib/server/solana'
 import { db } from '@/lib/server/supabase'
@@ -98,7 +98,7 @@ export const POST = route(async ({ request }) => {
     : null
   const prices =
     cashLeft < fee.raw && cashDeduction === null
-      ? await getPrices(items.filter((item) => !item.asset.isCash).map((item) => item.mint))
+      ? await getTokenPrices(items.filter((item) => !item.asset.isCash).map((item) => item.mint))
       : {}
   const plan = cashDeduction
     ? { asset: null, raws: [fee.raw] as bigint[] }

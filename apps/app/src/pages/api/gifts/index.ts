@@ -14,7 +14,7 @@ import {
 } from '@/lib/server/fees'
 import { GIFT_COLUMNS, GIFT_LIFETIME_DAYS, type GiftRow, toGiftViews } from '@/lib/server/gifts'
 import { badRequest, forbidden, json, readBody, route } from '@/lib/server/http'
-import { getPrices } from '@/lib/server/prices'
+import { getTokenPrices } from '@/lib/server/prices'
 import { enforceRateLimit } from '@/lib/server/rate-limit'
 import { resolveGiftRecipients } from '@/lib/server/recipients'
 import { buildRelayedTransaction, relayer, tokenBalance } from '@/lib/server/solana'
@@ -116,7 +116,7 @@ export const POST = route(async ({ request }) => {
     : null
   const prices =
     cashLeft < totalFee && cashDeductions === null
-      ? await getPrices(items.filter((item) => !item.asset.isCash).map((item) => item.mint))
+      ? await getTokenPrices(items.filter((item) => !item.asset.isCash).map((item) => item.mint))
       : {}
   const plan = cashDeductions
     ? { asset: null, raws: fees.map((fee) => fee.raw) }
