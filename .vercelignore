@@ -12,3 +12,6 @@
 **/.nitro/**
 programs/**
 .git/**
+**/.svelte-kit/**
+**/build/**
+.pnpm-store/**
