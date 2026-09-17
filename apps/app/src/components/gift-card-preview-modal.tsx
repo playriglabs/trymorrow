@@ -1,6 +1,7 @@
 import { XIcon } from '@phosphor-icons/react'
 import { type ReactNode, useEffect, useRef } from 'react'
 import { GiftCardPreview } from '@/components/gift-card-preview'
+import type { GiftCardContent } from '@/lib/client/share-card'
 
 export function GiftCardPreviewModal({
   amountUsd,
@@ -12,7 +13,7 @@ export function GiftCardPreviewModal({
   onClose,
 }: {
   amountUsd: number
-  contents: string[]
+  contents: GiftCardContent[]
   message?: string | null
   senderName: string
   code?: string

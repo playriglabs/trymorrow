@@ -2,6 +2,7 @@ import { CopyIcon } from '@phosphor-icons/react'
 import { useMemo, useState } from 'react'
 import { ShareCardPreview } from '@/components/share-card-preview'
 import { Button } from '@/components/ui'
+import type { GiftCardContent } from '@/lib/client/share-card'
 import { formatUsd } from '@/lib/format'
 import { formatCode } from '@/lib/redeem-code'
 
@@ -14,7 +15,7 @@ export function GiftCardPreview({
   code,
 }: {
   amountUsd: number
-  contents: string[]
+  contents: GiftCardContent[]
   message?: string | null
   senderName: string
   code?: string
@@ -32,7 +33,7 @@ export function GiftCardPreview({
       qrUrl: code ? `${location.origin}/redeem?code=${code}` : null,
       giftCard: {
         amount: formatUsd(amountUsd),
-        contents: JSON.parse(contentsKey) as string[],
+        contents: JSON.parse(contentsKey) as GiftCardContent[],
         message,
         senderName,
         code: code ? formatCode(code) : undefined,

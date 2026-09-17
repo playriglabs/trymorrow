@@ -62,11 +62,14 @@ function CardReady({ result, senderName }: { result: CreateGiftCardResult; sende
       rows: [],
       giftCard: {
         amount: formatUsd(gift.usdValue),
-        contents: gift.items.map((item) =>
-          item.isCash
+        contents: gift.items.map((item) => ({
+          text: item.isCash
             ? `${formatUsd(item.usdValue)} in cash`
             : `${formatUsd(item.usdValue)} of $${item.ticker}`,
-        ),
+          ticker: item.ticker,
+          isCash: item.isCash,
+          logoUrl: item.isCash ? null : `/api/stocks/${item.mint}/logo`,
+        })),
         message: gift.message,
         senderName,
         code: formatCode(code),
@@ -123,11 +126,7 @@ function CardReady({ result, senderName }: { result: CreateGiftCardResult; sende
         {previewOpen && (
           <GiftCardPreviewModal
             amountUsd={gift.usdValue ?? 0}
-            contents={gift.items.map((item) =>
-              item.isCash
-                ? `${formatUsd(item.usdValue)} in cash`
-                : `${formatUsd(item.usdValue)} of $${item.ticker}`,
-            )}
+            contents={shareInput.giftCard.contents}
             message={gift.message}
             senderName={senderName}
             code={code}
@@ -295,14 +294,29 @@ function GiftCardScreen() {
           {create.isError && (
             <p className="text-center text-[13px] text-loss">{errorMessage(create.error)}</p>
           )}
-          <Button
-            disabled={usd < MIN_GIFT_USD || !affordable(usd) || !feeSettled || feeBlocked}
-            loading={create.isPending}
-            onClick={createCard}
-          >
-            <GiftIcon className="size-5" />
-            {create.isPending ? 'Making your card…' : 'Make gift card'}
-          </Button>
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              variant="soft"
+              size="sm"
+              className="h-14 w-full"
+              aria-label="Preview gift card"
+              aria-haspopup="dialog"
+              aria-controls="gift-card-preview-modal"
+              onClick={() => setPreviewOpen(true)}
+            >
+              <GiftIcon className="size-5" />
+              Preview
+            </Button>
+            <Button
+              size="sm"
+              className="h-14 w-full"
+              disabled={usd < MIN_GIFT_USD || !affordable(usd) || !feeSettled || feeBlocked}
+              loading={create.isPending}
+              onClick={createCard}
+            >
+              {create.isPending ? 'Making…' : 'Make gift card'}
+            </Button>
+          </div>
         </>
       }
     >
@@ -487,24 +501,17 @@ function GiftCardScreen() {
         Anyone with the code can redeem it. Not redeemed in 30 days? It comes back to you.
       </Notice>
 
-      <Button
-        variant="soft"
-        aria-haspopup="dialog"
-        aria-controls="gift-card-preview-modal"
-        onClick={() => setPreviewOpen(true)}
-      >
-        <GiftIcon className="size-5" />
-        Preview gift card
-      </Button>
-
       {previewOpen && (
         <GiftCardPreviewModal
           amountUsd={Math.max(0, usd - feeFromCardUsd)}
-          contents={stocks.map((stock) =>
-            stock.isCash
+          contents={stocks.map((stock) => ({
+            text: stock.isCash
               ? `${formatUsd(cashReceivedUsd)} in cash`
               : `${formatShares(perStock / (stock.priceUsd ?? 1))} $${stock.ticker} shares`,
-          )}
+            ticker: stock.ticker,
+            isCash: stock.isCash,
+            logoUrl: stock.isCash ? null : `/api/stocks/${stock.mint}/logo`,
+          }))}
           message={message}
           senderName={session.profile?.name ?? 'you'}
           onClose={() => setPreviewOpen(false)}

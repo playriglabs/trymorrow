@@ -20,15 +20,22 @@ const COLORS = {
 const SANS = '"Aeonik", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif'
 const BODY = '"Pilat", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif'
 const TAGLINE = 'Give stocks and cash that grow'
-export const SHARE_CARD_RENDER_VERSION = '5'
+export const SHARE_CARD_RENDER_VERSION = '7'
 
 /** One line on the receipt sheet. `tone` colours the value; leave it off for plain facts */
 export type ShareCardRow = { label: string; value: string; tone?: 'gain' | 'loss' }
 
+export type GiftCardContent = {
+  text: string
+  ticker: string
+  isCash: boolean
+  logoUrl: string | null
+}
+
 export type ShareCardInput = {
   giftCard?: {
     amount: string
-    contents: string[]
+    contents: GiftCardContent[]
     message?: string | null
     senderName: string
     code?: string
@@ -335,12 +342,12 @@ async function renderGiftCard(
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('Canvas is not available')
   ctx.font = `400 14px ${BODY}`
-  const lines = (text: string) => {
+  const lines = (text: string, maxWidth = 280) => {
     const result: string[] = []
     for (const paragraph of text.split('\n')) {
       let line = ''
       for (const character of paragraph) {
-        if (ctx.measureText(line + character).width > 280 && line) {
+        if (ctx.measureText(line + character).width > maxWidth && line) {
           result.push(line)
           line = ''
         }
@@ -350,12 +357,26 @@ async function renderGiftCard(
     }
     return result
   }
-  const contents = card.contents.flatMap(lines)
+  const contents = await Promise.all(
+    card.contents.map(async (content) => {
+      const textLines = lines(content.text, 252)
+      let logo: HTMLImageElement | null = null
+      if (!content.isCash && content.logoUrl) {
+        try {
+          logo = await loadImage(content.logoUrl)
+        } catch {
+          // A missing logo should never prevent saving the gift card.
+        }
+      }
+      return { ...content, lines: textLines, height: Math.max(24, textLines.length * 21), logo }
+    }),
+  )
   const message = card.message?.trim() ? lines(card.message.trim()) : []
   const sender = lines(`From ${card.senderName}`)
   const sheetHeight =
     32 +
-    contents.length * 21 +
+    contents.reduce((total, content) => total + content.height, 0) +
+    Math.max(0, contents.length - 1) * 4 +
     (message.length ? 25 + message.length * 21 : 0) +
     12 +
     sender.length * 19
@@ -405,9 +426,28 @@ async function renderGiftCard(
   ctx.fillStyle = COLORS.ink
   ctx.font = `400 14px ${BODY}`
   let y = 206
-  for (const line of contents) {
-    ctx.fillText(line, 36, y)
-    y += 21
+  for (const [contentIndex, content] of contents.entries()) {
+    content.lines.forEach((line, index) => {
+      ctx.fillText(line, 72, y + index * 21)
+    })
+    const iconX = 36
+    const iconY = y - 17 + (content.height - 24) / 2
+    ctx.save()
+    ctx.beginPath()
+    ctx.arc(iconX + 12, iconY + 12, 12, 0, Math.PI * 2)
+    ctx.fillStyle = content.isCash || !content.logo ? COLORS.cream : COLORS.surface
+    ctx.fill()
+    ctx.clip()
+    if (content.logo) ctx.drawImage(content.logo, iconX, iconY, 24, 24)
+    else {
+      ctx.fillStyle = content.isCash ? COLORS.ink : COLORS.orange
+      ctx.font = `500 ${content.isCash ? 17 : content.ticker.length > 4 ? 7 : 8}px ${SANS}`
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(content.isCash ? '$' : content.ticker, iconX + 12, iconY + 12, 20)
+    }
+    ctx.restore()
+    y += content.height + (contentIndex < contents.length - 1 ? 4 : 0)
   }
   if (message.length) {
     ctx.strokeStyle = COLORS.line
