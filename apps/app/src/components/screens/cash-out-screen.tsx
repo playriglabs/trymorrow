@@ -476,7 +476,7 @@ function CashOut() {
 
       <div className="flex flex-col gap-2">
         <Label htmlFor="cashout-target">Where it goes</Label>
-        <div className="flex min-w-0 gap-2">
+        <div className="relative">
           <TextInput
             id="cashout-target"
             value={target}
@@ -485,12 +485,17 @@ function CashOut() {
             autoComplete="off"
             placeholder="Account address, @handle, or email"
             onChange={(event) => setTarget(event.target.value)}
-            className="min-w-0 flex-1 text-ellipsis font-body text-[14px] placeholder:text-[14px]"
+            className="text-ellipsis pr-26 font-body text-[14px] placeholder:text-[14px]"
           />
-          <Button variant="soft" size="sm" className="h-14 shrink-0 px-4" onClick={paste}>
-            <ClipboardIcon className="size-4.5" />
+          {/* Inset by 6px, so its corners follow the input's 16px ones */}
+          <button
+            type="button"
+            onClick={paste}
+            className="glass-soft absolute top-1.5 right-1.5 bottom-1.5 inline-flex cursor-pointer items-center gap-1.5 rounded-[10px] px-3 font-sans text-[14px] font-medium tracking-[-0.02em] text-ink transition-[filter] duration-150 hover:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+          >
+            <ClipboardIcon className="size-4" />
             Paste
-          </Button>
+          </button>
         </div>
         {isAddress ? null : <RecipientHint resolution={resolution} />}
       </div>
