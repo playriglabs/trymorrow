@@ -1,4 +1,9 @@
-import { ASSOCIATED_TOKEN_PROGRAM_ID, getAssociatedTokenAddressSync } from '@solana/spl-token'
+import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  createHarvestWithheldTokensToMintInstruction,
+  getAssociatedTokenAddressSync,
+  TOKEN_2022_PROGRAM_ID,
+} from '@solana/spl-token'
 import { type PublicKey, SystemProgram, TransactionInstruction } from '@solana/web3.js'
 import type { Buffer } from 'buffer'
 import { ArgWriter, uuidToBytes } from './encoding'
@@ -23,6 +28,9 @@ const readonly = (pubkey: PublicKey): Meta => ({ pubkey, isSigner: false, isWrit
 /** Owner-off-curve is allowed because vault owners are PDAs */
 const ata = (mint: PublicKey, owner: PublicKey, tokenProgram: PublicKey) =>
   getAssociatedTokenAddressSync(mint, owner, true, tokenProgram)
+
+/** Where a gift, gift card or fund (the PDA `owner`) keeps its shares of `mint` */
+export const vaultAddress = ata
 
 const programs = (tokenProgram: PublicKey): Meta[] => [
   readonly(tokenProgram),
@@ -318,4 +326,16 @@ export function closeFundInstruction(p: CloseFundParams): TransactionInstruction
     [signer(p.rentPayer, true), writable(findFundAddress(p.creator, p.fundId))],
     new ArgWriter(DISCRIMINATORS.closeFund, 0).done(),
   )
+}
+
+/**
+ * Moves transfer fees withheld in `sources` to the mint. Token-2022 won't close an account still
+ * holding withheld fees, so this goes before anything that closes a vault of a transfer-fee stock
+ * (PreStocks). Anyone may call it and it moves nothing but the withheld fees.
+ */
+export function harvestWithheldFeesInstruction(
+  mint: PublicKey,
+  sources: PublicKey[],
+): TransactionInstruction {
+  return createHarvestWithheldTokensToMintInstruction(mint, sources, TOKEN_2022_PROGRAM_ID)
 }

@@ -6,7 +6,7 @@ import {
 } from '@morrow/sdk'
 import { PublicKey } from '@solana/web3.js'
 import { findGiftAsset } from '@/lib/server/catalog'
-import { getGift } from '@/lib/server/gifts'
+import { getGift, giftHarvests } from '@/lib/server/gifts'
 import { badRequest, forbidden, json, route } from '@/lib/server/http'
 import { buildRelayedTransaction, relayer } from '@/lib/server/solana'
 import { requireUser, requireWallet } from '@/lib/server/users'
@@ -47,10 +47,17 @@ export const POST = route(async ({ params, request }) => {
   if (refunds.length === 0 && cardRefunds.length === 0)
     throw badRequest('This gift can’t be taken back right now.')
 
-  const transaction = await buildRelayedTransaction(
+  const harvests = await giftHarvests(
+    gift,
     gift.code_hash != null
-      ? cardRefunds.map(refundGiftCardInstruction)
-      : refunds.map(refundGiftInstruction),
+      ? cardRefunds.map((refund) => ({ ...refund, id: refund.cardId }))
+      : refunds.map((refund) => ({ ...refund, id: refund.giftId })),
   )
+  const transaction = await buildRelayedTransaction([
+    ...harvests,
+    ...(gift.code_hash != null
+      ? cardRefunds.map(refundGiftCardInstruction)
+      : refunds.map(refundGiftInstruction)),
+  ])
   return json({ transaction })
 })

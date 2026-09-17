@@ -1,10 +1,13 @@
 import { createHash } from 'node:crypto'
+import { findGiftAddress, findGiftCardAddress, vaultAddress } from '@morrow/sdk'
+import { PublicKey, type TransactionInstruction } from '@solana/web3.js'
 import { match, P } from 'ts-pattern'
 import { CASH_MINT, giftAmountLabel } from '@/lib/gifts'
 import { CODE_LENGTH, normalizeCode } from '@/lib/redeem-code'
 import { getStocks } from '@/lib/server/catalog'
 import { notFound } from '@/lib/server/http'
 import { avatarUrl, db } from '@/lib/server/supabase'
+import { harvestsBeforeClosing } from '@/lib/server/tokens'
 import type { UserRow } from '@/lib/server/users'
 import type { GiftItemView, GiftStatus, GiftView } from '@/lib/types'
 
@@ -14,6 +17,31 @@ export type GiftItemRow = {
   mint: string
   amount_raw: string
   usd_value: string | null
+}
+
+/** The on-chain gift, or gift card for a code gift, that holds this item */
+export function giftItemAddress(
+  gift: Pick<GiftRow, 'sender_wallet' | 'code_hash'>,
+  itemId: string,
+): PublicKey {
+  const sender = new PublicKey(gift.sender_wallet)
+  return gift.code_hash != null
+    ? findGiftCardAddress(sender, itemId)
+    : findGiftAddress(sender, itemId)
+}
+
+/** What has to run before a claim or refund closes these items' vaults (see `harvestsBeforeClosing`) */
+export function giftHarvests(
+  gift: Pick<GiftRow, 'sender_wallet' | 'code_hash'>,
+  items: { id: string; mint: PublicKey; tokenProgram: PublicKey }[],
+): Promise<TransactionInstruction[]> {
+  return harvestsBeforeClosing(
+    items.map(({ id, mint, tokenProgram }) => ({
+      mint,
+      tokenProgram,
+      vault: vaultAddress(mint, giftItemAddress(gift, id), tokenProgram),
+    })),
+  )
 }
 
 export type GiftRow = {

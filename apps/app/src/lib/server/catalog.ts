@@ -1,10 +1,18 @@
 import { type Asset, STOCKS, TOKEN_2022_PROGRAM, USDC } from '@morrow/sdk'
 import { PublicKey } from '@solana/web3.js'
 import { CASH_MINT } from '@/lib/gifts'
+import { transferFeeBps } from '@/lib/server/tokens'
 
 const VERIFIED_TOKENS_API = 'https://lite-api.jup.ag/tokens/v2/tag?query=verified'
+const PRESTOCKS_API = 'https://prestocks.com/api/prestocks'
 const LOGO_BASE = 'https://xstocks-metadata.backed.fi/logos/tokens'
 const CACHE_MS = 5 * 60_000
+
+/**
+ * PreStocks of companies that have since listed. Their public shares are already in the catalog as
+ * xStocks (SpaceX as SPCX, which xAI is now part of), and two prices for one company would confuse.
+ */
+const LISTED_PRESTOCKS = new Set(['SPACEX', 'XAI'])
 
 /** Friendlier names than the issuer's for the ones people see most */
 const NAME_OVERRIDES: Record<string, string> = {
@@ -13,11 +21,24 @@ const NAME_OVERRIDES: Record<string, string> = {
   NVDAx: 'Nvidia',
 }
 
+/** What we know about a private company from PreStocks, the issuer of its pre-IPO shares */
+export type PreIpoInfo = {
+  description: string | null
+  /** The company's value at the issuer's latest mark, not at our trading price */
+  valuationUsd: number | null
+  /** The issuer's mark for one share, to compare with what it trades at here */
+  markPriceUsd: number | null
+}
+
 export type StockAsset = Asset & {
   iconUrl: string
   priceUsd: number | null
   change24hPct: number | null
   liquidityUsd: number
+  /** Set for a private company's pre-IPO shares; null for listed stocks */
+  preIpo: PreIpoInfo | null
+  /** What the issuer keeps each time these shares move, in basis points; 0 for most stocks */
+  transferFeeBps: number
 }
 
 type JupiterToken = {
@@ -30,6 +51,16 @@ type JupiterToken = {
   usdPrice?: number | null
   liquidity?: number | null
   stats24h?: { priceChange?: number | null } | null
+}
+
+type PreStock = {
+  name: string
+  symbol: string
+  description?: string | null
+  image?: string | null
+  contract_address: string
+  markPrice?: number | null
+  markValuation?: number | null
 }
 
 type Catalog = { at: number; stocks: StockAsset[]; byMint: Map<string, StockAsset> }
@@ -51,6 +82,8 @@ const toStock = (token: JupiterToken): StockAsset => ({
   priceUsd: token.usdPrice ?? null,
   change24hPct: token.stats24h?.priceChange ?? null,
   liquidityUsd: token.liquidity ?? 0,
+  preIpo: null,
+  transferFeeBps: 0,
 })
 
 const builtIn = (): StockAsset[] =>
@@ -60,24 +93,86 @@ const builtIn = (): StockAsset[] =>
     priceUsd: null,
     change24hPct: null,
     liquidityUsd: 0,
+    preIpo: null,
+    transferFeeBps: 0,
   }))
+
+/** The issuer's list, or null when it's down; Jupiter's verified list still names the stocks */
+async function loadPreStocks(): Promise<Map<string, PreStock> | null> {
+  try {
+    const response = await fetch(PRESTOCKS_API, { headers: { accept: 'application/json' } })
+    if (!response.ok) throw new Error(`PreStocks responded ${response.status}`)
+    const list = (await response.json()) as PreStock[]
+    return new Map(list.map((item) => [item.contract_address, item]))
+  } catch (error) {
+    console.error('PreStocks list unavailable, using Jupiter alone', error)
+    return null
+  }
+}
+
+/** The issuer's copy ends with a paragraph about the token itself; only the company part is kept */
+const companyDescription = (description: string | null | undefined) =>
+  description?.split(/\n\s*\n/)[0]?.trim() || null
+
+const positive = (value: number | null | undefined) =>
+  typeof value === 'number' && value > 0 ? value : null
+
+async function toPreStock(token: JupiterToken, issuer: PreStock | undefined): Promise<StockAsset> {
+  const feeBps = await transferFeeBps(token.id).catch((error) => {
+    console.error('PreStocks transfer fee unavailable', token.symbol, error)
+    return 0
+  })
+  return {
+    symbol: token.symbol,
+    name: (issuer?.name ?? token.name).replace(/\s*PreStocks$/i, '').trim(),
+    ticker: token.symbol,
+    mint: new PublicKey(token.id),
+    decimals: token.decimals,
+    tokenProgram: TOKEN_2022_PROGRAM,
+    iconUrl: token.icon || issuer?.image || '',
+    priceUsd: token.usdPrice ?? null,
+    change24hPct: token.stats24h?.priceChange ?? null,
+    liquidityUsd: token.liquidity ?? 0,
+    preIpo: {
+      description: companyDescription(issuer?.description),
+      valuationUsd: positive(issuer?.markValuation),
+      markPriceUsd: positive(issuer?.markPrice),
+    },
+    transferFeeBps: feeBps,
+  }
+}
 
 async function load(): Promise<Catalog> {
   let stocks: StockAsset[]
   try {
-    const response = await fetch(VERIFIED_TOKENS_API)
+    const [response, preStocks] = await Promise.all([fetch(VERIFIED_TOKENS_API), loadPreStocks()])
     if (!response.ok) throw new Error(`Jupiter tokens responded ${response.status}`)
     const tokens = (await response.json()) as JupiterToken[]
+    const token2022 = TOKEN_2022_PROGRAM.toBase58()
     // Verified xStocks: issuer mint prefix, Token-2022, and the issuer's naming
     stocks = tokens
       .filter(
         (token) =>
           token.id.startsWith('Xs') &&
-          token.tokenProgram === TOKEN_2022_PROGRAM.toBase58() &&
+          token.tokenProgram === token2022 &&
           /xStock$/i.test(token.name),
       )
       .map(toStock)
     if (stocks.length === 0) stocks = builtIn()
+
+    // Verified PreStocks: on the issuer's list when we have it, otherwise the issuer's naming.
+    // Jupiter's verification is the gate either way, since that's where they trade.
+    const privateCompanies = tokens.filter(
+      (token) =>
+        token.tokenProgram === token2022 &&
+        !LISTED_PRESTOCKS.has(token.symbol.toUpperCase()) &&
+        (preStocks ? preStocks.has(token.id) : /PreStocks$/i.test(token.name)),
+    )
+    stocks.push(
+      ...(await Promise.all(
+        privateCompanies.map((token) => toPreStock(token, preStocks?.get(token.id))),
+      )),
+    )
   } catch (error) {
     console.error('xStocks catalog unavailable, using the built-in list', error)
     stocks = builtIn()
@@ -129,6 +224,8 @@ export function cashAsset(): GiftAsset {
     priceUsd: 1,
     change24hPct: null,
     liquidityUsd: 0,
+    preIpo: null,
+    transferFeeBps: 0,
     isCash: true,
   }
 }

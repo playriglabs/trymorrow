@@ -1,10 +1,16 @@
-import { type WithdrawParams, withdrawInstruction } from '@morrow/sdk'
+import {
+  findFundAddress,
+  vaultAddress,
+  type WithdrawParams,
+  withdrawInstruction,
+} from '@morrow/sdk'
 import { PublicKey } from '@solana/web3.js'
 import { MAX_WITHDRAWALS_PER_TRANSACTION } from '@/lib/funds'
 import { findStock } from '@/lib/server/catalog'
 import { getFund, vaultBalances } from '@/lib/server/funds'
 import { badRequest, forbidden, json, route } from '@/lib/server/http'
 import { buildRelayedTransaction, relayer } from '@/lib/server/solana'
+import { harvestsBeforeClosing } from '@/lib/server/tokens'
 import { requireUser, requireWallet } from '@/lib/server/users'
 
 /**
@@ -43,11 +49,15 @@ export const POST = route(async ({ params, request }) => {
 
   const batches: string[] = []
   for (let index = 0; index < withdrawals.length; index += MAX_WITHDRAWALS_PER_TRANSACTION) {
-    batches.push(
-      await buildRelayedTransaction(
-        withdrawals.slice(index, index + MAX_WITHDRAWALS_PER_TRANSACTION).map(withdrawInstruction),
-      ),
+    const batch = withdrawals.slice(index, index + MAX_WITHDRAWALS_PER_TRANSACTION)
+    const harvests = await harvestsBeforeClosing(
+      batch.map(({ mint, tokenProgram, creator, fundId }) => ({
+        mint,
+        tokenProgram,
+        vault: vaultAddress(mint, findFundAddress(creator, fundId), tokenProgram),
+      })),
     )
+    batches.push(await buildRelayedTransaction([...harvests, ...batch.map(withdrawInstruction)]))
   }
   return json({ transactions: batches })
 })

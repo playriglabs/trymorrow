@@ -8,7 +8,7 @@ import { PublicKey } from '@solana/web3.js'
 import { z } from 'astro/zod'
 import { normalizeCode } from '@/lib/redeem-code'
 import { findGiftAsset } from '@/lib/server/catalog'
-import { getGift, hashCode, isRedeemCode } from '@/lib/server/gifts'
+import { getGift, giftHarvests, hashCode, isRedeemCode } from '@/lib/server/gifts'
 import { badRequest, forbidden, json, readBody, route } from '@/lib/server/http'
 import { buildRelayedTransaction, relayer } from '@/lib/server/solana'
 import { requireUser, requireWallet } from '@/lib/server/users'
@@ -64,8 +64,15 @@ export const POST = route(async ({ params, request }) => {
   if (claims.length === 0 && cardClaims.length === 0)
     throw badRequest('This gift can’t be opened right now.')
 
-  const transaction = await buildRelayedTransaction(
-    codeCard ? cardClaims.map(claimGiftCardInstruction) : claims.map(claimGiftInstruction),
+  const harvests = await giftHarvests(
+    gift,
+    codeCard
+      ? cardClaims.map((claim) => ({ ...claim, id: claim.cardId }))
+      : claims.map((claim) => ({ ...claim, id: claim.giftId })),
   )
+  const transaction = await buildRelayedTransaction([
+    ...harvests,
+    ...(codeCard ? cardClaims.map(claimGiftCardInstruction) : claims.map(claimGiftInstruction)),
+  ])
   return json({ transaction })
 })

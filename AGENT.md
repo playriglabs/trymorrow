@@ -4,7 +4,7 @@ Read [README.md](./README.md) for setup, commands and env vars, [DESIGN.md](./DE
 
 ## Product in one paragraph
 
-Morrow is a mobile-first PWA for gifting tokenized stocks (xStocks) on Solana. A gift is locked to one recipient's wallet and only they can open it; unopened gifts go back to the sender after 30 days. People also buy and sell stocks with cash (USDC) through Jupiter. Built for the Solana Foundation Stocklana hackathon (deadline Fri 2026-09-18, 4pm ET), and meant to survive as a real product, so nothing should quietly cost us money.
+Morrow is a mobile-first PWA for gifting tokenized stocks (xStocks, plus PreStocks for private companies before they list) on Solana. A gift is locked to one recipient's wallet and only they can open it; unopened gifts go back to the sender after 30 days. People also buy and sell stocks with cash (USDC) through Jupiter. Built for the Solana Foundation Stocklana hackathon (deadline Fri 2026-09-18, 4pm ET), and meant to survive as a real product, so nothing should quietly cost us money.
 
 ## Rules that aren't negotiable
 
@@ -65,12 +65,12 @@ Server modules in `src/lib/server`:
 | `solana.ts`     | Relayer, `signRelayed` (simulate, size compute, sign), `sendRelayedTransaction` (resend loop), transaction parsing and verification |
 | `gifts.ts`      | Gift rows (`gift_items` embedded) to `GiftView`                                                                                     |
 | `fees.ts`       | Gift fee math, fee payment plan (cash, else shares), treasury accounts, fee transfer checks                                         |
-| `catalog.ts`    | xStocks list from Jupiter's verified tokens, 5-minute cache, name overrides                                                         |
+| `catalog.ts`    | xStocks and PreStocks from Jupiter's verified tokens (PreStocks cross-checked with their API), 5-minute cache, name overrides       |
 | `funds.ts`      | Fund rows, vault balances on-chain, `toFundView` (value, all-time change, contributors)                                             |
-| `prices.ts`     | Jupiter Price v3                                                                                                                    |
+| `prices.ts`     | Jupiter Price v3: `usdPrice` per share, `tokenPriceUsd` per raw token                                                               |
 | `jupiter.ts`    | Ultra `/order` and `/execute` (keyless `lite-api`), optional referral fee                                                           |
 | `trades.ts`     | Quotes, fair-price check (3%, fee excluded), fee-with-gasless-fallback, trade transaction checks                                    |
-| `charts.ts`     | GeckoTerminal OHLCV with pool selection and sanity checks, cached in `price_candles`                                                |
+| `charts.ts`     | Jupiter chart candles (per share, split-adjusted) with sanity checks, cached in `price_candles`                                     |
 | `notify.ts`     | The only way into the feed: settings filter, insert, then push for what happened while away                                         |
 | `push.ts`       | Web push through VAPID; inert with no keys set, prunes subscriptions the browser dropped                                            |
 | `pnl.ts`        | Average-cost basis per stock from claimed gifts and `trade_fills`; no basis rather than a wrong one                                 |
@@ -133,10 +133,20 @@ Everything goes through `notify()`. It reads `notification_settings` (no row mea
 ### Limits you'll hit
 
 - Solana transactions cap at 1,232 bytes and we use no lookup tables. Measured: 3 stocks + cash fee = 1,159 bytes, 3 stocks + share fee = 1,097, claim of 3 = 859, contribute of 3 = 732, withdraw of 2 = 690, withdraw of 4 = 924. That's why `MAX_GIFT_STOCKS` and `MAX_FUND_STOCKS` (the mix) are 3, a fund keeps at most `MAX_FUND_HOLDINGS` (6) stocks, and withdrawals go out `MAX_WITHDRAWALS_PER_TRANSACTION` (4) at a time. `pnpm test:program` fails if a full batch ever goes over the limit. Measure again (build the transaction and serialize it) before adding accounts to a gift transaction.
-- xStocks are Token-2022 with 8 decimals, a scaled UI amount multiplier, permanent delegate, pausable and an (unset) transfer hook. Jupiter prices are per unscaled token; convert with `toUi`/`uiMultiplier` in `tokens.ts` before showing shares. Use `TransferChecked` for Token-2022.
-- GeckoTerminal's free tier is ~8 calls a minute and about six months of history, so charts cache per range and serve stale copies on 429s.
+- xStocks are Token-2022 with 8 decimals, a scaled UI amount multiplier, permanent delegate, pausable and an (unset) transfer hook. Use `TransferChecked` for Token-2022.
+- Jupiter's `usdPrice` is per share, with the scaled UI multiplier applied (Netflix is ×10, OpenAI's PreStock ×1.49). Anything that works in raw amounts (fair-price check, fund vault values, share-paid fees) must use `tokenPriceUsd` from `getPriceData`/`getTokenPrices`. Convert raw balances to shares with `toUi`/`uiMultiplier`.
+- Charts come from `datapi.jup.ag/v2/charts` (keyless, undocumented), so they cache per range and serve stale copies on 429s or outages.
 - Jupiter Ultra is deprecated in favour of Swap V2 (API key). It still works keyless.
 - Gifts to an email must be opened by signing in with that email code. Google login creates a separate Privy user, so it won't see the gift.
+
+### PreStocks
+
+Tokenized pre-IPO shares (Anthropic, OpenAI, Kalshi…) from prestocks.com. They ride every existing flow (buy, sell, gift, gift card, fund) with no program change, but they differ from xStocks where it matters:
+
+- **9 decimals and a 0.5% Token-2022 transfer fee** on every move. A gift arrives about 1% lighter (fee on the way into the vault and on the way out), a fund withdrawal likewise. The UI says so on the send screen and the stock page; never promise a recipient the full amount.
+- **Vaults can't close while holding withheld fees** (`AccountHasWithheldTransferFees`). Every claim, refund, cron refund and withdrawal puts `harvestsBeforeClosing` (`tokens.ts`) in front, which adds a permissionless `HarvestWithheldTokensToMint` for transfer-fee mints only. `tokenTransfers` lets that instruction through and nothing else new. Any new flow that closes a vault needs the same.
+- `LISTED_PRESTOCKS` in `catalog.ts` hides companies that have since listed as xStocks (SpaceX, xAI).
+- `pnpm test:prestocks` runs gift, claim, refund and fund on a throwaway validator with a mint carrying the same fee, and asserts the recipient amounts to the unit. Measured: 3 PreStocks + cash fee = 1,171 bytes, withdrawing 3 with harvests = 828. The validator's Token-2022 lacks pausable and scaled UI, so those were covered by simulating create → harvest → claim/refund against the real mainnet mints (2026-09-17, all ok; without the harvest the claim fails).
 
 ## Don'ts
 

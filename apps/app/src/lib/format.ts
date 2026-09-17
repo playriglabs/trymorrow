@@ -15,6 +15,18 @@ export function formatUsdWhole(value: number): string {
   return wholeUsd.format(value)
 }
 
+const compactUsd = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  notation: 'compact',
+  maximumFractionDigits: 2,
+})
+
+/** Company-sized numbers: "$1.65T", "$38.96B" */
+export function formatUsdCompact(value: number): string {
+  return compactUsd.format(value)
+}
+
 /** A balance that rounds to nothing still isn't nothing: say so rather than printing "0" */
 export function formatShares(value: number): string {
   if (value > 0 && value < 0.00005) return '<0.0001'

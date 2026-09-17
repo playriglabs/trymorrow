@@ -19,7 +19,8 @@
     "lint": "biome check . && prettier --check .",
     "format": "biome check --write . && prettier --write .",
     "prepare": "test ! -e .git || lefthook install",
-    "test:gifts": "pnpm --filter @morrow/sdk test:gifts"
+    "test:gifts": "pnpm --filter @morrow/sdk test:gifts",
+    "test:prestocks": "pnpm --filter @morrow/sdk test:prestocks"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.13",

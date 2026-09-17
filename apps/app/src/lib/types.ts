@@ -35,6 +35,8 @@ export type Holding = {
   amount: number
   priceUsd: number | null
   valueUsd: number | null
+  /** What the issuer keeps each time these shares move, in percent; 0 for most stocks */
+  transferFeePct: number
   /** All-time cost basis (gift value + buys, minus what sells took out); null when unknown */
   costUsd: number | null
 }
@@ -76,6 +78,14 @@ export type Portfolio = {
 
 export type TradeSide = 'buy' | 'sell'
 
+/** A private company's pre-IPO shares, with the issuer's own numbers beside ours */
+export type PreIpoListing = {
+  /** What the issuer last valued the whole company at */
+  valuationUsd: number | null
+  /** The issuer's mark for one share, to compare with `priceUsd` */
+  markPriceUsd: number | null
+}
+
 export type StockListing = {
   mint: string
   symbol: string
@@ -91,6 +101,10 @@ export type StockListing = {
   /** Raw base units as a string (bigint-safe) */
   ownedRaw: string
   ownedValueUsd: number | null
+  /** Set for pre-IPO shares of a private company */
+  preIpo: PreIpoListing | null
+  /** What the issuer keeps each time these shares move, in percent; 0 for most stocks */
+  transferFeePct: number
 }
 
 export type StocksResponse = {

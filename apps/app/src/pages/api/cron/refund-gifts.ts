@@ -1,7 +1,5 @@
 import { CRON_SECRET } from 'astro:env/server'
 import {
-  findGiftAddress,
-  findGiftCardAddress,
   MORROW_PROGRAM_ID,
   type RefundGiftCardParams,
   type RefundGiftParams,
@@ -12,7 +10,13 @@ import { type AccountInfo, PublicKey } from '@solana/web3.js'
 import bs58 from 'bs58'
 import { CASH_MINT } from '@/lib/gifts'
 import { findGiftAsset } from '@/lib/server/catalog'
-import { GIFT_COLUMNS, type GiftRow, giftLabel } from '@/lib/server/gifts'
+import {
+  GIFT_COLUMNS,
+  type GiftRow,
+  giftHarvests,
+  giftItemAddress,
+  giftLabel,
+} from '@/lib/server/gifts'
 import { json, route, unauthorized } from '@/lib/server/http'
 import { notify } from '@/lib/server/notify'
 import {
@@ -50,13 +54,6 @@ type Settled = {
 }
 
 /** The address a gift's items live at: card PDAs for a code card, gift PDAs otherwise */
-function itemAddressOf(gift: GiftRow, itemId: string): PublicKey {
-  const sender = new PublicKey(gift.sender_wallet)
-  return gift.code_hash != null
-    ? findGiftCardAddress(sender, itemId)
-    : findGiftAddress(sender, itemId)
-}
-
 /**
  * How a fully closed gift actually settled, read off the last transaction to touch it. Claim and
  * refund settle every stock in one transaction, so the first item's history tells the whole story.
@@ -64,7 +61,7 @@ function itemAddressOf(gift: GiftRow, itemId: string): PublicKey {
 async function howGiftSettled(gift: GiftRow): Promise<Settled | null> {
   const [first] = gift.gift_items
   if (!first) return null
-  const target = itemAddressOf(gift, first.id)
+  const target = giftItemAddress(gift, first.id)
   const [entry] = await connection.getSignaturesForAddress(target, { limit: 1 })
   if (!entry || entry.err) return null
   const transaction = await connection.getParsedTransaction(entry.signature, {
@@ -199,7 +196,7 @@ export const GET = route(async ({ request }) => {
       const sender = new PublicKey(gift.sender_wallet)
       const codeCard = gift.code_hash != null
       const accounts = await connection.getMultipleAccountsInfo(
-        gift.gift_items.map((item) => itemAddressOf(gift, item.id)),
+        gift.gift_items.map((item) => giftItemAddress(gift, item.id)),
       )
       const open = gift.gift_items.filter((_, index) => accounts[index])
       if (open.length === 0) {
@@ -233,12 +230,19 @@ export const GET = route(async ({ request }) => {
         else refunds.push({ ...base, giftId: item.id })
       }
 
+      const harvests = await giftHarvests(
+        gift,
+        codeCard
+          ? cardRefunds.map((refund) => ({ ...refund, id: refund.cardId }))
+          : refunds.map((refund) => ({ ...refund, id: refund.giftId })),
+      )
       const signature = await sendRelayedTransaction(
-        await signRelayed(
-          codeCard
+        await signRelayed([
+          ...harvests,
+          ...(codeCard
             ? cardRefunds.map(refundGiftCardInstruction)
-            : refunds.map(refundGiftInstruction),
-        ),
+            : refunds.map(refundGiftInstruction)),
+        ]),
       )
       const { error: updateError } = await db
         .from('gifts')
@@ -285,7 +289,7 @@ export const GET = route(async ({ request }) => {
   const entries = (live as GiftRow[]).flatMap((gift) =>
     gift.gift_items.map((item) => ({
       gift,
-      address: itemAddressOf(gift, item.id),
+      address: giftItemAddress(gift, item.id),
     })),
   )
   const infos: (AccountInfo<Buffer> | null)[] = []

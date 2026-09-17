@@ -2,6 +2,7 @@ import { ShareIcon, ShieldCheckIcon, WarningIcon, XIcon } from '@phosphor-icons/
 import clsx from 'clsx'
 import { useEffect, useRef, useState } from 'react'
 import { match, P } from 'ts-pattern'
+import { PreIpoFacts } from '@/components/pre-ipo-facts'
 import { PriceChart } from '@/components/price-chart'
 import { withProviders } from '@/components/providers'
 import { StockAbout } from '@/components/stock-about'
@@ -417,6 +418,8 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
           />
           <Row label="Cash available" value={formatUsd(stocks.data?.cashUsd ?? 0)} />
         </Card>
+
+        <PreIpoFacts stock={stock} />
 
         <StockAbout mint={stock.mint} name={stock.name} />
       </Screen>

@@ -1,5 +1,6 @@
 /** Browsing categories for the stock list. Jupiter has no sectors, so tickers are mapped by hand */
 export const STOCK_CATEGORIES = [
+  { id: 'pre-ipo', label: 'Pre-IPO' },
   { id: 'ai', label: 'AI & chips' },
   { id: 'tech', label: 'Tech' },
   { id: 'fintech', label: 'Fintech & crypto' },
@@ -14,7 +15,8 @@ export const STOCK_CATEGORIES = [
 
 export type StockCategory = (typeof STOCK_CATEGORIES)[number]['id']
 
-const GROUPS: Record<Exclude<StockCategory, 'other'>, string[]> = {
+/** Pre-IPO shares are known by where they come from, not their ticker, so the catalog sets it */
+const GROUPS: Record<Exclude<StockCategory, 'other' | 'pre-ipo'>, string[]> = {
   ai: [
     'NVDA',
     'AMD',

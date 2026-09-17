@@ -2,6 +2,7 @@ import { MagnifyingGlassIcon } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { ChangePill } from '@/components/change-pill'
+import { PreIpoCarousel } from '@/components/pre-ipo-carousel'
 import { withProviders } from '@/components/providers'
 import { StockLogo } from '@/components/stock-logo'
 import { Card, Loading, Notice, Screen } from '@/components/ui'
@@ -32,6 +33,15 @@ function BuyList() {
           stock.ticker.toLowerCase().includes(search)),
     )
   }, [stocks.data, category, query])
+
+  // Most valuable first: the names people have heard of lead the carousel
+  const preIpo = useMemo(
+    () =>
+      (stocks.data?.stocks ?? [])
+        .filter((stock) => stock.preIpo)
+        .sort((a, b) => (b.preIpo?.valuationUsd ?? 0) - (a.preIpo?.valuationUsd ?? 0)),
+    [stocks.data],
+  )
 
   // Thin markets swing wildly on tiny trades, so they don't count as movers
   const [moverTab, setMoverTab] = useState<'gainers' | 'losers'>('gainers')
@@ -118,6 +128,10 @@ function BuyList() {
           </button>
         ))}
       </div>
+
+      {!query.trim() && (category === 'all' || category === 'pre-ipo') && (
+        <PreIpoCarousel stocks={preIpo} hrefFor={(stock) => tradeHref(stock.ticker)} />
+      )}
 
       {!query.trim() && (movers.gainers.length > 0 || movers.losers.length > 0) && (
         <section className="flex flex-col gap-3">
@@ -206,6 +220,11 @@ function BuyList() {
                   {stock.ownedShares > 0
                     ? `You own ${formatShares(stock.ownedShares)}`
                     : stock.ticker}
+                  {stock.preIpo && (
+                    <span className="rounded-link bg-orange-wash px-1.5 text-[11px] text-ink">
+                      Pre-IPO
+                    </span>
+                  )}
                   {stock.lowLiquidity && (
                     <span className="rounded-link bg-orange-wash px-1.5 text-[11px] text-ink">
                       Few trades

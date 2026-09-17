@@ -23,13 +23,18 @@ export const GET = route(async ({ request }) => {
         name: stock.name,
         ticker: stock.ticker,
         iconUrl: stock.iconUrl,
-        category: categoryFor(stock.ticker),
+        category: stock.preIpo ? 'pre-ipo' : categoryFor(stock.ticker),
         priceUsd: holding?.priceUsd ?? stock.priceUsd,
         change24hPct: stock.change24hPct,
         lowLiquidity: stock.liquidityUsd < LOW_LIQUIDITY_USD,
         ownedShares: holding?.amount ?? 0,
         ownedRaw: holding?.raw ?? '0',
         ownedValueUsd: holding?.valueUsd ?? null,
+        preIpo: stock.preIpo && {
+          valuationUsd: stock.preIpo.valuationUsd,
+          markPriceUsd: stock.preIpo.markPriceUsd,
+        },
+        transferFeePct: stock.transferFeeBps / 100,
       }
     })
 

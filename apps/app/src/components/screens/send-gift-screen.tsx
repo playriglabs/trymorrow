@@ -549,6 +549,15 @@ function SendGift() {
             )
             .otherwise(() => `${stocks.length} assets · ${formatUsd(perStock)} in each`)}
         </p>
+        {stocks
+          .filter((holding) => holding.transferFeePct > 0)
+          .map((holding) => (
+            <p key={holding.mint} className="text-[13px] text-stone">
+              PreStocks keeps {holding.transferFeePct}% each time {holding.name} shares move: once
+              when you send, once when they open it. They get about {holding.transferFeePct * 2}%
+              less than you send.
+            </p>
+          ))}
       </div>
 
       <div className="flex flex-col items-center gap-1">

@@ -292,10 +292,14 @@ export type TokenTransfer = {
 /** Instruction tags: `Transfer` is u8 tag + u64 amount, `TransferChecked` adds u8 decimals */
 const TRANSFER_TAG = 3
 const TRANSFER_CHECKED_TAG = 12
+/** Token-2022 transfer fee extension (26), `HarvestWithheldTokensToMint` (4), no arguments */
+const HARVEST_DATA = [26, 4]
 
 /**
  * The transfers the transaction runs through SPL Token or Token-2022, or null if it runs any other
  * instruction of theirs. Token-2022 only counts `TransferChecked`, which extensions require.
+ * Harvesting withheld transfer fees is let through and isn't a transfer: it has no signer, anyone
+ * can run it on-chain anyway, and it only moves fees the issuer already kept into the mint.
  */
 export function tokenTransfers(transaction: VersionedTransaction): TokenTransfer[] | null {
   const keys = transaction.message.staticAccountKeys
@@ -304,6 +308,14 @@ export function tokenTransfers(transaction: VersionedTransaction): TokenTransfer
     const program = keys[ix.programIdIndex]
     const classic = program?.equals(TOKEN_PROGRAM_ID)
     if (!program || !(classic || program.equals(TOKEN_2022_PROGRAM_ID))) continue
+
+    if (
+      !classic &&
+      ix.data.length === HARVEST_DATA.length &&
+      HARVEST_DATA.every((byte, index) => ix.data[index] === byte)
+    ) {
+      continue
+    }
 
     const [first, second, third, fourth] = ix.accountKeyIndexes.map((index) => keys[index])
     const amount = () => Buffer.from(ix.data).readBigUInt64LE(1)

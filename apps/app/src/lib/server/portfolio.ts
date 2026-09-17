@@ -49,6 +49,7 @@ export async function getPortfolio(walletAddress: string): Promise<Portfolio> {
       amount: cash?.amount ?? 0,
       priceUsd: 1,
       valueUsd: cash?.amount ?? 0,
+      transferFeePct: 0,
       costUsd: null,
     },
     ...ownedStockMints.flatMap((mint) => {
@@ -69,6 +70,7 @@ export async function getPortfolio(walletAddress: string): Promise<Portfolio> {
           amount: balance.amount,
           priceUsd,
           valueUsd: priceUsd == null ? null : balance.amount * priceUsd,
+          transferFeePct: stock.transferFeeBps / 100,
           costUsd: null,
         },
       ]
