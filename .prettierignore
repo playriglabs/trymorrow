@@ -14,8 +14,9 @@
 pnpm-lock.yaml
 node_modules
 dist
-.nuxt
+build
 .output
 .astro
+.svelte-kit
 .vercel
 target

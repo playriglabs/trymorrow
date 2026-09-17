@@ -2,9 +2,6 @@
 
 @import 'tailwindcss';
 
-/* Scan shared components; each app's own files are detected automatically */
-@source './components';
-
 @font-face {
   font-family: 'Pilat';
   src: url('./fonts/Pilat-Book.woff2') format('woff2');

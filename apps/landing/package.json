@@ -4,23 +4,23 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "nuxt dev --port 3000",
-    "build": "nuxt build",
-    "generate": "nuxt generate",
-    "preview": "nuxt preview",
-    "typecheck": "nuxt typecheck",
-    "postinstall": "nuxt prepare"
+    "dev": "vite dev --port 3000",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "postinstall": "svelte-kit sync"
   },
   "dependencies": {
-    "@morrow/ui": "workspace:*",
-    "@nuxtjs/robots": "6.2.2",
-    "@nuxtjs/sitemap": "8.5.1",
-    "nuxt": "4.5.2",
-    "vue": "3.5.42"
+    "@morrow/ui": "workspace:*"
   },
   "devDependencies": {
+    "@sveltejs/adapter-static": "^3.0.8",
+    "@sveltejs/kit": "^2.22.0",
+    "@sveltejs/vite-plugin-svelte": "^6.0.0",
     "@tailwindcss/vite": "4.3.3",
+    "svelte": "^5.35.0",
+    "svelte-check": "^4.2.0",
     "typescript": "5.9.3",
-    "vue-tsc": "3.3.11"
+    "vite": "^7.0.0"
   }
 }

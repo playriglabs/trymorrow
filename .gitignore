@@ -1,9 +1,11 @@
 node_modules
 dist
+build
 .nuxt
 .output
 .nitro
 .astro
+.svelte-kit
 .vercel
 .cache
 .data

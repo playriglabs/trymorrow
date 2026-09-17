@@ -98,7 +98,7 @@ A fund is a long-term pot for someone ("Aisyah's college fund"): locked until a 
       while rate-limited, and daily candles accumulate past the six months GeckoTerminal still
       returns. 1Y still equals ALL until enough days have been collected
 - [x] **Trade screen**: `?side=sell` opens at the full position
-- [ ] **Landing site** (`apps/landing`): it's an empty `index.vue`. Needs a real page, not a copy edit
+- [ ] **Landing site** (`apps/landing`): basic homepage is in place; expand it into a full marketing page
 - [x] **PWA polish**: install prompt on Home (iOS gets the manual steps), offline shell via
       `public/sw.js` with an `/offline` page, and web push. Gifts now write feed events at all
       (sent, received, opened, returned) and anything that happened while you were away also goes

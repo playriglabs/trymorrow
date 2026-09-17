@@ -12,7 +12,7 @@
     "build": "pnpm --filter './apps/*' build",
     "build:program": "cd programs && anchor build --no-idl -- --tools-version v1.51 && anchor idl build -o target/idl/morrow.json",
     "test:program": "pnpm --filter @morrow/sdk test:program",
-    "generate": "pnpm --filter @morrow/landing generate",
+    "generate": "pnpm --filter @morrow/landing build",
     "typecheck": "pnpm -r typecheck",
     "lint": "biome check . && prettier --check .",
     "format": "biome check --write . && prettier --write .",
@@ -24,8 +24,8 @@
     "lefthook": "2.1.12",
     "prettier": "3.9.6",
     "prettier-plugin-astro": "1.0.0",
+    "prettier-plugin-svelte": "3.4.0",
     "prettier-plugin-tailwindcss": "0.8.1",
-    "typescript": "5.9.3",
-    "vue-tsc": "3.3.11"
+    "typescript": "5.9.3"
   }
 }
