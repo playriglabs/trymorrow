@@ -1,1 +1,387 @@
 @import '@morrow/ui/styles.css';
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    min-width: 320px;
+  }
+  ::selection {
+    background: #fccc3c;
+    color: #1c1c1c;
+  }
+  a,
+  button {
+    -webkit-tap-highlight-color: transparent;
+  }
+  a:focus-visible,
+  button:focus-visible {
+    outline: 2px solid #1c1c1c;
+    outline-offset: 5px;
+  }
+}
+
+@layer components {
+  .section-title {
+    @apply font-sans text-[clamp(38px,4.7vw,64px)] leading-[1.03] tracking-[-0.055em];
+  }
+  .nav-link {
+    @apply flex min-h-11 items-center transition-colors hover:text-orange;
+  }
+  .cta {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    background-color: rgb(28 28 28 / 0.88);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    backdrop-filter: blur(16px) saturate(160%);
+    background-image: linear-gradient(
+      160deg,
+      rgb(255 255 255 / 0.22),
+      rgb(255 255 255 / 0.02) 45%,
+      rgb(255 255 255 / 0.1)
+    );
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.3),
+      inset 0 0 0 1px rgb(255 255 255 / 0.16),
+      inset 0 -3px 6px rgb(0 0 0 / 0.3),
+      0 12px 28px -10px rgb(28 28 28 / 0.55);
+    /* translate/scale, not transform: the hero intro animates transform, and a transform
+       transition here would make the button lag behind the rest of the intro. */
+    transition:
+      translate 0.25s ease,
+      scale 0.25s ease,
+      box-shadow 0.25s ease,
+      background-color 0.25s ease;
+  }
+  .cta:hover {
+    background-color: rgb(28 28 28 / 0.95);
+    translate: 0 -1px;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.38),
+      inset 0 0 0 1px rgb(255 255 255 / 0.2),
+      inset 0 -3px 6px rgb(0 0 0 / 0.3),
+      0 16px 34px -10px rgb(28 28 28 / 0.6);
+  }
+  .cta:active {
+    translate: 0 0;
+    scale: 0.98;
+    box-shadow:
+      inset 0 2px 5px rgb(0 0 0 / 0.35),
+      inset 0 0 0 1px rgb(255 255 255 / 0.12);
+  }
+  .btn-liquid {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    background-color: rgb(255 255 255 / 0.35);
+    -webkit-backdrop-filter: blur(14px) saturate(150%);
+    backdrop-filter: blur(14px) saturate(150%);
+    background-image: linear-gradient(
+      160deg,
+      rgb(255 255 255 / 0.6),
+      rgb(255 255 255 / 0.08) 45%,
+      rgb(255 255 255 / 0.25)
+    );
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.85),
+      inset 0 0 0 1px rgb(255 255 255 / 0.5),
+      inset 0 -2px 5px rgb(126 98 70 / 0.1),
+      0 10px 24px -10px rgb(76 40 6 / 0.35);
+    transition:
+      transform 0.25s ease,
+      box-shadow 0.25s ease;
+  }
+  .btn-liquid:hover {
+    transform: translateY(-1px);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.95),
+      inset 0 0 0 1px rgb(255 255 255 / 0.6),
+      inset 0 -2px 5px rgb(126 98 70 / 0.1),
+      0 14px 30px -10px rgb(76 40 6 / 0.4);
+  }
+  .btn-liquid:active {
+    transform: translateY(0) scale(0.98);
+    box-shadow:
+      inset 0 2px 5px rgb(126 98 70 / 0.18),
+      inset 0 0 0 1px rgb(255 255 255 / 0.4);
+  }
+  .action-words {
+    visibility: hidden;
+    opacity: 0;
+  }
+}
+
+@media (max-width: 767px) {
+  /* Full-size phone, centered by the markup and cropped by the hero box. No transform here:
+     the intro animation writes transform, so a transform rule only showed until it ran. */
+  .hero-screenshot {
+    top: 24px;
+  }
+  .hero-gift,
+  .hero-stock,
+  .hero-note {
+    display: none;
+  }
+  .together-stage {
+    height: auto;
+    min-height: 900px;
+  }
+  .together-canvas {
+    height: 900px;
+  }
+  .gather-one {
+    top: 5%;
+    left: 5%;
+    width: 205px;
+  }
+  .gather-two {
+    top: 7%;
+    right: 2%;
+    width: 212px;
+  }
+  .gather-three {
+    top: 66%;
+    left: 1%;
+    width: 205px;
+  }
+  .gather-four {
+    top: 67%;
+    right: 1%;
+    width: 215px;
+  }
+  .gather-five {
+    top: 82%;
+    left: 32%;
+    width: 232px;
+  }
+  .gather-card {
+    font-size: 12.5px;
+  }
+  .gather-card .text-4xl,
+  .gather-card .text-\[43px\] {
+    font-size: 34px;
+  }
+  .gather-card p.text-xs {
+    font-size: 11.5px;
+  }
+  .gather-card .mt-5 {
+    margin-top: 12px;
+  }
+  .gather-card .mt-6 {
+    margin-top: 14px;
+  }
+  .gather-card .mt-7 {
+    margin-top: 16px;
+  }
+}
+
+/* Portrait tablets (iPad, iPad Pro 13" at 1032, Surface Pro at 912): the desktop spots put cards over the heading,
+   so keep the middle band clear and the layout symmetric. Top cards sit below the nav. */
+@media (min-width: 768px) and (max-width: 1199px) and (orientation: portrait) {
+  .gather-one {
+    top: 15%;
+    left: 4%;
+  }
+  .gather-two {
+    top: 15%;
+    right: 4%;
+  }
+  .gather-three {
+    top: 63%;
+    left: 6%;
+  }
+  .gather-four {
+    top: 63%;
+    right: 6%;
+  }
+  .gather-five {
+    top: 9%;
+    /* Centered with calc, not translate, so the scroll animation still measures the real position. */
+    left: calc(50% - 117px);
+  }
+  /* A full-height stage on a 1376-1440px tall tablet leaves a big gap above the content,
+     so cap it by width; the pin still holds it at the top. */
+  .together-stage {
+    height: min(100svh, 110vw);
+  }
+  /* Bigger heading and closing words so the pinned screen isn't mostly empty. */
+  #together-title {
+    font-size: 11.5vw;
+  }
+  .action-word {
+    font-size: 13vw;
+  }
+  .action-word > span {
+    width: 8vw;
+    height: 8vw;
+    border-radius: 2.4vw;
+  }
+  .action-words > p {
+    font-size: 18px;
+  }
+}
+
+/* App tour below lg: pin the phone and show one caption at a time as the page scrolls.
+   Only once motion has started (.tour-live), so reduced motion keeps the stacked list. */
+@media (max-width: 1023px) {
+  #app-tour.tour-live {
+    height: 480svh;
+    padding-block: 0;
+  }
+  .tour-live .tour-pin {
+    position: sticky;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    height: 100svh;
+    padding-top: 96px;
+    padding-bottom: 24px;
+  }
+  .tour-live .tour-stage {
+    align-self: center;
+    width: auto;
+    /* What's left after the nav gap, heading, caption and bars. */
+    height: clamp(220px, calc(100svh - 380px), 550px);
+    aspect-ratio: 714 / 1454;
+  }
+  .tour-live .tour-intro {
+    display: none;
+  }
+  .tour-live .tour-list {
+    align-self: center;
+    width: 100%;
+    max-width: 22rem;
+  }
+  .tour-live .tour-steps {
+    display: grid;
+    margin-top: 0;
+  }
+  .tour-live .tour-step {
+    grid-area: 1 / 1;
+    transition:
+      opacity 0.4s ease,
+      translate 0.4s ease;
+  }
+  .tour-live .tour-step[data-active='false'] {
+    opacity: 0;
+    translate: 0 12px;
+    pointer-events: none;
+  }
+  .tour-live .tour-bars {
+    display: flex;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .tour-live .tour-pin {
+    padding-top: 116px;
+  }
+  .tour-live .tour-stage {
+    height: clamp(220px, calc(100svh - 400px), 550px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    /* biome-ignore lint/complexity/noImportantStyles: Accessibility preference must override animation utilities. */
+    animation: none !important;
+    /* biome-ignore lint/complexity/noImportantStyles: Accessibility preference must override transition utilities. */
+    transition: none !important;
+  }
+  .together-stage {
+    height: auto;
+    min-height: 900px;
+  }
+  .together-canvas {
+    height: 900px;
+  }
+  .action-words {
+    position: relative;
+    visibility: visible;
+    opacity: 1;
+    padding-block: 60px;
+  }
+}
+
+@property --app-border-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes app-border-orbit {
+  to {
+    --app-border-angle: 360deg;
+  }
+}
+
+@layer components {
+  /* Springy press feel for footer links: lift on hover, squish on press. */
+  .footer-pop {
+    transition:
+      transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+      box-shadow 0.35s ease;
+  }
+  .footer-pop:hover {
+    transform: translateY(-4px) scale(1.03);
+    box-shadow: 0 16px 30px -14px rgb(0 0 0 / 0.6);
+  }
+  .footer-pop:active {
+    transform: scale(0.95);
+    transition-duration: 0.12s;
+  }
+}
+
+@layer components {
+  .app-glow {
+    background: conic-gradient(
+      from var(--app-border-angle),
+      #fff7e9 0%,
+      #fff7e9 15%,
+      #ff77ed 23%,
+      #f50db4 29%,
+      #fff7e9 36%,
+      #fff7e9 62%,
+      #f66f00 72%,
+      #fccc3c 78%,
+      #fff7e9 87%
+    );
+    animation: app-border-orbit 4s linear infinite;
+    box-shadow: 0 0 12px rgb(245 13 180 / 0.12);
+  }
+  .app-glow:hover {
+    box-shadow: 0 0 18px rgb(245 13 180 / 0.3);
+  }
+}
+
+@layer components {
+  .nav-glass {
+    background-color: rgb(255 247 233 / 0.82);
+    background-image: linear-gradient(
+      135deg,
+      rgb(255 255 255 / 0.55),
+      rgb(255 255 255 / 0.06) 48%,
+      rgb(255 255 255 / 0.22)
+    );
+    border: 1px solid rgb(255 255 255 / 0.5);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.85),
+      inset 0 -1px 0 rgb(126 98 70 / 0.08),
+      0 8px 30px rgb(76 40 6 / 0.08);
+  }
+  @supports (backdrop-filter: blur(20px)) or (-webkit-backdrop-filter: blur(20px)) {
+    .nav-glass {
+      background-color: rgb(255 247 233 / 0.38);
+      -webkit-backdrop-filter: blur(20px) saturate(160%);
+      backdrop-filter: blur(20px) saturate(160%);
+    }
+  }
+}
