@@ -241,16 +241,20 @@
     padding-bottom: 24px;
   }
   .tour-live .tour-stage {
+    /* What's left after the nav gap, heading, caption and bars. The caption tucks into the
+       stage's bottom fade, so the phone can be wider than its full height allows: the crop
+       lands under the fade, and the width cap keeps at least ~80% of the screen in view. */
+    --tour-stage-height: clamp(220px, calc(100svh - 330px), 620px);
     align-self: center;
-    width: auto;
-    /* What's left after the nav gap, heading, caption and bars. */
-    height: clamp(220px, calc(100svh - 380px), 550px);
-    aspect-ratio: 714 / 1454;
+    width: min(80vw, 340px, calc(var(--tour-stage-height) * 0.6));
+    height: var(--tour-stage-height);
+    margin-bottom: -44px;
   }
   .tour-live .tour-intro {
     display: none;
   }
   .tour-live .tour-list {
+    position: relative;
     align-self: center;
     width: 100%;
     max-width: 22rem;
@@ -280,7 +284,7 @@
     padding-top: 116px;
   }
   .tour-live .tour-stage {
-    height: clamp(220px, calc(100svh - 400px), 550px);
+    --tour-stage-height: clamp(220px, calc(100svh - 350px), 620px);
   }
 }
 
