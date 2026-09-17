@@ -1,6 +1,15 @@
-import { BagIcon, BellIcon, EyeIcon, EyeSlashIcon, GiftIcon, PlusIcon } from '@phosphor-icons/react'
+import {
+  BagIcon,
+  BellIcon,
+  CaretLeftIcon,
+  CaretRightIcon,
+  EyeIcon,
+  EyeSlashIcon,
+  GiftIcon,
+  PlusIcon,
+} from '@phosphor-icons/react'
 import clsx from 'clsx'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { FundCard } from '@/components/fund-card'
 import { GiftRow } from '@/components/gift-row'
 import { byValue, HoldingRow } from '@/components/holding-row'
@@ -18,10 +27,100 @@ import {
 import { useSession } from '@/lib/client/session'
 import { formatUsd } from '@/lib/format'
 import { giftAssetsLabel } from '@/lib/gifts'
+import type { FundCardView } from '@/lib/types'
 
 /** Home shows the biggest handful; the rest live on their own page */
 const HOME_STOCKS = 7
 const BALANCE_HIDDEN_KEY = 'morrow:balance-hidden'
+
+function HomeFunds({ funds }: { funds: FundCardView[] }) {
+  const track = useRef<HTMLDivElement>(null)
+  const [active, setActive] = useState(0)
+  const current = Math.min(active, Math.max(0, funds.length - 1))
+
+  const show = (index: number) => {
+    const container = track.current
+    const card = container?.children[index] as HTMLElement | undefined
+    const first = container?.children[0] as HTMLElement | undefined
+    if (!container || !card || !first) return
+    container.scrollTo({
+      left: card.offsetLeft - first.offsetLeft,
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        ? 'instant'
+        : 'smooth',
+    })
+  }
+
+  if (funds.length <= 1) return funds[0] ? <FundCard fund={funds[0]} /> : null
+
+  return (
+    <section
+      className="flex min-w-0 flex-col gap-2"
+      aria-roledescription="carousel"
+      aria-label="Your funds"
+    >
+      <div
+        ref={track}
+        className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        onScroll={(event) => {
+          const container = event.currentTarget
+          setActive(Math.round(container.scrollLeft / (container.clientWidth + 12)))
+        }}
+      >
+        {funds.map((fund, index) => (
+          <article
+            key={fund.id}
+            className="w-full shrink-0 snap-center"
+            aria-roledescription="slide"
+            aria-label={`${index + 1} of ${funds.length}`}
+          >
+            <FundCard fund={fund} />
+          </article>
+        ))}
+      </div>
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          aria-label="Previous fund"
+          disabled={current === 0}
+          onClick={() => show(current - 1)}
+          className="flex size-11 items-center justify-center rounded-full text-stone hover:bg-orange-wash focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-30"
+        >
+          <CaretLeftIcon className="size-4" aria-hidden />
+        </button>
+        <div className="flex min-w-0 flex-wrap items-center justify-center">
+          {funds.map((fund, index) => (
+            <button
+              key={fund.id}
+              type="button"
+              aria-label={`Show ${fund.name}`}
+              aria-current={index === current ? 'true' : undefined}
+              onClick={() => show(index)}
+              className="flex size-11 items-center justify-center rounded-link focus-visible:outline-2 focus-visible:outline-ink"
+            >
+              <span
+                className={clsx(
+                  'h-1.5 rounded-full transition-[width] motion-reduce:transition-none',
+                  index === current ? 'w-4 bg-orange' : 'w-1.5 bg-line',
+                )}
+                aria-hidden
+              />
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          aria-label="Next fund"
+          disabled={current === funds.length - 1}
+          onClick={() => show(current + 1)}
+          className="flex size-11 items-center justify-center rounded-full text-stone hover:bg-orange-wash focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-30"
+        >
+          <CaretRightIcon className="size-4" aria-hidden />
+        </button>
+      </div>
+    </section>
+  )
+}
 
 function House() {
   const session = useSession()
@@ -213,7 +312,7 @@ function House() {
           </section>
         )}
 
-        {(funds.data?.length ?? 0) > 0 && (
+        {(funds.isPending || (funds.data?.length ?? 0) > 0) && (
           <section className="flex flex-col gap-3">
             <div className="flex items-baseline justify-between">
               <h2 className="font-sans text-lg font-medium tracking-[-0.02em]">Your funds</h2>
@@ -221,9 +320,36 @@ function House() {
                 See all
               </a>
             </div>
-            {funds.data?.slice(0, 2).map((fund) => (
-              <FundCard key={fund.id} fund={fund} />
-            ))}
+            {funds.isPending ? (
+              <>
+                <span role="status" className="sr-only">
+                  Loading your funds
+                </span>
+                <Card className="p-4">
+                  <div
+                    className="flex animate-pulse flex-col gap-3 motion-reduce:animate-none"
+                    aria-hidden
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 flex-1 flex-col gap-2">
+                        <div className="h-5 w-40 max-w-full rounded bg-orange-wash" />
+                        <div className="h-3.5 w-28 max-w-full rounded bg-orange-wash" />
+                      </div>
+                      <div className="h-5 w-16 shrink-0 rounded bg-orange-wash" />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <div className="h-2 rounded-full bg-orange-wash" />
+                      <div className="flex justify-between gap-3">
+                        <div className="h-3.5 w-24 rounded bg-orange-wash" />
+                        <div className="h-3.5 w-20 rounded bg-orange-wash" />
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              </>
+            ) : (
+              <HomeFunds funds={funds.data ?? []} />
+            )}
           </section>
         )}
 
@@ -273,6 +399,8 @@ function House() {
         </section>
 
         {portfolio.data &&
+          received.isSuccess &&
+          sent.isSuccess &&
           portfolio.data.cashUsd === 0 &&
           stocks.length === 0 &&
           toClaim.length === 0 &&
@@ -298,13 +426,36 @@ function House() {
             </Card>
           )}
 
-        {(sent.data?.length ?? 0) > 0 && (
+        {(sent.isPending || (sent.data?.length ?? 0) > 0) && (
           <section className="flex flex-col gap-3">
-            <h2 className="font-sans text-lg font-medium tracking-[-0.02em]">Gifts you sent</h2>
+            <div className="flex items-baseline justify-between">
+              <h2 className="font-sans text-lg font-medium tracking-[-0.02em]">Gifts you sent</h2>
+              <a href="/gifts" className="text-[14px] text-stone">
+                See all
+              </a>
+            </div>
+            {sent.isPending && (
+              <span role="status" className="sr-only">
+                Loading gifts you sent
+              </span>
+            )}
             <Card className="flex flex-col divide-y divide-line px-4">
-              {sent.data?.map((gift) => (
-                <GiftRow key={gift.id} gift={gift} sent />
-              ))}
+              {sent.isPending
+                ? [0, 1, 2].map((gift) => (
+                    <div
+                      key={gift}
+                      className="flex animate-pulse items-center gap-3 py-3 motion-reduce:animate-none"
+                      aria-hidden
+                    >
+                      <div className="size-10 shrink-0 rounded-full bg-orange-wash" />
+                      <div className="flex min-w-0 flex-1 flex-col gap-2">
+                        <div className="h-4 w-36 max-w-full rounded bg-orange-wash" />
+                        <div className="h-3 w-28 max-w-full rounded bg-orange-wash" />
+                      </div>
+                      <div className="h-5 w-16 shrink-0 rounded-link bg-orange-wash" />
+                    </div>
+                  ))
+                : sent.data?.slice(0, 5).map((gift) => <GiftRow key={gift.id} gift={gift} sent />)}
             </Card>
           </section>
         )}
