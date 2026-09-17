@@ -25,3 +25,5 @@ test-ledger
 # Supabase CLI
 supabase/.temp
 supabase/.branches
+.aider*
+.env*
