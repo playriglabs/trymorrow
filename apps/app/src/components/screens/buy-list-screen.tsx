@@ -1,4 +1,4 @@
-import { MagnifyingGlassIcon } from '@phosphor-icons/react'
+import { HeartIcon, MagnifyingGlassIcon } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { ChangePill } from '@/components/change-pill'
@@ -94,7 +94,19 @@ function BuyList() {
   }
 
   return (
-    <Screen title="Buy stocks" back="/">
+    <Screen
+      title="Buy stocks"
+      back="/"
+      right={
+        <a
+          href="/watchlist"
+          aria-label="Your watchlist"
+          className="flex size-11 items-center justify-center rounded-link hover:bg-orange-wash focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+        >
+          <HeartIcon className="size-5.5" />
+        </a>
+      }
+    >
       <label className="flex h-12 items-center gap-2.5 rounded-button border border-line bg-surface px-3.5 focus-within:border-orange focus-within:ring-4 focus-within:ring-orange-wash">
         <MagnifyingGlassIcon className="size-4.5 shrink-0 text-steel" />
         <span className="sr-only">Search stocks</span>

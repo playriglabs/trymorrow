@@ -11,6 +11,7 @@ import {
 import clsx from 'clsx'
 import { useEffect, useRef, useState } from 'react'
 import { match } from 'ts-pattern'
+import { ChangePill } from '@/components/change-pill'
 import { FundCard } from '@/components/fund-card'
 import { GiftRow } from '@/components/gift-row'
 import { byValue, HoldingRow } from '@/components/holding-row'
@@ -19,20 +20,25 @@ import { PullIndicator, usePullToRefresh } from '@/components/pull-to-refresh'
 import { CashLogo, StockLogo } from '@/components/stock-logo'
 import { TabBar } from '@/components/tab-bar'
 import { Avatar, Card, LinkButton, Loading } from '@/components/ui'
+import { WatchlistTabs } from '@/components/watchlist-tabs'
 import { useAnimatedNumber } from '@/lib/client/animated-number'
 import {
   useFundsQuery,
   useGiftsQuery,
   useNotificationsQuery,
   usePortfolioQuery,
+  useStocksQuery,
 } from '@/lib/client/queries'
 import { useSession } from '@/lib/client/session'
+import { useWatchlists, watchedMints } from '@/lib/client/watchlists'
 import { formatUsd } from '@/lib/format'
 import { giftAssetsLabel } from '@/lib/gifts'
 import type { FundCardView } from '@/lib/types'
 
 /** Home shows the biggest handful; the rest live on their own page */
 const HOME_STOCKS = 7
+/** A glance at what's being watched, not the whole list */
+const HOME_WATCHED = 4
 const BALANCE_HIDDEN_KEY = 'morrow:balance-hidden'
 
 function HomeFunds({ funds }: { funds: FundCardView[] }) {
@@ -147,6 +153,14 @@ function House() {
     ])
   })
 
+  // Prices for watched stocks only: someone who keeps no lists never pays for the extra call
+  const { lists: watchlists } = useWatchlists()
+  const watching = watchedMints(watchlists)
+  const stockPrices = useStocksQuery({ enabled: session.ready && watching.length > 0 })
+  // Home shows one basket at a time; a deleted list falls back to the first one
+  const [watchlistId, setWatchlistId] = useState<string | null>(null)
+  const watchlist = watchlists.find((list) => list.id === watchlistId) ?? watchlists[0] ?? null
+
   const total = portfolio.data ? portfolio.data.cashUsd + portfolio.data.stocksUsd : null
   const shownTotal = useAnimatedNumber(total)
   const [balanceHidden, setBalanceHidden] = useState(() => {
@@ -189,6 +203,11 @@ function House() {
 
   const toClaim = received.data?.filter((gift) => gift.status === 'pending') ?? []
   const stocks = (portfolio.data?.holdings.filter((holding) => !holding.isCash) ?? []).sort(byValue)
+  const pricedStocks = new Map((stockPrices.data?.stocks ?? []).map((stock) => [stock.mint, stock]))
+  const watched = (watchlist?.mints ?? []).flatMap((mint) => {
+    const stock = pricedStocks.get(mint)
+    return stock ? [stock] : []
+  })
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -203,7 +222,7 @@ function House() {
           <span className="font-sans text-[22px] font-medium tracking-[-0.02em]">
             morrow<span className="text-orange">*</span>
           </span>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-x-2 gap-y-1">
             <a
               href="/notifications"
               aria-label="Notifications"
@@ -422,6 +441,50 @@ function House() {
               </Card>
             ))}
         </section>
+
+        {watching.length > 0 && watchlist && (
+          <section className="flex flex-col gap-3">
+            <div className="flex items-baseline justify-between">
+              <h2 className="font-sans text-lg font-medium tracking-[-0.02em]">Watching</h2>
+              <a href="/watchlist" className="text-[14px] text-stone">
+                See all
+              </a>
+            </div>
+            {watchlists.length > 1 && (
+              <WatchlistTabs lists={watchlists} activeId={watchlist.id} onPick={setWatchlistId} />
+            )}
+            {watched.length === 0 ? (
+              <Card className="px-4 py-5 text-[15px] text-stone">
+                {match({ pending: stockPrices.isPending, empty: watchlist.mints.length === 0 })
+                  .with({ empty: true }, () => 'Nothing in this list yet.')
+                  .with({ pending: true }, () => 'Loading prices…')
+                  .otherwise(() => 'Prices are taking a moment.')}
+              </Card>
+            ) : (
+              <Card className="flex flex-col divide-y divide-line px-4">
+                {watched.slice(0, HOME_WATCHED).map((stock) => (
+                  <a
+                    key={stock.mint}
+                    href={`/trade/${encodeURIComponent(stock.ticker.toLowerCase())}`}
+                    className="flex h-16 items-center gap-3"
+                  >
+                    <StockLogo iconUrl={stock.iconUrl} ticker={stock.ticker} size={40} />
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <span className="truncate">{stock.name}</span>
+                      <span className="text-[13px] text-stone">{stock.ticker}</span>
+                    </div>
+                    <div className="flex flex-col items-end gap-0.5">
+                      <span className="text-[15px]">{formatUsd(stock.priceUsd)}</span>
+                      {stock.change24hPct != null && !stock.lowLiquidity && (
+                        <ChangePill value={stock.change24hPct} />
+                      )}
+                    </div>
+                  </a>
+                ))}
+              </Card>
+            )}
+          </section>
+        )}
 
         {portfolio.data &&
           received.isSuccess &&

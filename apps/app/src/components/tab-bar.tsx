@@ -12,7 +12,7 @@ export type Tab = (typeof TABS)[number]['href']
 
 export function TabBar({ active }: { active: Tab }) {
   return (
-    <nav className="sticky bottom-0 z-20 px-5 pt-3 pb-[max(24px,env(safe-area-inset-bottom))]">
+    <nav className="sticky bottom-0 z-20 px-5 pt-3 pb-[max(23px,env(safe-area-inset-bottom))]">
       <div className="glass-surface flex gap-1 rounded-link border border-line p-1">
         {TABS.map(({ href, label, Icon }) => (
           <a

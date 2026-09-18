@@ -1,10 +1,11 @@
-import { ShareIcon, ShieldCheckIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
+import { HeartIcon, ShareIcon, ShieldCheckIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { useEffect, useRef, useState } from 'react'
 import { match, P } from 'ts-pattern'
 import { PreIpoFacts } from '@/components/pre-ipo-facts'
 import { PriceChart } from '@/components/price-chart'
 import { withProviders } from '@/components/providers'
+import { SaveToWatchlistSheet } from '@/components/save-to-watchlist-sheet'
 import { StockAbout } from '@/components/stock-about'
 import { StockLogo } from '@/components/stock-logo'
 import { SuccessMark } from '@/components/success-mark'
@@ -14,6 +15,7 @@ import { errorMessage } from '@/lib/client/api'
 import { useDebounced } from '@/lib/client/debounce'
 import { useStocksQuery, useTradeMutation, useTradeQuoteQuery } from '@/lib/client/queries'
 import { useSession } from '@/lib/client/session'
+import { useWatchlists, watchlistsWith } from '@/lib/client/watchlists'
 import { formatShares, formatUsd } from '@/lib/format'
 import type { TradeSide } from '@/lib/types'
 
@@ -50,6 +52,8 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
     initialSide === 'sell' ? 'amount' : 'overview',
   )
   const [shareCardOpen, setShareCardOpen] = useState(false)
+  const [watchlistOpen, setWatchlistOpen] = useState(false)
+  const { lists: watchlists } = useWatchlists()
 
   const stock = stocks.data?.stocks.find((item) => item.ticker === ticker)
   const cashRaw = BigInt(stocks.data?.cashRaw ?? '0')
@@ -371,58 +375,94 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
     .otherwise(() => ' ')
 
   if (stage === 'overview') {
+    const onLists = watchlistsWith(watchlists, stock.mint)
     return (
-      <Screen
-        title={`Trade $${stock.ticker}`}
-        back="/buy"
-        footer={
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              onClick={() => {
-                switchSide('buy')
-                setStage('amount')
-              }}
+      <>
+        <Screen
+          title={`Trade $${stock.ticker}`}
+          back="/buy"
+          right={
+            <button
+              type="button"
+              aria-label={onLists.length > 0 ? 'Edit watchlists' : 'Add to a watchlist'}
+              aria-pressed={onLists.length > 0}
+              onClick={() => setWatchlistOpen(true)}
+              className="flex size-11 items-center justify-center rounded-link hover:bg-orange-wash focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
             >
-              Buy
-            </Button>
-            <Button
-              variant="soft"
-              disabled={ownedRaw === 0n}
-              onClick={() => {
-                switchSide('sell')
-                setStage('amount')
-              }}
-            >
-              Sell
-            </Button>
-          </div>
-        }
-      >
-        <PriceChart
-          mint={stock.mint}
-          name={stock.name}
-          ticker={stock.ticker}
-          iconUrl={stock.iconUrl}
-          fallbackPrice={stock.priceUsd}
-          lowLiquidity={stock.lowLiquidity}
-        />
-
-        <Card className="flex flex-col divide-y divide-line px-4 text-[15px]">
-          <Row
-            label="Your position"
-            value={
-              stock.ownedShares > 0
-                ? `${formatShares(stock.ownedShares)} shares · ${formatUsd(stock.ownedValueUsd)}`
-                : 'Not invested yet'
-            }
+              <HeartIcon
+                className={clsx('size-5.5', { 'text-orange': onLists.length > 0 })}
+                weight={onLists.length > 0 ? 'fill' : 'regular'}
+              />
+            </button>
+          }
+          footer={
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                onClick={() => {
+                  switchSide('buy')
+                  setStage('amount')
+                }}
+              >
+                Buy
+              </Button>
+              <Button
+                variant="soft"
+                disabled={ownedRaw === 0n}
+                onClick={() => {
+                  switchSide('sell')
+                  setStage('amount')
+                }}
+              >
+                Sell
+              </Button>
+            </div>
+          }
+        >
+          <PriceChart
+            mint={stock.mint}
+            name={stock.name}
+            ticker={stock.ticker}
+            iconUrl={stock.iconUrl}
+            fallbackPrice={stock.priceUsd}
+            lowLiquidity={stock.lowLiquidity}
           />
-          <Row label="Cash available" value={formatUsd(stocks.data?.cashUsd ?? 0)} />
-        </Card>
 
-        <PreIpoFacts stock={stock} />
+          <Card className="flex flex-col divide-y divide-line px-4 text-[15px]">
+            <Row
+              label="Your position"
+              value={
+                stock.ownedShares > 0
+                  ? `${formatShares(stock.ownedShares)} shares · ${formatUsd(stock.ownedValueUsd)}`
+                  : 'Not invested yet'
+              }
+            />
+            <Row label="Cash available" value={formatUsd(stocks.data?.cashUsd ?? 0)} />
+          </Card>
 
-        <StockAbout mint={stock.mint} name={stock.name} />
-      </Screen>
+          <PreIpoFacts stock={stock} />
+
+          {onLists.length > 0 && (
+            <p className="-mt-2 flex flex-wrap items-center gap-1.5 text-[13px] text-stone">
+              Watching in
+              {onLists.map((list) => (
+                <span key={list.id} className="rounded-link bg-orange-wash px-2 py-0.5 text-ink">
+                  {list.emoji} {list.name}
+                </span>
+              ))}
+            </p>
+          )}
+
+          <StockAbout mint={stock.mint} name={stock.name} />
+        </Screen>
+
+        {watchlistOpen && (
+          <SaveToWatchlistSheet
+            mint={stock.mint}
+            stockName={stock.name}
+            onClose={() => setWatchlistOpen(false)}
+          />
+        )}
+      </>
     )
   }
 

@@ -26,6 +26,7 @@ const loaders = {
   'send-gift-screen': () => import('@/components/screens/send-gift-screen'),
   'stocks-screen': () => import('@/components/screens/stocks-screen'),
   'trade-screen': () => import('@/components/screens/trade-screen'),
+  'watchlist-screen': () => import('@/components/screens/watchlist-screen'),
 }
 
 type ScreenName = keyof typeof loaders
@@ -57,6 +58,7 @@ const routes: Record<string, ScreenName> = {
   '/notifications': 'notifications-screen',
   '/notifications/settings': 'notifications-settings-screen',
   '/funds/new': 'create-fund-screen',
+  '/watchlist': 'watchlist-screen',
 }
 
 function preload(href: string) {

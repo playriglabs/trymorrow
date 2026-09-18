@@ -106,6 +106,16 @@ The address must be on-curve and either unused or system-owned, so a pasted cash
 
 `/ask` builds a link to the asker's own handle page carrying the wish: `app.trymorrow.money/maya?stock=AAPLX&amount=25&note=Birthday`. Nothing is stored, so there's no row to abuse and no cleanup. `[handle].astro` renders the ask with its own OG preview and points at `/send` with the same values; `send-gift-screen.tsx` preselects the stock only when the sender actually holds it, and says so when they don't.
 
+### Watchlists
+
+Stocks someone follows without buying, grouped into named lists with an emoji. `lib/client/watchlists.ts` is the whole store: `localStorage` under `morrow.watchlists.v1.<privy user id>`, one store per account (the same identity `providers.tsx` scopes the query cache to), read through `useSyncExternalStore` so every screen and every tab of the app agrees. Signing in as someone else on the same phone therefore shows their own lists, not the last person's. Nothing reaches the server — it isn't money, and keeping it local costs nothing to run. `useWatchlists()` hands back the lists and the actions; nothing writes storage directly.
+
+- At most `MAX_WATCHLISTS` (5) lists, names capped at `MAX_WATCHLIST_NAME` (16) so a tab never truncates. Unparseable or hand-edited storage is dropped entry by entry rather than thrown.
+- The heart in the trade screen header opens `SaveToWatchlistSheet`; taps save immediately. With no lists yet it offers to make "Watching" ⭐️ in one tap instead of asking someone to name something first.
+- `/watchlist` lists the baskets as tabs (scroll-snapped past three), swaps the stocks below as tabs change, and holds the edit sheet (rename, icon, delete) plus per-stock removal behind "Edit stocks".
+- `WatchlistTabs` is shared: Home's "Watching" section shows the same baskets (no "New list" tab) and swaps its rows as they're picked. Prices come from the existing `/api/stocks`; Home only asks for them when something is actually being watched.
+- Say "heart" and "list" on screen. Lists live on one device, and the screen says so.
+
 ### Share cards
 
 `renderShareCard` (`lib/client/share-card.ts`) draws every shareable image on a canvas: eyebrow, hero, subhero, a cream receipt of labelled rows, and a footer with a code to the sharer's handle page. It shares its module grid with `qr-code.tsx` through `qr-layout.ts`, so both codes look the same.
