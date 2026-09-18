@@ -143,7 +143,7 @@ onMount(() => {
       </div>
       <p class="relative z-30 mt-6 hidden px-5 pb-2 text-xs text-stone md:block">
         <span class="mr-1.5 rounded-full bg-sun px-2.5 py-1 text-ink">Tiny fees</span> Most gifts and
-        trades cost under 50¢ to send.
+        trades cost under 50¢.
       </p>
       <div
         class="relative z-30 mx-auto hidden max-w-page items-center justify-between gap-4 px-6 pt-2 pb-10 text-[10px] text-stone sm:flex md:px-10 md:text-xs"
