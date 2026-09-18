@@ -1,32 +1,10 @@
 <script lang="ts">
 import SocialIcon from './social-icon.svelte'
 
-// Pastel tiles reuse the gift card colors from the sections above.
 const socials = [
-  {
-    name: 'x',
-    label: 'X',
-    handle: '@trymorrow',
-    href: 'https://x.com/trymorrow',
-    color: 'bg-sun',
-    tilt: '-rotate-2',
-  },
-  {
-    name: 'reddit',
-    label: 'Reddit',
-    handle: 'r/TRYMORROW',
-    href: 'https://www.reddit.com/r/TRYMORROW/',
-    color: 'bg-[#ded1f1]',
-    tilt: 'rotate-1',
-  },
-  {
-    name: 'linkedin',
-    label: 'LinkedIn',
-    handle: 'Morrow',
-    href: 'https://www.linkedin.com/company/trymorrow',
-    color: 'bg-[#dbe7c9]',
-    tilt: '-rotate-1',
-  },
+  { name: 'x', label: 'X', href: 'https://x.com/trymorrow' },
+  { name: 'reddit', label: 'Reddit', href: 'https://www.reddit.com/r/TRYMORROW/' },
+  { name: 'linkedin', label: 'LinkedIn', href: 'https://www.linkedin.com/company/trymorrow' },
 ] as const
 
 const pageLinks = [
@@ -68,7 +46,7 @@ const year = new Date().getFullYear()
         </a>
       </div>
 
-      <ul class="grid gap-3 sm:grid-cols-3 lg:w-150">
+      <ul class="flex items-center gap-2">
         {#each socials as social}
           <li>
             <a
@@ -76,22 +54,9 @@ const year = new Date().getFullYear()
               target="_blank"
               rel="noopener noreferrer"
               aria-label={`Morrow on ${social.label}`}
-              class="footer-pop group flex min-h-20 items-center gap-3 rounded-card p-3 text-ink focus-visible:outline-cream sm:min-h-36 sm:flex-col sm:items-start sm:justify-between sm:p-4 {social.color} {social.tilt}"
+              class="flex size-12 items-center justify-center rounded-full text-cream/70 transition-colors hover:bg-cream/10 hover:text-cream focus-visible:outline-cream"
+              ><SocialIcon name={social.name} /></a
             >
-              <span class="flex size-11 items-center justify-center rounded-button bg-surface"
-                ><SocialIcon name={social.name} /></span
-              >
-              <span class="flex flex-1 items-end justify-between gap-2 self-stretch sm:flex-none">
-                <span>
-                  <span class="block font-sans text-lg leading-tight">{social.label}</span>
-                  <span class="block text-xs text-ink/60">{social.handle}</span>
-                </span>
-                <span
-                  class="text-lg transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
-                  aria-hidden="true">↗</span
-                >
-              </span>
-            </a>
           </li>
         {/each}
       </ul>
@@ -105,7 +70,7 @@ const year = new Date().getFullYear()
       class="mt-6 flex flex-col-reverse gap-4 border-t border-cream/10 pt-6 text-xs text-steel sm:flex-row sm:items-center sm:justify-between"
     >
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
-        <p>© {year} Morrow. A little gift, a big tomorrow.</p>
+        <p>© {year} Morrow. Buy, gift, grow.</p>
         <nav aria-label="Footer" class="flex flex-wrap gap-x-5">
           {#each pageLinks as link}
             <a

@@ -16,16 +16,16 @@ import StockMark from './stock-mark.svelte'
 
 const tourScreens = [
   {
+    src: '/images/buy-screen.png',
+    title: 'Buy a little',
+    text: 'Search 142 stocks and Pre-IPO stocks, then start trade.',
+    icon: MagnifyingGlassIcon,
+  },
+  {
     src: '/images/trade-screen.png',
     title: 'Trade in a tap',
     text: 'Live prices, simple charts, and one-tap buys.',
     icon: CurrencyDolarIcon,
-  },
-  {
-    src: '/images/buy-screen.png',
-    title: 'Buy a little',
-    text: 'Search 142 stocks and start with a fraction of a share.',
-    icon: MagnifyingGlassIcon,
   },
   {
     src: '/images/fund-screen.png',
@@ -84,15 +84,15 @@ onMount(() => {
           id="hero-title"
           class="mx-auto max-w-page font-sans text-[clamp(48px,8.8vw,126px)] leading-[0.92] tracking-[-0.075em]"
         >
-          <span class="block">A little gift,</span><span class="block text-orange"
+          <span class="block">Buy, gift, grow.</span><span class="block text-orange"
             >A big tomorrow.</span
           >
         </h1>
         <p
           class="mx-auto mt-7 max-w-90 text-sm leading-relaxed text-stone md:max-w-110 md:text-base"
         >
-          Give stocks. Send cash. Build a future together.<br class="hidden sm:block" /> A little today
-          can mean a lot tomorrow.
+          Send cash, Buy stocks, Gift them. Build a future together.<br class="hidden sm:block" /> A little
+          today can mean a lot tomorrow.
         </p>
         <a
           href="https://app.trymorrow.money/login"
@@ -142,8 +142,8 @@ onMount(() => {
         </div>
       </div>
       <p class="relative z-30 mt-6 hidden px-5 pb-2 text-xs text-stone md:block">
-        <span class="mr-1.5 rounded-full bg-sun px-2.5 py-1 text-ink">Tiny fees</span> Most gifts cost
-        under 50¢ to send.
+        <span class="mr-1.5 rounded-full bg-sun px-2.5 py-1 text-ink">Tiny fees</span> Most gifts and
+        trades cost under 50¢ to send.
       </p>
       <div
         class="relative z-30 mx-auto hidden max-w-page items-center justify-between gap-4 px-6 pt-2 pb-10 text-[10px] text-stone sm:flex md:px-10 md:text-xs"
@@ -305,9 +305,9 @@ onMount(() => {
             <div class="flex justify-between">
               <StockMark stock="nvidia" color="#fffefb" /><Icon name="chart" size={20} />
             </div>
-            <p class="mt-5 text-xs">A gifts for you.</p>
-            <p class="mt-1 font-sans text-4xl tracking-tighter">Big potential.</p>
-            <p class="mt-4 text-[10px] text-stone">Start with a fraction of a share.</p>
+            <p class="mt-5 text-xs">Nvidia, from a few dollars.</p>
+            <p class="mt-1 font-sans text-4xl tracking-tighter">Start small.</p>
+            <p class="mt-4 text-[10px] text-stone">Fractions of a share, priced live.</p>
           </div>
           <div
             class="gather-card gather-two absolute top-[7%] right-[16%] z-30 w-55 rotate-[9deg] rounded-3xl bg-[#ded1f1] p-5"
@@ -334,7 +334,7 @@ onMount(() => {
           <div
             class="gather-card gather-four absolute top-[66%] right-[13%] z-20 w-57.5 rotate-12 rounded-3xl bg-[#f0d8cd] p-5"
           >
-            <span class="text-[10px] tracking-widest">THE BEST KIND OF NOTIFICATION</span>
+            <span class="text-[12px]">The best kind notification</span>
             <div class="my-5 flex size-12 items-center justify-center rounded-full bg-surface">
               <Icon name="heart" size={25} />
             </div>
@@ -409,9 +409,10 @@ onMount(() => {
             </div>
           </div>
           <div class="px-2 pt-5">
-            <h3 class="text-xl">Big companies. Your little piece.</h3>
+            <h3 class="text-xl">Buy and sell, a little at a time.</h3>
             <p class="mt-2 max-w-92.5 text-sm leading-relaxed text-stone">
-              Buy a fraction of a share in companies you know. Build a portfolio at your own pace.
+              Buy a fraction of a share in companies you know, watch live prices and simple charts,
+              and sell back to cash whenever you like.
             </p>
           </div>
         </article>

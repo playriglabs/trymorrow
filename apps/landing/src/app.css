@@ -201,6 +201,10 @@
     /* Centered with calc, not translate, so the scroll animation still measures the real position. */
     left: calc(50% - 117px);
   }
+  .gather-six {
+    top: 78%;
+    right: 3%;
+  }
   /* A full-height stage on a 1376-1440px tall tablet leaves a big gap above the content,
      so cap it by width; the pin still holds it at the top. */
   .together-stage {

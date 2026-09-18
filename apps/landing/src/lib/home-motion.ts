@@ -125,6 +125,7 @@ export function initHomeMotion(root: HTMLElement) {
           { x: -140, y: 95, rotation: -5, from: 'left' },
           { x: 140, y: 115, rotation: 9, from: 'right' },
           { x: 0, y: 20, rotation: -3, from: 'bottom' },
+          { x: 115, y: 240, rotation: 8, from: 'right' },
         ] as const
         const compact = () => canvas.clientWidth < 768
         // Tall portrait tablets would leave most of the screen empty, so the cluster grows
@@ -190,11 +191,11 @@ export function initHomeMotion(root: HTMLElement) {
               duration: 0.75,
               ease: 'power2.out',
             },
-            0.25 + i * 0.05,
+            0.25 + i * 0.035,
           )
         })
         timeline.to({}, { duration: 0.35 })
-        timeline.to(cards, { opacity: 0, scale: 0.6, duration: 0.35, stagger: 0.03 }, 1.55)
+        timeline.to(cards, { opacity: 0, scale: 0.6, duration: 0.35, stagger: 0.03 }, 1.62)
         timeline.fromTo('.action-words', { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.3 }, 1.8)
         timeline.from(
           '.action-word',
