@@ -1,6 +1,6 @@
 import { PublicKey } from '@solana/web3.js'
 import { z } from 'astro/zod'
-import { MAX_FUND_HOLDINGS } from '@/lib/funds'
+import { MAX_CONTRIBUTION_STOCKS } from '@/lib/funds'
 import { findStock } from '@/lib/server/catalog'
 import { contributionFee } from '@/lib/server/fees'
 import { allocationMints, fundAddress, getFund } from '@/lib/server/funds'
@@ -10,7 +10,7 @@ import type { FundFeeQuote } from '@/lib/types'
 
 const schema = z.object({
   /** The stocks going in; the fund's whole mix when left out */
-  mints: z.array(z.string().min(32).max(44)).max(MAX_FUND_HOLDINGS).optional(),
+  mints: z.array(z.string().min(32).max(44)).max(MAX_CONTRIBUTION_STOCKS).optional(),
 })
 
 /** What adding to this fund costs right now, before anything is bought or signed */

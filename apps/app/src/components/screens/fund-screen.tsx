@@ -30,6 +30,7 @@ import { formatDate, formatUsd, formatUsdWhole } from '@/lib/format'
 import {
   FUND_MIN_SPLIT_USD,
   formatUnlock,
+  MAX_CONTRIBUTION_STOCKS,
   MAX_FUND_HOLDINGS,
   purposeLabel,
   timeToGo,
@@ -125,6 +126,8 @@ function AddSheet({ fund, onClose }: { fund: FundView; onClose: () => void }) {
   const newStocks = selectedHoldings.filter((holding) => !inFund.has(holding.mint)).length
   const openStockSlots = Math.max(0, MAX_FUND_HOLDINGS - fund.holdings.length)
   const tooManyStocks = fund.holdings.length + newStocks > MAX_FUND_HOLDINGS
+  // One contribution is one transaction, so only so many stocks fit in it
+  const contributionFull = selectedMints.length >= MAX_CONTRIBUTION_STOCKS
 
   const minimum = Math.max(
     FUND_MIN_SPLIT_USD,
@@ -191,6 +194,7 @@ function AddSheet({ fund, onClose }: { fund: FundView; onClose: () => void }) {
 
   const toggleStock = (holding: Holding) => {
     const selected = selectedMints.includes(holding.mint)
+    if (!selected && contributionFull) return
     setSelectedMints(
       selected
         ? selectedMints.filter((mint) => mint !== holding.mint)
@@ -253,10 +257,13 @@ function AddSheet({ fund, onClose }: { fund: FundView; onClose: () => void }) {
                 type="button"
                 aria-pressed={mode === value}
                 onClick={() => setMode(value)}
-                className={clsx('h-10 flex-1 rounded-link font-sans text-[15px] font-medium', {
-                  'bg-orange-wash text-ink': mode === value,
-                  'text-stone': mode !== value,
-                })}
+                className={clsx(
+                  'h-10 flex-1 rounded-link font-sans text-[15px] font-medium transition-colors',
+                  {
+                    'bg-orange text-white': mode === value,
+                    'text-stone': mode !== value,
+                  },
+                )}
               >
                 {label}
               </button>
@@ -327,18 +334,20 @@ function AddSheet({ fund, onClose }: { fund: FundView; onClose: () => void }) {
                   <span className="font-sans text-[15px] font-medium">Choose shares</span>
                   <span className="text-[13px] text-stone">
                     {selectedMints.length > 0
-                      ? `${selectedMints.length} selected`
+                      ? `${selectedMints.length} of ${MAX_CONTRIBUTION_STOCKS} selected`
                       : `${owned.length} ${owned.length === 1 ? 'stock' : 'stocks'} available`}
                   </span>
                 </div>
                 <span className="text-right text-[12px] text-stone">
-                  {openStockSlots === 0
-                    ? 'Existing fund stocks only'
-                    : `${openStockSlots - Math.min(openStockSlots, newStocks)} new ${
-                        openStockSlots - Math.min(openStockSlots, newStocks) === 1
-                          ? 'stock'
-                          : 'stocks'
-                      } left`}
+                  {contributionFull
+                    ? `${MAX_CONTRIBUTION_STOCKS} at a time`
+                    : openStockSlots === 0
+                      ? 'Existing fund stocks only'
+                      : `${openStockSlots - Math.min(openStockSlots, newStocks)} new ${
+                          openStockSlots - Math.min(openStockSlots, newStocks) === 1
+                            ? 'stock'
+                            : 'stocks'
+                        } left`}
                 </span>
               </div>
 
@@ -371,7 +380,8 @@ function AddSheet({ fund, onClose }: { fund: FundView; onClose: () => void }) {
                   {visibleOwned.map((holding) => {
                     const selected = selectedMints.includes(holding.mint)
                     const isNewStock = !inFund.has(holding.mint)
-                    const noRoom = isNewStock && !selected && newStocks >= openStockSlots
+                    const noRoom =
+                      !selected && (contributionFull || (isNewStock && newStocks >= openStockSlots))
                     return (
                       <button
                         type="button"
@@ -538,10 +548,11 @@ function AddSheet({ fund, onClose }: { fund: FundView; onClose: () => void }) {
               </a>
             </p>
           )}
-          {error && <p className="text-[13px] text-loss">{errorMessage(error)}</p>}
         </div>
 
         <div className="flex shrink-0 flex-col gap-2.5 border-t border-line bg-cream px-5 pt-5 pb-[max(20px,env(safe-area-inset-bottom))]">
+          {/* A failed submit belongs next to the button that failed, not up in the scroll area */}
+          {error && <p className="text-center text-[13px] text-loss">{errorMessage(error)}</p>}
           <Button disabled={addDisabled} loading={pending} onClick={submit}>
             {submitLabel}
           </Button>

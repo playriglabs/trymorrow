@@ -12,7 +12,7 @@ import type {
 const variants = {
   filled: 'button-shiny bg-orange text-white',
   soft: 'glass-soft text-ink',
-  outline: 'border border-line bg-surface text-ink',
+  outline: 'button-shiny-light border border-line bg-surface text-ink',
   dark: 'button-shiny bg-ink text-surface',
   ghost: 'bg-transparent text-ink',
   danger: 'bg-transparent text-loss',

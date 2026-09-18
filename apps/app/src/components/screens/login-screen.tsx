@@ -73,7 +73,9 @@ function Login() {
   return (
     <div className="flex min-h-dvh flex-col">
       <div className="px-5 pt-4">
-        <span className="font-sans text-[22px] font-medium tracking-[-0.02em]">Morrow</span>
+        <span className="font-sans text-[22px] font-medium tracking-[-0.02em]">
+          morrow<span className="text-orange">*</span>
+        </span>
       </div>
 
       <div className="relative mx-5 mt-4 h-75 overflow-hidden rounded-sheet bg-orange" aria-hidden>

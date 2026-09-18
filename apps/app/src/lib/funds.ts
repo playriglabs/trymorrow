@@ -13,6 +13,12 @@ export const FUND_MIN_SPLIT_USD = 5
  */
 export const MAX_FUND_HOLDINGS = 6
 
+/**
+ * One contribution is one transaction with a `contribute` per stock, so it hits the same
+ * 1,232-byte ceiling a gift does. Measured: three stocks plus the fee run 732 bytes.
+ */
+export const MAX_CONTRIBUTION_STOCKS = 3
+
 /** Measured: a withdrawal runs about 240 bytes plus 225 per stock, against the 1,232-byte limit */
 export const MAX_WITHDRAWALS_PER_TRANSACTION = 4
 
