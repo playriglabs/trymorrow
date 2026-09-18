@@ -47,12 +47,22 @@ function ProfilePage() {
   const { exportWallet } = useExportWallet()
   const [copied, setCopied] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
+  const [blocked, setBlocked] = useState(false)
 
   if (!session.ready || !session.profile) return <Loading />
   const { profile } = session
   const link = `${location.host}/${profile.handle}`
   const address = wallets[0]?.address
   const account = findOurAccount(user, address)
+
+  /** The key is shown on Privy's own domain, so we never see it ourselves */
+  const openKey = () => {
+    if (!address) return
+    setBlocked(false)
+    exportWallet({ address }).catch((error: unknown) =>
+      setExportError(error instanceof Error ? error.message : String(error)),
+    )
+  }
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -109,19 +119,14 @@ function ProfilePage() {
             <button
               type="button"
               className="flex h-13 items-center gap-3 text-left"
-              // The key is shown on Privy's own domain, so we never see it ourselves
               onClick={() => {
                 if (!address) return
-                if (!keyOpensHere()) {
-                  setExportError(
-                    'Your account key opens on a computer — phone browsers block the window it needs. Sign in at app.trymorrow.money there. To move money out from your phone, use Cash out.',
-                  )
+                setExportError(null)
+                if (keyOpensHere()) {
+                  openKey()
                   return
                 }
-                setExportError(null)
-                exportWallet({ address }).catch((error: unknown) =>
-                  setExportError(error instanceof Error ? error.message : String(error)),
-                )
+                setBlocked(true)
               }}
             >
               <KeyIcon className="size-5" />
@@ -135,6 +140,20 @@ function ProfilePage() {
             <CaretRightIcon className="size-4.5 text-steel" />
           </a>
         </Card>
+
+        {blocked && (
+          <Notice tone="warning">
+            Your account key opens on a computer — phone browsers block the window it needs. Sign in
+            at app.trymorrow.money there. To move money out from your phone, use Cash out.
+            <button
+              type="button"
+              onClick={openKey}
+              className="mt-2 block font-medium underline underline-offset-2"
+            >
+              Try it here anyway
+            </button>
+          </Notice>
+        )}
 
         {exportError && <Notice tone="warning">{exportError}</Notice>}
 
