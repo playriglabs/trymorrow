@@ -8,9 +8,12 @@ const LOGO_HOSTS = new Set(['xstocks-metadata.backed.fi'])
  * Serves a stock logo from our own origin. Drawing a cross-origin image taints a canvas and blocks
  * exporting the share card, so the card loads logos through here.
  */
-export const GET = route(async ({ params }) => {
+export const GET = route(async ({ params, redirect }) => {
   const stock = await findStock(params.mint ?? '')
   if (!stock) throw notFound('We couldn’t find that stock.')
+
+  // PreStocks marks ship with the app, so they're already on our origin and need no proxying
+  if (stock.iconUrl.startsWith('/')) return redirect(stock.iconUrl, 302)
 
   const source = new URL(stock.iconUrl)
   if (source.protocol !== 'https:' || !LOGO_HOSTS.has(source.hostname)) {

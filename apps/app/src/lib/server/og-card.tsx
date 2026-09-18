@@ -3,6 +3,7 @@
  * turns it into the PNG expected by chat and social crawlers.
  */
 
+import { PUBLIC_APP_URL } from 'astro:env/client'
 import { Buffer } from 'node:buffer'
 import pilatDataUrl from '@morrow/ui/fonts/Pilat-Book.woff2?inline'
 import { create, type Font } from 'fontkitten'
@@ -127,7 +128,10 @@ function outlineText(svg: string): string {
 async function imageData(url: string | null): Promise<string | null> {
   if (!url) return null
   try {
-    const response = await fetch(url, { signal: AbortSignal.timeout(5_000) })
+    // Logos that ship with the app are recorded as paths; a crawler's card is rendered server-side
+    const response = await fetch(new URL(url, PUBLIC_APP_URL), {
+      signal: AbortSignal.timeout(5_000),
+    })
     if (!response.ok) return null
     const contentType = response.headers.get('content-type')?.split(';')[0]
     if (!contentType?.startsWith('image/')) return null

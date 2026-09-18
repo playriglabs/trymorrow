@@ -71,6 +71,26 @@ let loading: Promise<Catalog> | null = null
 /** The issuer serves a logo for every xStock at a predictable path, even when Jupiter has none */
 const logoFor = (symbol: string) => `${LOGO_BASE}/${encodeURIComponent(symbol)}.png`
 
+/**
+ * The issuer frames every company mark in its own hexagon, so a PreStock reads as the issuer's
+ * brand rather than the company's. We ship the plain marks and serve them from our own origin,
+ * which also keeps them on the share card canvas. A company we don't have falls back to theirs.
+ */
+const PRESTOCK_LOGOS = new Set([
+  'ANDURIL',
+  'ANTHROPIC',
+  'FIGUREAI',
+  'KALSHI',
+  'NEURALINK',
+  'OPENAI',
+  'POLYMARKET',
+])
+
+const preStockLogo = (symbol: string): string | null => {
+  const key = symbol.toUpperCase()
+  return PRESTOCK_LOGOS.has(key) ? `/logos/prestocks/${key}.png` : null
+}
+
 const toStock = (token: JupiterToken): StockAsset => ({
   symbol: token.symbol,
   name: NAME_OVERRIDES[token.symbol] ?? token.name.replace(/\s*xStock$/i, '').trim(),
@@ -129,7 +149,7 @@ async function toPreStock(token: JupiterToken, issuer: PreStock | undefined): Pr
     mint: new PublicKey(token.id),
     decimals: token.decimals,
     tokenProgram: TOKEN_2022_PROGRAM,
-    iconUrl: token.icon || issuer?.image || '',
+    iconUrl: preStockLogo(token.symbol) ?? (token.icon || issuer?.image || ''),
     priceUsd: token.usdPrice ?? null,
     change24hPct: token.stats24h?.priceChange ?? null,
     liquidityUsd: token.liquidity ?? 0,
