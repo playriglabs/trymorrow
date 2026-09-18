@@ -20,6 +20,14 @@ import { Button, Card, Loading, Notice } from '@/components/ui'
 import { copyText } from '@/lib/client/copy'
 import { useSession } from '@/lib/client/session'
 
+/**
+ * Privy assembles the key in a window on its own domain, and Safari and Brave block that window
+ * on a phone. It never loads, and the screen it puts up sits there with nothing behind it, so a
+ * tap would leave someone stuck until they reloaded. A mouse means a desktop browser, where it
+ * works, and that's as close to asking as we can get.
+ */
+const keyOpensHere = () => window.matchMedia('(pointer: fine)').matches
+
 /** Only accounts we made hold a key Privy can hand back; someone's own wallet keeps its own */
 function findOurAccount(user: ReturnType<typeof usePrivy>['user'], address: string | undefined) {
   if (!address) return null
@@ -101,9 +109,15 @@ function ProfilePage() {
             <button
               type="button"
               className="flex h-13 items-center gap-3 text-left"
-              // Privy's own modal shows the key in an iframe on a separate domain; we never see it
+              // The key is shown on Privy's own domain, so we never see it ourselves
               onClick={() => {
                 if (!address) return
+                if (!keyOpensHere()) {
+                  setExportError(
+                    'Your account key opens on a computer — phone browsers block the window it needs. Sign in at app.trymorrow.money there. To move money out from your phone, use Cash out.',
+                  )
+                  return
+                }
                 setExportError(null)
                 exportWallet({ address }).catch((error: unknown) =>
                   setExportError(error instanceof Error ? error.message : String(error)),
