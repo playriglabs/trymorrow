@@ -11,6 +11,7 @@ import { CashLogo, StockLogo } from '@/components/stock-logo'
 import { SuccessMark } from '@/components/success-mark'
 import { Button, Card, Label, LinkButton, Loading, Notice, Screen } from '@/components/ui'
 import { errorMessage } from '@/lib/client/api'
+import { copyText } from '@/lib/client/copy'
 import type { CreateGiftCardResult } from '@/lib/client/queries'
 import {
   useCreateGiftCardMutation,
@@ -108,16 +109,7 @@ function CardReady({ result, senderName }: { result: CreateGiftCardResult; sende
           <span className="font-sans text-[17px] font-medium tracking-[0.02em]">
             {formatCode(code)}
           </span>
-          <Button
-            variant="soft"
-            size="sm"
-            onClick={() =>
-              navigator.clipboard
-                .writeText(code)
-                .then(() => setCopied(true))
-                .catch(() => setCopied(false))
-            }
-          >
+          <Button variant="soft" size="sm" onClick={() => copyText(code).then(setCopied)}>
             <CopyIcon className="size-4" />
             {copied ? 'Copied' : 'Copy code'}
           </Button>

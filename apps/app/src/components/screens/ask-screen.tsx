@@ -6,6 +6,7 @@ import { withProviders } from '@/components/providers'
 import { CashLogo, StockLogo } from '@/components/stock-logo'
 import { Button, Card, Label, Loading, Notice, Screen, TextInput } from '@/components/ui'
 import { errorMessage } from '@/lib/client/api'
+import { copyText } from '@/lib/client/copy'
 import { useStocksQuery } from '@/lib/client/queries'
 import { useSession } from '@/lib/client/session'
 import { formatUsd } from '@/lib/format'
@@ -68,7 +69,7 @@ function Ask() {
         .catch(() => {})
       return
     }
-    navigator.clipboard.writeText(link).then(() => setCopied(true))
+    void copyText(link).then(setCopied)
   }
 
   return (
@@ -224,11 +225,7 @@ function Ask() {
           <span className="text-[13px] text-stone">Your link</span>
           <span className="truncate">{link.replace(/^https?:\/\//, '')}</span>
         </div>
-        <Button
-          variant="soft"
-          size="sm"
-          onClick={() => navigator.clipboard.writeText(link).then(() => setCopied(true))}
-        >
+        <Button variant="soft" size="sm" onClick={() => copyText(link).then(setCopied)}>
           {copied ? <CheckIcon className="size-4" /> : <CopyIcon className="size-4" />}
           {copied ? 'Copied' : 'Copy'}
         </Button>

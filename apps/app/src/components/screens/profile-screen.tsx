@@ -4,25 +4,47 @@ import {
   CaretRightIcon,
   CopyIcon,
   GiftIcon,
+  KeyIcon,
   QuestionIcon,
   SignOutIcon,
   TicketIcon,
   WalletIcon,
 } from '@phosphor-icons/react'
+import { usePrivy } from '@privy-io/react-auth'
+import { useExportWallet, useWallets } from '@privy-io/react-auth/solana'
 import { useState } from 'react'
 import { AvatarPicker } from '@/components/avatar-picker'
 import { withProviders } from '@/components/providers'
 import { TabBar } from '@/components/tab-bar'
-import { Button, Card, Loading } from '@/components/ui'
+import { Button, Card, Loading, Notice } from '@/components/ui'
+import { copyText } from '@/lib/client/copy'
 import { useSession } from '@/lib/client/session'
+
+/** Only accounts we made hold a key Privy can hand back; someone's own wallet keeps its own */
+function findOurAccount(user: ReturnType<typeof usePrivy>['user'], address: string | undefined) {
+  if (!address) return null
+  for (const account of user?.linkedAccounts ?? []) {
+    if (account.type !== 'wallet') continue
+    if (account.address !== address) continue
+    if (account.walletClientType?.startsWith('privy') !== true) continue
+    return account
+  }
+  return null
+}
 
 function ProfilePage() {
   const session = useSession()
+  const { user } = usePrivy()
+  const { wallets } = useWallets()
+  const { exportWallet } = useExportWallet()
   const [copied, setCopied] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
 
   if (!session.ready || !session.profile) return <Loading />
   const { profile } = session
   const link = `${location.host}/${profile.handle}`
+  const address = wallets[0]?.address
+  const account = findOurAccount(user, address)
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -47,11 +69,7 @@ function ProfilePage() {
           <Button
             variant="soft"
             size="sm"
-            onClick={() =>
-              navigator.clipboard
-                .writeText(`${location.protocol}//${link}`)
-                .then(() => setCopied(true))
-            }
+            onClick={() => copyText(`${location.protocol}//${link}`).then(setCopied)}
           >
             <CopyIcon className="size-4" />
             {copied ? 'Copied' : 'Copy'}
@@ -79,12 +97,32 @@ function ProfilePage() {
             <span className="flex-1">Cash out</span>
             <CaretRightIcon className="size-4.5 text-steel" />
           </a>
+          {account && (
+            <button
+              type="button"
+              className="flex h-13 items-center gap-3 text-left"
+              // Privy's own modal shows the key in an iframe on a separate domain; we never see it
+              onClick={() => {
+                if (!address) return
+                setExportError(null)
+                exportWallet({ address }).catch((error: unknown) =>
+                  setExportError(error instanceof Error ? error.message : String(error)),
+                )
+              }}
+            >
+              <KeyIcon className="size-5" />
+              <span className="flex-1">Reveal account key</span>
+              <CaretRightIcon className="size-4.5 text-steel" />
+            </button>
+          )}
           <a href="mailto:help@trymorrow.money" className="flex h-13 items-center gap-3">
             <QuestionIcon className="size-5" />
             <span className="flex-1">Help</span>
             <CaretRightIcon className="size-4.5 text-steel" />
           </a>
         </Card>
+
+        {exportError && <Notice tone="warning">{exportError}</Notice>}
 
         <Button
           variant="danger"

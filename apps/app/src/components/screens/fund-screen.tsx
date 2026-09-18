@@ -16,6 +16,7 @@ import { StockLogo } from '@/components/stock-logo'
 import { SuccessMark } from '@/components/success-mark'
 import { Avatar, Button, Card, Label, Loading, Notice, Screen } from '@/components/ui'
 import { ApiError, errorMessage } from '@/lib/client/api'
+import { copyText } from '@/lib/client/copy'
 import {
   useAddToFundMutation,
   useContributeSharesMutation,
@@ -581,7 +582,7 @@ function Fund({ fundId }: { fundId: string }) {
     if (typeof navigator.share === 'function') {
       navigator.share({ title: view.name, url }).catch(() => {})
     } else {
-      navigator.clipboard.writeText(url)
+      void copyText(url)
     }
   }
 

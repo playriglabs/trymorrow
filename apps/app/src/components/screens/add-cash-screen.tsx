@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { withProviders } from '@/components/providers'
 import { QrCode } from '@/components/qr-code'
 import { Button, Card, Loading, Notice, Screen } from '@/components/ui'
+import { copyText } from '@/lib/client/copy'
 import { usePortfolioQuery } from '@/lib/client/queries'
 import { useSession } from '@/lib/client/session'
 import { formatUsd } from '@/lib/format'
@@ -51,10 +52,7 @@ function AddCash() {
           <p className="text-center text-[14px] leading-normal break-all">{address}</p>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <Button
-            size="sm"
-            onClick={() => navigator.clipboard.writeText(address).then(() => setCopied(true))}
-          >
+          <Button size="sm" onClick={() => copyText(address).then(setCopied)}>
             <CopyIcon className="size-4" />
             {copied ? 'Copied' : 'Copy address'}
           </Button>

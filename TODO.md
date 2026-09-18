@@ -75,6 +75,47 @@ A fund is a long-term pot for someone ("Aisyah's college fund"): locked until a 
   - [ ] A transaction-size test that fails when a gift transaction goes over 1,232 bytes
 - [ ] **Migration tracking**: migrations were run by hand in the SQL editor. Adopt `supabase db push` (or record which files ran) so a fresh database matches production.
 
+## P1.5 — key export on a phone (decided, not built)
+
+Someone on a phone can't get their key out. Privy's hosted export modal measures its container
+once at mount with no `ResizeObserver`, bakes that width into both the iframe and its `width=`
+query param, and the Copy button ends up untappable on a sheet. Everything else was tried and
+closed, on 2026-09-18:
+
+| Approach                                  | What happened                                                                                                     |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `useGetWalletPrivateKey` (client export)  | 403 `Client wallet export is not enabled for this app` — per-app flag Privy controls                              |
+| Server relay, app secret                  | Wallet's owner quorum holds no key of ours                                                                        |
+| Server relay, user JWT                    | `/wallets/authenticate` wants a JWT from a registered auth provider; Privy's own tokens refused                   |
+| Browser signs, server relays              | User signer refuses: `Wallet export is not supported`                                                             |
+| Call the client API directly              | 403 `invalid_origin` — by design, it only answers Privy's own iframe                                              |
+| **Wallet owned by our authorization key** | **Works.** `POST /v1/wallets` with `owner.public_key`, then `POST /v1/wallets/{id}/export` returns the sealed key |
+
+**The one that works makes us custodial.** A 1-of-k quorum means our key alone can export, and a
+key that can export can drain. It would live in the same env as `PRIVY_APP_SECRET`, which today
+can't touch user money. That ends "money only moves signed by them", and the no-KYC posture rests
+on not holding customer assets. It also makes leaving Privy easy, since we could export everyone.
+
+- [ ] **Decide the custody question first.** If no, the answer is Privy enabling client export
+      (ticket) or another provider (Turnkey, Dynamic and Web3Auth document key export properly)
+- [ ] If yes: wallets must be owned by a quorum holding **both** the person and our key, or they
+      can't sign their own transactions. Verify a 1-of-2 wallet still signs in-app before anything
+      depends on it
+- [ ] Creation moves server-side. `createOnLogin` in `providers.tsx` makes wallets client-side with
+      Privy's default owner, so the login path, `walletForEmail` and `useEnsureWallet` all change
+- [ ] Existing accounts can't be retrofitted: adding a key to their quorum needs a signature from a
+      current member, and the only member is the person. Either they stay on the modal, or the
+      browser signs the `PATCH /v1/key_quorums/{id}` itself — untested, and the user signer already
+      refuses export, so it may refuse this too
+- [ ] Signing, already proven: canonicalize the request (RFC 8785), SHA-256, P-256 ECDSA, DER,
+      base64, in `privy-authorization-signature`. Body is `encryption_type: HPKE`,
+      `recipient_public_key` (plain base64 SPKI, not PEM — PEM is the seed-phrase export),
+      `export_seed_phrase: false`. Seal to a keypair the browser keeps so the key never lands here
+
+**Meanwhile:** the modal works on desktop, and Cash out already lets someone on a phone move their
+money out. Worth re-testing the modal on HTTPS — `navigator.clipboard` doesn't exist on the LAN dev
+origin, so "the button does nothing" may just have been the clipboard failing silently.
+
 ## P2 — product
 
 - [x] **Trade history** stored in the DB (`trade_fills`, `pending_trades`), which gives a cost basis

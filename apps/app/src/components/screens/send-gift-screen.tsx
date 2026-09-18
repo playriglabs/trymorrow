@@ -28,6 +28,7 @@ import {
   TextInput,
 } from '@/components/ui'
 import { errorMessage } from '@/lib/client/api'
+import { copyText } from '@/lib/client/copy'
 import { useDebounced } from '@/lib/client/debounce'
 import {
   type SendGiftResult,
@@ -133,7 +134,7 @@ function RecipientChip({ recipient, onRemove }: { recipient: Recipient; onRemove
 
 function GiftLink({ url, label }: { url: string; label?: string }) {
   const [copied, setCopied] = useState(false)
-  const copy = () => navigator.clipboard.writeText(url).then(() => setCopied(true))
+  const copy = () => copyText(url).then(setCopied)
   return (
     <div className="flex items-center gap-2 py-3">
       <div className="flex min-w-0 flex-1 flex-col text-left">
@@ -182,7 +183,7 @@ function GiftsReady({ result }: { result: SendGiftResult }) {
               onClick={() =>
                 canShare()
                   ? navigator.share({ title: 'A gift for you', url: first.url }).catch(() => {})
-                  : navigator.clipboard.writeText(first.url).then(() => setCopied(true))
+                  : copyText(first.url).then(setCopied)
               }
             >
               <ShareIcon className="size-5" />

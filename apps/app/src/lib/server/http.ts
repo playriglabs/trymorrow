@@ -36,7 +36,14 @@ export function route(handler: (context: APIContext) => Promise<Response>): APIR
       }
       console.error(error)
       return json(
-        { error: 'internal', message: 'Something went wrong. Try again.' },
+        {
+          error: 'internal',
+          // Locally the real reason is worth more than a tidy message; in production it isn't ours to give
+          message:
+            import.meta.env.DEV && error instanceof Error
+              ? `${error.message}\n${error.stack ?? ''}`
+              : 'Something went wrong. Try again.',
+        },
         { status: 500 },
       )
     }

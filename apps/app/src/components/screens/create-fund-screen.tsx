@@ -25,6 +25,7 @@ import {
   TextInput,
 } from '@/components/ui'
 import { errorMessage } from '@/lib/client/api'
+import { copyText } from '@/lib/client/copy'
 import {
   useCreateFundMutation,
   useFundFeeQuery,
@@ -70,7 +71,7 @@ function FundReady({ fund }: { fund: FundView }) {
   const share = () =>
     typeof navigator.share === 'function'
       ? navigator.share({ title: fund.name, url }).catch(() => {})
-      : navigator.clipboard.writeText(url).then(() => setCopied(true))
+      : copyText(url).then(setCopied)
 
   return (
     <Screen
@@ -105,11 +106,7 @@ function FundReady({ fund }: { fund: FundView }) {
           <span className="min-w-0 flex-1 truncate text-left text-[15px]">
             {url.replace(/^https?:\/\//, '')}
           </span>
-          <Button
-            variant="soft"
-            size="sm"
-            onClick={() => navigator.clipboard.writeText(url).then(() => setCopied(true))}
-          >
+          <Button variant="soft" size="sm" onClick={() => copyText(url).then(setCopied)}>
             <CopyIcon className="size-4" />
             {copied ? 'Copied' : 'Copy'}
           </Button>

@@ -2,6 +2,7 @@ import { CopyIcon } from '@phosphor-icons/react'
 import { useMemo, useState } from 'react'
 import { ShareCardPreview } from '@/components/share-card-preview'
 import { Button } from '@/components/ui'
+import { copyText } from '@/lib/client/copy'
 import type { GiftCardContent } from '@/lib/client/share-card'
 import { formatUsd } from '@/lib/format'
 import { formatCode } from '@/lib/redeem-code'
@@ -53,16 +54,7 @@ export function GiftCardPreview({
         fullWidth
       />
       {code && (
-        <Button
-          variant="soft"
-          size="sm"
-          onClick={() =>
-            navigator.clipboard
-              .writeText(code)
-              .then(() => setCopied(true))
-              .catch(() => setCopied(false))
-          }
-        >
+        <Button variant="soft" size="sm" onClick={() => copyText(code).then(setCopied)}>
           <CopyIcon className="size-4" />
           {copied ? 'Copied' : 'Copy redeem code'}
         </Button>
