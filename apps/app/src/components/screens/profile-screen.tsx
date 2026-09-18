@@ -34,8 +34,8 @@ function ProfilePage() {
         <div className="flex flex-col items-center gap-3">
           <AvatarPicker profile={profile} />
           <div className="flex flex-col items-center">
-            <h2 className="font-sans text-2xl font-medium tracking-[-0.02em]">{profile.name}</h2>
-            <p className="text-[14px] text-stone">{profile.email}</p>
+            <h2 className="font-sans text-2xl font-medium tracking-[-0.02em]">{profile.handle}</h2>
+            <p className="text-[14px] text-stone mt-1">{profile.email}</p>
           </div>
         </div>
 
