@@ -151,7 +151,10 @@ function Watchlists() {
             </div>
 
             {stocks.isPending ? (
-              <Loading />
+              // Room for the loader to sit in, so the list doesn't collapse while prices land
+              <div className="flex min-h-40 items-center justify-center">
+                <Loading />
+              </div>
             ) : watched.length === 0 ? (
               <Card className="px-4 py-6 text-center text-[15px] text-stone">
                 Nothing in this list yet.

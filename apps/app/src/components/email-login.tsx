@@ -101,7 +101,7 @@ export function EmailLogin({ intro }: { intro?: string }) {
         </p>
       </div>
 
-      <label className="group relative grid grid-cols-6 gap-2">
+      <label className="group relative grid grid-cols-6 gap-1.5">
         <span className="sr-only">6-digit code</span>
         {Array.from({ length: CODE_LENGTH }, (_, index) => (
           <span

@@ -21,12 +21,13 @@ import { copyText } from '@/lib/client/copy'
 import { useSession } from '@/lib/client/session'
 
 /**
- * Privy assembles the key in a window on its own domain, and Safari and Brave block that window
- * on a phone. It never loads, and the screen it puts up sits there with nothing behind it, so a
- * tap would leave someone stuck until they reloaded. A mouse means a desktop browser, where it
- * works, and that's as close to asking as we can get.
+ * Privy assembles the key in a window on its own domain, and an installed app keeps its own
+ * storage, where that window never loads — the screen would sit there empty and leave someone
+ * stuck. A browser tab has no such trouble, phone or not, so that's where we send them.
  */
-const keyOpensHere = () => window.matchMedia('(pointer: fine)').matches
+const inInstalledApp = () =>
+  window.matchMedia('(display-mode: standalone)').matches ||
+  (window.navigator as { standalone?: boolean }).standalone === true
 
 /** Only accounts we made hold a key Privy can hand back; someone's own wallet keeps its own */
 function findOurAccount(user: ReturnType<typeof usePrivy>['user'], address: string | undefined) {
@@ -122,11 +123,11 @@ function ProfilePage() {
               onClick={() => {
                 if (!address) return
                 setExportError(null)
-                if (keyOpensHere()) {
-                  openKey()
+                if (inInstalledApp()) {
+                  setBlocked(true)
                   return
                 }
-                setBlocked(true)
+                openKey()
               }}
             >
               <KeyIcon className="size-5" />
@@ -143,15 +144,16 @@ function ProfilePage() {
 
         {blocked && (
           <Notice tone="warning">
-            Your account key opens on a computer — phone browsers block the window it needs. Sign in
-            at app.trymorrow.money there. To move money out from your phone, use Cash out.
-            <button
-              type="button"
-              onClick={openKey}
+            Your account key won’t open in the installed app. Open Morrow in your browser and try
+            again there — everything else works the same.
+            <a
+              href="/profile"
+              target="_blank"
+              rel="noopener noreferrer"
               className="mt-2 block font-medium underline underline-offset-2"
             >
-              Try it here anyway
-            </button>
+              Open in your browser
+            </a>
           </Notice>
         )}
 

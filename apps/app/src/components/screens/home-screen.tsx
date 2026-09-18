@@ -39,6 +39,37 @@ import type { FundCardView } from '@/lib/types'
 const HOME_STOCKS = 7
 /** A glance at what's being watched, not the whole list */
 const HOME_WATCHED = 4
+/** Baskets past this are a swipe too far on a phone; "See all" holds the rest */
+const HOME_WATCHLISTS = 4
+
+/** Stands in for rows while prices load, so the section doesn't jump when they land */
+function StockRowsSkeleton({ label }: { label: string }) {
+  return (
+    <Card className="flex flex-col divide-y divide-line px-4">
+      <span role="status" className="sr-only">
+        {label}
+      </span>
+      {[0, 1, 2, 3].map((row) => (
+        <div
+          key={row}
+          className="flex animate-pulse items-center gap-3 py-3 motion-reduce:animate-none"
+          aria-hidden
+        >
+          <div className="size-10 shrink-0 rounded-full bg-orange-wash" />
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <div className="h-4 w-28 max-w-full rounded bg-orange-wash" />
+            <div className="h-3 w-18 max-w-full rounded bg-orange-wash" />
+          </div>
+          <div className="flex shrink-0 flex-col items-end gap-2">
+            <div className="h-4 w-16 rounded bg-orange-wash" />
+            <div className="h-3 w-20 rounded bg-orange-wash" />
+          </div>
+        </div>
+      ))}
+    </Card>
+  )
+}
+
 const BALANCE_HIDDEN_KEY = 'morrow:balance-hidden'
 
 function HomeFunds({ funds }: { funds: FundCardView[] }) {
@@ -159,7 +190,8 @@ function House() {
   const stockPrices = useStocksQuery({ enabled: session.ready && watching.length > 0 })
   // Home shows one basket at a time; a deleted list falls back to the first one
   const [watchlistId, setWatchlistId] = useState<string | null>(null)
-  const watchlist = watchlists.find((list) => list.id === watchlistId) ?? watchlists[0] ?? null
+  const homeLists = watchlists.slice(0, HOME_WATCHLISTS)
+  const watchlist = homeLists.find((list) => list.id === watchlistId) ?? homeLists[0] ?? null
 
   const total = portfolio.data ? portfolio.data.cashUsd + portfolio.data.stocksUsd : null
   const shownTotal = useAnimatedNumber(total)
@@ -404,30 +436,7 @@ function House() {
             )}
           </div>
           {match({ pending: portfolio.isPending, empty: stocks.length === 0 })
-            .with({ pending: true }, () => (
-              <Card className="flex flex-col divide-y divide-line px-4">
-                <span role="status" className="sr-only">
-                  Loading stocks
-                </span>
-                {[0, 1, 2, 3].map((row) => (
-                  <div
-                    key={row}
-                    className="flex animate-pulse items-center gap-3 py-3 motion-reduce:animate-none"
-                    aria-hidden
-                  >
-                    <div className="size-10 shrink-0 rounded-full bg-orange-wash" />
-                    <div className="flex min-w-0 flex-1 flex-col gap-2">
-                      <div className="h-4 w-28 max-w-full rounded bg-orange-wash" />
-                      <div className="h-3 w-18 max-w-full rounded bg-orange-wash" />
-                    </div>
-                    <div className="flex shrink-0 flex-col items-end gap-2">
-                      <div className="h-4 w-16 rounded bg-orange-wash" />
-                      <div className="h-3 w-20 rounded bg-orange-wash" />
-                    </div>
-                  </div>
-                ))}
-              </Card>
-            ))
+            .with({ pending: true }, () => <StockRowsSkeleton label="Loading stocks" />)
             .with({ empty: true }, () => (
               <Card className="px-4 py-5 text-[15px] text-stone">
                 No stocks yet. Buy one, or open a gift, to get started.
@@ -450,39 +459,46 @@ function House() {
                 See all
               </a>
             </div>
-            {watchlists.length > 1 && (
-              <WatchlistTabs lists={watchlists} activeId={watchlist.id} onPick={setWatchlistId} />
+            {homeLists.length > 1 && (
+              <WatchlistTabs lists={homeLists} activeId={watchlist.id} onPick={setWatchlistId} />
             )}
-            {watched.length === 0 ? (
-              <Card className="px-4 py-5 text-[15px] text-stone">
-                {match({ pending: stockPrices.isPending, empty: watchlist.mints.length === 0 })
-                  .with({ empty: true }, () => 'Nothing in this list yet.')
-                  .with({ pending: true }, () => 'Loading prices…')
-                  .otherwise(() => 'Prices are taking a moment.')}
-              </Card>
-            ) : (
-              <Card className="flex flex-col divide-y divide-line px-4">
-                {watched.slice(0, HOME_WATCHED).map((stock) => (
-                  <a
-                    key={stock.mint}
-                    href={`/trade/${encodeURIComponent(stock.ticker.toLowerCase())}`}
-                    className="flex h-16 items-center gap-3"
-                  >
-                    <StockLogo iconUrl={stock.iconUrl} ticker={stock.ticker} size={40} />
-                    <div className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate">{stock.name}</span>
-                      <span className="text-[13px] text-stone">{stock.ticker}</span>
-                    </div>
-                    <div className="flex flex-col items-end gap-0.5">
-                      <span className="text-[15px]">{formatUsd(stock.priceUsd)}</span>
-                      {stock.change24hPct != null && !stock.lowLiquidity && (
-                        <ChangePill value={stock.change24hPct} />
-                      )}
-                    </div>
-                  </a>
-                ))}
-              </Card>
-            )}
+            {match({
+              empty: watchlist.mints.length === 0,
+              pending: stockPrices.isPending,
+              unpriced: watched.length === 0,
+            })
+              .with({ empty: true }, () => (
+                <Card className="px-4 py-5 text-[15px] text-stone">Nothing in this list yet.</Card>
+              ))
+              .with({ pending: true }, () => <StockRowsSkeleton label="Loading watched stocks" />)
+              .with({ unpriced: true }, () => (
+                <Card className="px-4 py-5 text-[15px] text-stone">
+                  Prices are taking a moment.
+                </Card>
+              ))
+              .otherwise(() => (
+                <Card className="flex flex-col divide-y divide-line px-4">
+                  {watched.slice(0, HOME_WATCHED).map((stock) => (
+                    <a
+                      key={stock.mint}
+                      href={`/trade/${encodeURIComponent(stock.ticker.toLowerCase())}`}
+                      className="flex h-16 items-center gap-3"
+                    >
+                      <StockLogo iconUrl={stock.iconUrl} ticker={stock.ticker} size={40} />
+                      <div className="flex min-w-0 flex-1 flex-col">
+                        <span className="truncate">{stock.name}</span>
+                        <span className="text-[13px] text-stone">{stock.ticker}</span>
+                      </div>
+                      <div className="flex flex-col items-end gap-0.5">
+                        <span className="text-[15px]">{formatUsd(stock.priceUsd)}</span>
+                        {stock.change24hPct != null && !stock.lowLiquidity && (
+                          <ChangePill value={stock.change24hPct} />
+                        )}
+                      </div>
+                    </a>
+                  ))}
+                </Card>
+              ))}
           </section>
         )}
 
