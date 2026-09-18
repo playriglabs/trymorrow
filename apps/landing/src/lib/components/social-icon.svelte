@@ -1,11 +1,16 @@
 <script lang="ts">
-let { name }: { name: 'x' | 'reddit' | 'linkedin' } = $props()
+let { name, small = false }: { name: 'x' | 'reddit' | 'linkedin'; small?: boolean } = $props()
+
+// Reddit's mark reads smaller than the others at the same box, so it gets a step up.
+const sizes = {
+  x: small ? 'size-4' : 'size-5',
+  linkedin: small ? 'size-4' : 'size-5',
+  reddit: small ? 'size-5' : 'size-6',
+}
 </script>
 
 <span
-  class="block shrink-0 bg-current"
-  class:size-5={name === 'x' || name === 'linkedin'}
-  class:size-6={name === 'reddit'}
+  class="block shrink-0 bg-current {sizes[name]}"
   style:mask-image={`url('/${name}.svg')`}
   style:mask-repeat="no-repeat"
   style:mask-position="center"

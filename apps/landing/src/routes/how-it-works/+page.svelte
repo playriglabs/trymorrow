@@ -140,6 +140,10 @@ const faqs = [
     a: 'After 30 days it comes back to you automatically. You can also take it back yourself any time before it’s opened.',
   },
   {
+    q: 'What if they don’t have Morrow yet?',
+    a: 'Send it to their email anyway. The gift waits for them, and it opens when they sign in with the code sent to that same email address — no app to install first, nothing for you to set up on their side.',
+  },
+  {
     q: 'Can I change a fund after I start it?',
     a: 'No. Who it’s for and the unlock date are fixed, so everyone who adds to it knows exactly where it’s going.',
   },
@@ -245,7 +249,7 @@ const faqs = [
     <h2 id="faq-title" class="section-title">Good to know.</h2>
     <div class="mt-10 divide-y divide-line border-y border-line">
       {#each faqs as faq}
-        <details class="group">
+        <details class="faq-row group">
           <summary
             class="flex min-h-16 cursor-pointer list-none items-center justify-between gap-6 py-5 font-sans text-lg tracking-tight md:text-xl [&::-webkit-details-marker]:hidden"
             >{faq.q}<span

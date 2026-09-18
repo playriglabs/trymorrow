@@ -7,13 +7,13 @@ const socials = [
 ] as const
 </script>
 
-<header class="fixed inset-x-0 top-5 z-40 px-3 md:top-7">
-  <nav aria-label="Main navigation" class="nav-glass mx-auto max-w-155 rounded-3xl p-1.5 md:p-2">
+<header class="fixed inset-x-0 top-3 z-40 px-3 md:top-4">
+  <nav aria-label="Main navigation" class="nav-glass mx-auto max-w-135 rounded-3xl p-1.5">
     <div class="flex items-center justify-between gap-1 md:gap-5">
       <a
         href="/"
         aria-label="Morrow home"
-        class="flex min-h-11 items-center pl-2 font-sans text-2xl leading-none tracking-tighter md:pl-3 md:text-3xl"
+        class="flex min-h-10 items-center pl-2 font-sans text-2xl leading-none tracking-tighter md:pl-3 md:text-3xl"
         ><img
           src="/trymorrow-logo-rounded.png"
           alt=""
@@ -22,15 +22,15 @@ const socials = [
           class="rounded-lg min-[360px]:hidden"
         /><span class="hidden min-[360px]:inline">morrow<span class="text-orange">*</span></span></a
       >
-      <div class="flex items-center">
+      <div class="-mx-0.5 flex items-center">
         {#each socials as social}
           <a
             href={social.href}
             aria-label={social.label}
             target="_blank"
             rel="noopener noreferrer"
-            class="flex size-11 items-center justify-center rounded-lg transition-colors hover:bg-cream hover:text-orange"
-            ><SocialIcon name={social.name} /></a
+            class="flex size-9 items-center justify-center rounded-lg transition-colors hover:bg-cream hover:text-orange"
+            ><SocialIcon name={social.name} small /></a
           >
         {/each}
       </div>
@@ -39,14 +39,14 @@ const socials = [
         class="app-glow relative isolate shrink-0 overflow-hidden rounded-card p-0.5"
       >
         <span
-          class="relative z-10 flex min-h-11 items-center gap-2 rounded-[18px] bg-[#efe8dc] p-1 pr-3 text-xs md:gap-3 md:pr-4 md:text-sm"
-          ><span class="flex size-9 items-center justify-center rounded-[13px] bg-ink md:size-11"
+          class="relative z-10 flex min-h-10 items-center gap-2 rounded-[16px] bg-[#efe8dc] p-1 pr-3 text-xs md:gap-3 md:pr-4 md:text-sm"
+          ><span class="flex size-9 items-center justify-center rounded-[12px] bg-ink"
             ><img
               src="/trymorrow-logo-rounded.png"
               width="29"
               height="29"
               alt=""
-              class="size-7 rounded-lg"
+              class="size-6.5 rounded-lg"
             /></span
           >Open app</span
         >

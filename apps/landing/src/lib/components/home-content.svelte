@@ -129,10 +129,27 @@ onMount(() => {
           <div class="flex justify-between">
             <StockMark stock="apple" color="#fffefb" size={45} /><Icon name="diagonal" size={19} />
           </div>
-          <p class="mt-8 text-xs">A piece of something big.</p>
-          <p class="mt-1 font-sans text-[44px] tracking-[-0.06em]">Apple</p>
-          <div class="mt-4 flex items-center justify-between border-t border-ink/15 pt-3 text-xs">
-            <span>Big ideas. Little shares.</span><span>↗</span>
+          <p class="mt-7 text-xs text-ink/70">A piece of something big.</p>
+          <p class="mt-0.5 font-sans text-[44px] leading-none tracking-[-0.06em]">Apple</p>
+          <div class="mt-4 flex items-baseline gap-2 border-t border-ink/15 pt-3">
+            <span class="font-sans text-lg tracking-tight">$2.50</span><span class="text-[11px]"
+              >a share, or less</span
+            >
+          </div>
+        </div>
+        <!-- The gift card, the other way to send one: a code anyone can redeem. -->
+        <div
+          class="hero-redeem absolute top-107.5 left-[11%] z-20 w-52 rotate-6 overflow-hidden rounded-3xl bg-surface text-left shadow-[0_18px_40px_-22px_rgb(76_40_6/0.45)]"
+        >
+          <div class="bg-orange px-4 pt-4 pb-5 text-white">
+            <div class="flex items-center justify-between text-[10px]">
+              <span>Morrow gift card</span><Icon name="gift" size={15} />
+            </div>
+            <p class="mt-3 font-sans text-[28px] leading-none tracking-[-0.05em]">$50.00</p>
+          </div>
+          <div class="border-t border-dashed border-line px-4 py-3">
+            <p class="text-[10px] text-stone">Redeem code</p>
+            <p class="mt-0.5 font-sans text-sm tracking-tight">7QF4-2M9K-8RD3</p>
           </div>
         </div>
         <div
@@ -350,9 +367,9 @@ onMount(() => {
             class="action-words pointer-events-none absolute inset-0 z-50 flex flex-col items-center justify-center gap-2 bg-surface px-5"
             aria-hidden="true"
           >
-            {#each [{ word: 'Give.', icon: 'gift', color: '#c85a00' }, { word: 'Invest.', icon: 'chart', color: '#6f548d' }, { word: 'Grow.', icon: 'grow', color: '#486839' }] as action}
+            {#each [{ word: 'Give.', icon: 'gift', color: '#f66f00' }, { word: 'Invest.', icon: 'chart', color: '#6f548d' }, { word: 'Grow.', icon: 'grow', color: '#486839' }] as action}
               <div
-                class="action-word flex items-center gap-5 font-sans text-[clamp(64px,9vw,130px)] leading-[1.13] tracking-[-0.065em]"
+                class="action-word flex items-center gap-4 font-sans text-[clamp(64px,9vw,130px)] leading-[1.13] tracking-[-0.065em]"
                 style:color={action.color}
               >
                 <span
@@ -386,10 +403,13 @@ onMount(() => {
           ></a
         >
       </div>
-      <div class="grid gap-x-6 gap-y-12 md:grid-cols-2">
-        <article class="reveal">
+      <!-- Below lg these swipe sideways like the section above, bleeding to the screen edge. -->
+      <div
+        class="-mx-5 flex snap-x snap-mandatory scroll-px-5 gap-5 overflow-x-auto px-5 pb-2 [scrollbar-width:none] md:-mx-10 md:scroll-px-10 md:gap-6 md:px-10 lg:mx-0 lg:grid lg:snap-none lg:grid-cols-2 lg:gap-x-6 lg:gap-y-12 lg:overflow-visible lg:px-0 lg:pb-0 [&::-webkit-scrollbar]:hidden"
+      >
+        <article class="reveal w-[82%] shrink-0 snap-start md:w-[46%] lg:w-auto">
           <div
-            class="feature-art relative flex aspect-[1.35] items-center justify-center overflow-hidden rounded-3xl bg-[#e4ead9]"
+            class="feature-art relative flex aspect-[0.92] items-center justify-center overflow-hidden rounded-3xl bg-[#e4ead9] lg:aspect-[1.35]"
           >
             <CardOrnament variant="orbit" />
             <div class="relative w-[75%] max-w-78.75 -rotate-6 rounded-[22px] bg-surface p-5">
@@ -416,13 +436,13 @@ onMount(() => {
             </p>
           </div>
         </article>
-        <article class="reveal">
+        <article class="reveal w-[82%] shrink-0 snap-start md:w-[46%] lg:w-auto">
           <div
-            class="feature-art relative flex aspect-[1.35] items-center justify-center overflow-hidden rounded-3xl bg-[#eddbc3]"
+            class="feature-art relative flex aspect-[0.92] items-center justify-center overflow-hidden rounded-3xl bg-[#eddbc3] lg:aspect-[1.35]"
           >
             <CardOrnament variant="sparkles" />
             <div class="absolute top-8 left-10 w-55 -rotate-12 opacity-45">
-              <GiftPreview compact />
+              <GiftPreview compact stock="apple" markColor="#eeeae2" />
             </div>
             <div class="relative mt-8 ml-12 w-62.5 rotate-10"><GiftPreview compact /></div>
           </div>
@@ -434,9 +454,9 @@ onMount(() => {
             </p>
           </div>
         </article>
-        <article class="reveal">
+        <article class="reveal w-[82%] shrink-0 snap-start md:w-[46%] lg:w-auto">
           <div
-            class="feature-art relative flex aspect-[1.35] items-center justify-center overflow-hidden rounded-3xl bg-[#e0d5ed]"
+            class="feature-art relative flex aspect-[0.92] items-center justify-center overflow-hidden rounded-3xl bg-[#e0d5ed] lg:aspect-[1.35]"
           >
             <CardOrnament variant="sunburst" />
             <div class="relative w-[75%] max-w-77.5 rotate-[-5deg] rounded-[22px] bg-surface p-6">
@@ -456,7 +476,7 @@ onMount(() => {
                 <div class="h-full w-[49%] rounded-full bg-[#ad8dcc]"></div>
               </div>
               <div class="mt-5 flex items-center gap-2 text-[10px] text-stone">
-                <Icon name="lock" size={14} />Set a date. Give it time.
+                <LockMark class="size-3.5" />Set a date. Give it time.
               </div>
             </div>
           </div>
@@ -467,9 +487,9 @@ onMount(() => {
             </p>
           </div>
         </article>
-        <article class="reveal">
+        <article class="reveal w-[82%] shrink-0 snap-start md:w-[46%] lg:w-auto">
           <div
-            class="feature-art relative flex aspect-[1.35] items-center justify-center overflow-hidden rounded-3xl bg-[#f6cfa9]"
+            class="feature-art relative flex aspect-[0.92] items-center justify-center overflow-hidden rounded-3xl bg-[#f6cfa9] lg:aspect-[1.35]"
           >
             <CardOrnament variant="security" />
             <div

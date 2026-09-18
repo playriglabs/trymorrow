@@ -24,7 +24,7 @@ export function initHomeMotion(root: HTMLElement) {
           delay: 0.3,
           ease: 'power3.out',
         })
-        gsap.from('.hero-gift, .hero-stock, .hero-note', {
+        gsap.from('.hero-gift, .hero-stock, .hero-redeem, .hero-note', {
           y: 65,
           opacity: 0,
           scale: 0.85,
@@ -45,6 +45,14 @@ export function initHomeMotion(root: HTMLElement) {
           y: 15,
           rotation: 7,
           duration: 3.8,
+          yoyo: true,
+          repeat: -1,
+          ease: 'sine.inOut',
+        })
+        gsap.to('.hero-redeem', {
+          y: -14,
+          rotation: 4,
+          duration: 4.2,
           yoyo: true,
           repeat: -1,
           ease: 'sine.inOut',

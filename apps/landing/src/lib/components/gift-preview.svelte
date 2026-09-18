@@ -2,7 +2,11 @@
 import Icon from './landing-icon.svelte'
 import StockMark from './stock-mark.svelte'
 
-let { compact = false }: { compact?: boolean } = $props()
+let {
+  compact = false,
+  stock = 'nvidia',
+  markColor = '#d5efb2',
+}: { compact?: boolean; stock?: string; markColor?: string } = $props()
 </script>
 
 <div
@@ -17,7 +21,7 @@ let { compact = false }: { compact?: boolean } = $props()
   </div>
   <div class="rounded-button bg-cream p-4 text-ink">
     <div class="flex items-center gap-3">
-      <StockMark stock="nvidia" size={38} />
+      <StockMark {stock} color={markColor} size={38} />
       <div>
         <p class="text-xs text-stone">A gifts for you.</p>
         <p class="font-sans text-2xl tracking-tight">$50.00</p>

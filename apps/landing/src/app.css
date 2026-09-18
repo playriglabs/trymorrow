@@ -3,6 +3,7 @@
 @layer base {
   html {
     scroll-behavior: smooth;
+    interpolate-size: allow-keywords;
   }
   body {
     min-width: 320px;
@@ -111,6 +112,21 @@
     visibility: hidden;
     opacity: 0;
   }
+  /* FAQ rows slide open. Browsers without ::details-content still open them, just
+     instantly, so the answer is never hidden by a missing feature. */
+  .faq-row::details-content {
+    block-size: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition:
+      block-size 0.35s cubic-bezier(0.32, 0.72, 0, 1),
+      content-visibility 0.35s allow-discrete,
+      opacity 0.25s ease;
+  }
+  .faq-row[open]::details-content {
+    block-size: auto;
+    opacity: 1;
+  }
 }
 
 @media (max-width: 767px) {
@@ -121,6 +137,7 @@
   }
   .hero-gift,
   .hero-stock,
+  .hero-redeem,
   .hero-note {
     display: none;
   }
