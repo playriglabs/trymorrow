@@ -53,4 +53,27 @@ export async function sendEmails(messages: Map<string, EmailContent>): Promise<v
   }
 }
 
+/**
+ * One email to an address that has no account yet. Everything else goes through `notify()`, which
+ * keys on a user id and reads the address off their profile — but a gift to a new email is sent
+ * before its recipient exists, and they're the one person who can't find out any other way.
+ * There are no notification settings to respect, because there's nobody to hold them.
+ */
+export async function sendEmailTo(to: string, content: EmailContent): Promise<void> {
+  if (!resend) return
+  try {
+    const sent = await resend.emails.send({
+      from: FROM,
+      to: [to],
+      replyTo: REPLY_TO,
+      subject: content.subject,
+      html: renderEmail(content, PUBLIC_APP_URL),
+      text: renderEmailText(content, PUBLIC_APP_URL),
+    })
+    if (sent.error) console.error('Email failed', sent.error)
+  } catch (sendError) {
+    console.error('Email failed', sendError)
+  }
+}
+
 export const emailConfigured = configured

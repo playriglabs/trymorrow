@@ -2,9 +2,11 @@ import { findGiftAddress, findGiftCardAddress, USDC } from '@morrow/sdk'
 import { PublicKey } from '@solana/web3.js'
 import { z } from 'astro/zod'
 import { match } from 'ts-pattern'
+import type { EmailContent } from '@/lib/email-template'
 import { formatFullDate, formatUsd } from '@/lib/format'
 import { CASH_MINT } from '@/lib/gifts'
 import { findGiftAsset } from '@/lib/server/catalog'
+import { sendEmailTo } from '@/lib/server/email'
 import { isFeeTransfer } from '@/lib/server/fees'
 import {
   GIFT_COLUMNS,
@@ -132,6 +134,21 @@ export const POST = route(async ({ params, request }) => {
     const opening = sent.gift_items.some((item) => item.mint === CASH_MINT)
       ? 'Open it to keep it.'
       : 'Open it to keep the shares.'
+    const giftEmail: EmailContent = {
+      subject: `${senderName} sent you ${label}`,
+      preview: `${opening} It goes back to ${senderName} in ${GIFT_LIFETIME_DAYS} days.`,
+      eyebrow: `${senderName} sent you a gift`,
+      hero: label,
+      subhero: 'Only you can open it.',
+      rows: [
+        { label: 'From', value: senderName },
+        { label: 'Worth when sent', value: formatUsd(sentUsd) },
+        { label: 'Open before', value: formatFullDate(sent.expires_at) },
+      ],
+      note: sent.message ? { from: senderName, text: sent.message } : null,
+      cta: { label: 'Open your gift', path: `/gift/${sent.id}` },
+      footnote: `Not opened in ${GIFT_LIFETIME_DAYS} days? It goes back to ${senderName}, in full.`,
+    }
     // A take-back doesn't notify: the sender did it themselves and sees the result on screen,
     // and notify only buzzes for things that happened while someone was away
     const rows = match(action)
@@ -157,21 +174,7 @@ export const POST = route(async ({ params, request }) => {
                 body: opening,
                 giftId: sent.id,
                 url: `/gift/${sent.id}`,
-                email: {
-                  subject: `${senderName} sent you ${label}`,
-                  preview: `${opening} It goes back to ${senderName} in ${GIFT_LIFETIME_DAYS} days.`,
-                  eyebrow: `${senderName} sent you a gift`,
-                  hero: label,
-                  subhero: 'Only you can open it.',
-                  rows: [
-                    { label: 'From', value: senderName },
-                    { label: 'Worth when sent', value: formatUsd(sentUsd) },
-                    { label: 'Open before', value: formatFullDate(sent.expires_at) },
-                  ],
-                  note: sent.message ? { from: senderName, text: sent.message } : null,
-                  cta: { label: 'Open your gift', path: `/gift/${sent.id}` },
-                  footnote: `Not opened in ${GIFT_LIFETIME_DAYS} days? It goes back to ${senderName}, in full.`,
-                },
+                email: giftEmail,
               },
             ]
           : []),
@@ -191,6 +194,18 @@ export const POST = route(async ({ params, request }) => {
       ])
       .otherwise(() => [])
     await notify(rows)
+
+    // A gift to an email nobody has signed in with yet has no user row, so `notify()` has nobody
+    // to reach: no feed to write to, no phone, no address on a profile. That person is exactly
+    // the one who needs telling, and this address is the only handle we have on them.
+    if (action === 'createGift' && !sent.recipient_id && sent.recipient_email) {
+      await sendEmailTo(sent.recipient_email, {
+        ...giftEmail,
+        preview: `${opening} Sign in with this email to open it.`,
+        // Signing in with Google makes a separate account, which can't see this gift
+        footnote: `Open it by signing in with this email address, not with a Google account. Not opened in ${GIFT_LIFETIME_DAYS} days? It goes back to ${senderName}, in full.`,
+      })
+    }
   } catch (notifyError) {
     console.error('Gift notification failed', notifyError)
   }
