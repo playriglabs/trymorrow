@@ -5,6 +5,8 @@ import {
   CopyIcon,
   GiftIcon,
   KeyIcon,
+  PaperPlaneTiltIcon,
+  PlantIcon,
   QuestionIcon,
   SignOutIcon,
   TicketIcon,
@@ -111,6 +113,16 @@ function ProfilePage() {
             <span className="flex-1">Add cash</span>
             <CaretRightIcon className="size-4.5 text-steel" />
           </a>
+          <a href="/send-stocks" className="flex h-13 items-center gap-3">
+            <PaperPlaneTiltIcon className="size-5" />
+            <span className="flex-1">Send stocks</span>
+            <CaretRightIcon className="size-4.5 text-steel" />
+          </a>
+          <a href="/earn" className="flex h-13 items-center gap-3">
+            <PlantIcon className="size-5" />
+            <span className="flex-1">Earn on your cash</span>
+            <CaretRightIcon className="size-4.5 text-steel" />
+          </a>
           <a href="/cash-out" className="flex h-13 items-center gap-3">
             <ArrowLineUpRightIcon className="size-5" />
             <span className="flex-1">Cash out</span>
@@ -131,7 +143,7 @@ function ProfilePage() {
               }}
             >
               <KeyIcon className="size-5" />
-              <span className="flex-1">Reveal account key</span>
+              <span className="flex-1">Reveal key</span>
               <CaretRightIcon className="size-4.5 text-steel" />
             </button>
           )}

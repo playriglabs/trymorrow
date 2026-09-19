@@ -7,6 +7,7 @@ import {
   CurrencyDollarIcon,
   GearIcon,
   GiftIcon,
+  HeartIcon,
   LockOpenIcon,
   PaperPlaneTiltIcon,
   PiggyBankIcon,
@@ -27,6 +28,7 @@ const ICONS: Record<NotificationKind, typeof GiftIcon> = {
   gift_received: GiftIcon,
   gift_opened: ConfettiIcon,
   gift_returned: ArrowUUpLeftIcon,
+  gift_thanks: HeartIcon,
   trade_bought: TrendUpIcon,
   trade_sold: TrendDownIcon,
   fund_added: PiggyBankIcon,
@@ -35,6 +37,7 @@ const ICONS: Record<NotificationKind, typeof GiftIcon> = {
   cash_deposited: CurrencyDollarIcon,
   cash_sent: ArrowLineUpRightIcon,
   stock_deposited: ArrowFatDownIcon,
+  stock_sent: ArrowLineUpRightIcon,
 }
 
 function NotificationRow({ notification }: { notification: NotificationView }) {

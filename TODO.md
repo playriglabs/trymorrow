@@ -1,6 +1,6 @@
 # TODO
 
-What's left, in the order it matters. Hackathon deadline: **Fri 2026-09-18, 4pm ET**.
+What's left, in the order it matters. Hackathon deadline: **Thu 2026-09-25** (extended).
 
 ## P0 — before submitting
 
@@ -10,12 +10,21 @@ What's left, in the order it matters. Hackathon deadline: **Fri 2026-09-18, 4pm 
   - [x] Gift to a brand-new email, opened by signing in with that email's code
   - [x] Fee paid in shares (sender with no cash)
   - [x] Claim a 3-stock gift
-- [ ] **Deploy the app to Vercel**
-  - [ ] Set every env var from `apps/app/.env`, including `CRON_SECRET` and `PUBLIC_APP_URL`
-  - [ ] Raise the function duration (`vercel({ maxDuration })` in `astro.config.mjs`): sending a gift can wait up to ~60–90s while the transaction lands
-  - [ ] Confirm the daily cron shows up in Vercel and `/api/cron/refund-gifts` returns 401 without the secret
+- [x] **Deploy the app to Vercel** — live at `app.trymorrow.money`
+  - [x] Set every env var from `apps/app/.env`, including `CRON_SECRET` and `PUBLIC_APP_URL`
+  - [x] Raise the function duration (`vercel({ maxDuration })` in `astro.config.mjs`): sending a gift can wait up to ~60–90s while the transaction lands
+  - [x] Confirm the daily cron shows up in Vercel and `/api/cron/refund-gifts` returns 401 without the secret
 - [x] **Jupiter referral fee**: create the referral account under the Ultra project at referral.jup.ag, open token accounts for USDC and SOL, set `JUPITER_REFERRAL_ACCOUNT`. Then check in logs how often the fee survives (gasless) versus falls back.
 - [x] **Commit the work.** Nothing is in git yet.
+- [ ] **Apply `20260919090000_gift_thanks.sql` before the next deploy.** `GIFT_COLUMNS` now selects
+      `thanks_note` and `thanked_at`, so every gift query fails until the migration has run.
+- [ ] **Apply `20260919100000_stock_sends.sql`** before the next deploy: `/send-stocks` reads and
+      writes the new `stock_sends` table, and the feed's `stock_sent` kind is in the same file.
+- [ ] **Push for shares arriving.** The recipient's `stock_deposited` row lands in the feed but
+      never buzzes, because `notify()` only pushes kinds with a settings toggle and this one has
+      none. Add a toggle column (and a settings row) if incoming shares should reach a phone.
+- [ ] **Run one share send on mainnet**: to an address that already holds the stock (free), then to
+      one that doesn't (fee opens their account). Only the cash-out twin has been proven on chain.
 - [ ] **Submission**: demo video (buy → gift → open), pitch, README screenshots, program address and a Solscan link.
 
 ## P0 — family funds (next feature)
@@ -268,18 +277,33 @@ Two shapes of Earn, very different in effort:
         CCIP) and oracle exposure. Cap how much of a fund can be in Earn
 - [ ] **Claimed-holding Earn:** after a gift is opened, let the owner allocate supported shares to
       Earn and request withdrawal; never enroll a pending gift automatically
-- [ ] **Idle-cash Earn:** likely the first to ship, since it needs no program change; never describe
-      variable yield as savings interest or guaranteed return
-  - [ ] Pick the venue: compare Kamino K-Lend and Jupiter Lend on rate history, withdrawal liquidity
-        at high utilization, audits and how deposit and withdraw fit our transaction checks
+- [x] **Idle-cash Earn** shipped 2026-09-19 as `/earn`; never describe variable yield as savings
+      interest or a guaranteed return
+  - [x] Venue picked: **Jupiter Lend Earn**, measured 2026-09-19. USDC pays 4.45% lending + 0.38%
+        rewards = **4.83%** with $469M supplied, against Kamino main market USDC at 3.79% with
+        $127M and Save at 3.43% with $5M. Keyless `lite-api.jup.ag/lend/v1`, same vendor as our
+        swaps, one instruction with 17 accounts. Deposit simulated clean on mainnet at 71,197
+        compute units, 726 bytes.
+  - [x] **Kamino rejected on cost, not taste** (measured 2026-09-19 by building a real deposit with
+        `klend-sdk` v12 and a noop signer). A first deposit opens an obligation (0.01764 SOL), user
+        metadata (0.00585) and a collateral account (0.00149): **0.0250 SOL, about $2.84**, none of
+        it coming back unless those accounts are closed. Jupiter Lend costs one 0.00149 SOL account
+        that closes itself on a full take-back. So Kamino's main market is a lower rate at 17× the
+        setup cost. Only its isolated USDC market (6.41%, $7M) beats Jupiter, and that's a thin
+        pool with riskier collateral — revisit with a minimum deposit and a plain warning.
+  - [x] The screen lists Jupiter Lend, Kamino and Save with live rates and marks the one the cash
+        goes to, so the claim "best rate" can be checked rather than believed. Kamino answers for
+        itself; Save comes through DefiLlama.
+  - [x] `submit` checks: relayer pays, the person signs, no lookup tables, and every instruction
+        belongs to the lending program, the token programs or the compute budget
+  - [ ] **Run it once on mainnet with about $1**: deposit, part take-back, then all of it. The
+        redeem-then-close pair has only been built and type-checked, never landed.
   - [ ] Keep ready cash: leave enough outside Earn for trades and fees, or unwind in the same
         transaction as a buy, gift or cash out (measure the size first)
-  - [ ] One cash balance on screen with the earning part inside it, plus what it earned; no receipt
-        token names or rates dressed as promises
-  - [ ] `submit` checks for deposit and withdraw as strict as trades: only the recorded amount, only
-        between the person's own account and the chosen market
-  - [ ] Fee and share-paid fee rules: decide whether cash in Earn counts as cash for gift fees and
-        the "send the whole balance" case
+  - [ ] Fee and share-paid fee rules: cash in Earn does not count as cash today, so a gift fee and
+        "send the whole balance" both ignore it. Decide whether that stays.
+  - [ ] Earning and ready cash are two lines on screen rather than one balance, because the fee
+        planner only knows about spendable cash. Revisit once the rule above is decided.
   - [ ] Cash in a fund: funds hold only shares today; a cash allocation that earns would go through
         the same program CPI as Fund Earn
 - [ ] **Transparent earnings view:** separate market change, dividend-related balance changes, gross

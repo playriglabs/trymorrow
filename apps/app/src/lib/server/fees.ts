@@ -230,6 +230,30 @@ export async function cashoutFee(destination: PublicKey): Promise<CashoutFee> {
   return { opensAccount: true, ...cashAtCost(rent + 2 * lamportsPerTransaction, solUsd) }
 }
 
+/**
+ * What sending shares to an address outside Morrow costs us for good. The same rule as a cash
+ * out: free when the destination already holds this stock, because the network fee is under a
+ * cent; charged at cost when the relayer has to open an account for it, since that rent stays
+ * with their account forever.
+ */
+export async function stockSendFee(destination: PublicKey, asset: GiftAsset): Promise<CashoutFee> {
+  if (await connection.getAccountInfo(holdingAccount(destination, asset))) {
+    return { opensAccount: false, raw: 0n, usd: 0 }
+  }
+  const [rent, solUsd, lamportsPerTransaction] = await Promise.all([
+    shareAccountRent(asset),
+    solPrice(),
+    transactionLamports(),
+  ])
+  // Opening the account is its own relayer transaction, then the transfer is a second one
+  return { opensAccount: true, ...cashAtCost(rent + 2 * lamportsPerTransaction, solUsd) }
+}
+
+/** The account a stock lands in, so a send can check whether the destination has one yet */
+export function shareAccount(owner: PublicKey, asset: GiftAsset): PublicKey {
+  return holdingAccount(owner, asset)
+}
+
 export type ContributionFee = {
   raw: bigint
   usd: number

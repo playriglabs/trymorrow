@@ -11,6 +11,7 @@ import {
 import clsx from 'clsx'
 import { useEffect, useRef, useState } from 'react'
 import { match } from 'ts-pattern'
+import { type Banner, BannerCarousel } from '@/components/banner-carousel'
 import { ChangePill } from '@/components/change-pill'
 import { FundCard } from '@/components/fund-card'
 import { GiftRow } from '@/components/gift-row'
@@ -23,6 +24,7 @@ import { Avatar, Card, LinkButton, Loading } from '@/components/ui'
 import { WatchlistTabs } from '@/components/watchlist-tabs'
 import { useAnimatedNumber } from '@/lib/client/animated-number'
 import {
+  useEarnQuery,
   useFundsQuery,
   useGiftsQuery,
   useNotificationsQuery,
@@ -171,6 +173,31 @@ function House() {
   const sent = useGiftsQuery('sent', { enabled })
   const feed = useNotificationsQuery({ enabled })
   const funds = useFundsQuery({ enabled })
+  const earn = useEarnQuery({ enabled })
+  // Everything we want to put in front of someone lives in this list: a rate today, a new
+  // feature tomorrow, a paid placement later. Anything with `sponsored` is labelled as an ad.
+  // The Earn banner only appears once there's cash to talk about — either sitting idle or already
+  // earning. Someone with an empty account sees nothing, because there's nothing to offer them.
+  const banners: Banner[] = [
+    ...(earn.data && (earn.data.earningUsd > 0 || earn.data.readyUsd > 0)
+      ? [
+          {
+            id: 'earn',
+            emoji: '🌱',
+            eyebrow: earn.data.earningUsd > 0 ? 'Your cash is working' : 'Cash sitting still',
+            title:
+              earn.data.earningUsd > 0
+                ? `${formatUsd(earn.data.earningUsd)} earning ${earn.data.ratePct.toFixed(1)}% a year`
+                : `Earn ${earn.data.ratePct.toFixed(1)}% a year on your cash`,
+            body:
+              earn.data.earningUsd > 0
+                ? 'Take it back whenever you want'
+                : 'Nothing locked, take it back any time',
+            href: '/earn',
+          } satisfies Banner,
+        ]
+      : []),
+  ]
   // Everything home shows, so a pull brings the balance, stocks, gifts, funds and badge up to
   // date. Not before sign-in settles: refetch ignores `enabled` and would go out without a session
   const pullToRefresh = usePullToRefresh(async () => {
@@ -339,6 +366,8 @@ function House() {
             Create a gift
           </LinkButton>
         </div>
+
+        <BannerCarousel banners={banners} />
 
         {toClaim.length > 0 && (
           <section className="flex flex-col gap-3">

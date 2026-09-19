@@ -1,5 +1,5 @@
 <script lang="ts">
-let { variant }: { variant: 'orbit' | 'sparkles' | 'sunburst' | 'security' } = $props()
+let { variant }: { variant: 'orbit' | 'sparkles' | 'sunburst' | 'security' | 'growth' } = $props()
 </script>
 
 <div class="pointer-events-none absolute inset-0" aria-hidden="true">
@@ -18,6 +18,23 @@ let { variant }: { variant: 'orbit' | 'sparkles' | 'sunburst' | 'security' } = $
         stroke-linecap="round"
       />
       <circle cx="425" cy="70" r="5" fill="#ce945b" fill-opacity="0.4" />
+    {:else if variant === 'growth'}
+      <g stroke="#6f8f6a" stroke-opacity="0.26" stroke-width="1.2">
+        <path d="M-10 300C90 300 150 250 230 180S390 60 510 52" />
+        <path d="M-10 340C100 340 170 296 250 226S400 104 510 96" stroke-dasharray="4 10" />
+      </g>
+      <g fill="#6f8f6a" fill-opacity="0.4">
+        <circle cx="230" cy="180" r="5" />
+        <circle cx="330" cy="116" r="4" />
+        <circle cx="430" cy="70" r="6" />
+      </g>
+      <path
+        d="M64 88v20m-10-10h20M452 286v16m-8-8h16"
+        stroke="#6f8f6a"
+        stroke-opacity="0.45"
+        stroke-width="2"
+        stroke-linecap="round"
+      />
     {:else if variant === 'orbit'}
       <g stroke="#819b67" stroke-opacity="0.25" stroke-width="1.2">
         <ellipse cx="250" cy="185" rx="225" ry="130" transform="rotate(-25 250 185)" />

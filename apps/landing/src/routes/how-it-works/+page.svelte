@@ -6,7 +6,7 @@ import LockMark from '$lib/components/lock-mark.svelte'
 import SeoHead from '$lib/components/seo-head.svelte'
 
 const description =
-  'Send a gift of shares or cash, open one, start a fund together, and buy or sell with cash. Here is how each one works.'
+  'Send a gift of shares or cash, open one, start a fund together, buy or sell with cash, and earn on what you have not spent. Here is how each one works.'
 
 // Panel colors are the same pastels the landing cards use for each idea.
 const flows = [
@@ -142,6 +142,10 @@ const faqs = [
   {
     q: 'What if they don’t have Morrow yet?',
     a: 'Send it to their email anyway. The gift waits for them, and it opens when they sign in with the code sent to that same email address — no app to install first, nothing for you to set up on their side.',
+  },
+  {
+    q: 'What happens to cash I haven’t spent?',
+    a: 'It can earn while it waits. Morrow lends it out on Solana at whichever rate is best that day, it never leaves your own account, and you take it back whenever you want. The rate moves with the market, so it isn’t a savings account and it isn’t a promise — and cash that’s earning can’t be spent on stocks or gifts until you move it back.',
   },
   {
     q: 'Can I change a fund after I start it?',

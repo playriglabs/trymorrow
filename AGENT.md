@@ -94,6 +94,49 @@ Server modules in `src/lib/server`:
 6. `GET /api/cron/refund-gifts` (daily on Vercel, `Authorization: Bearer CRON_SECRET`) refunds expired gifts and deletes stale drafts. A gift closed on-chain but still pending in the DB is reconciled by reading its last on-chain transaction (`claimed` or `refunded`); the cron also scans up to 200 not-yet-expired pending gifts per run for the same problem.
 7. Cash gifts ride this same flow. `findGiftAsset` (`catalog.ts`) resolves the USDC mint the way `findStock` resolves xStocks — every gift route, the views and the refund cron go through it, so a cash item is `gift_items` row with the USDC mint, nothing more (no `kind` column). Cash left after the gifts pays the fee first; any shortfall comes out of the cash locked for the recipients, so sending the whole balance still works. Cash is never a share-paid-fee candidate. `pnpm test:gifts` runs the gift flow on a throwaway validator with a plain SPL cash stand-in and fails if the biggest gift (2 stocks + cash + cash fee, measured 1,139 bytes) ever exceeds the byte limit.
 
+### Send stocks out
+
+`/send-stocks` is the cash out flow for shares, and it reuses its parts: `resolveCashoutTarget`
+(address, @handle, or a Morrow user — never a pregenerated wallet) and `resolveDestination` (on
+curve, unused or system-owned). `POST /api/stock-sends/quote` prices it, `POST /api/stock-sends`
+records a draft row and returns the relayer-signed transfer, `POST /api/stock-sends/submit` reads
+the signed transaction back and only broadcasts when the shares leave the sender's own account for
+the mint, address and amount on that row, with nothing else but the recorded fee.
+
+- The fee is only ever the unrecoverable part: opening a share account the destination doesn't
+  have. Cash pays it when there is any, exactly like a gift; without cash it comes out of the
+  shares themselves (`fee_mint` on the row), so sending an entire holding still works.
+- A destination that already holds the stock is free.
+- PreStocks carry the issuer's own transfer fee, so the screen says a little less than the amount
+  sent will arrive. Never promise the full number.
+- Both sides hear about it. The sender gets `stock_sent`; a destination that belongs to a Morrow
+  account gets `stock_deposited` naming the sender, at the moment it lands. `noteDeposits` skips
+  signatures found in `stock_sends` for exactly that reason — without it the same transfer would
+  surface again days later as coming "from an outside account".
+
+### Earn on cash
+
+`/earn` lends idle cash through **Jupiter Lend Earn** (`lite-api.jup.ag/lend/v1`, keyless, program
+`jup3YeL8QhtSx1e253b2FDvsMNC87fDrgQZivbrndc9`). No program change of ours: `POST /api/earn/move`
+builds one relayer-signed transaction, the browser adds the person's signature, and
+`POST /api/earn/submit` verifies and broadcasts it. Receipt tokens (jlUSDC) sit in the person's own
+account, so the market is the only book — `GET /api/earn` reads the rate, the position and the
+earnings back from it rather than from our database.
+
+- Putting cash in needs the receipt account to exist, so the relayer opens it (idempotent, ~0.00204
+  SOL). Taking **everything** back is asked for in receipt tokens (`redeem`) rather than dollars, so
+  interest earned between building and signing can't strand a sliver, and the transaction closes the
+  receipt account so that rent comes back to the relayer. A partial take-back uses `withdraw` and
+  leaves the account open.
+- Cash in Earn is **not** spendable cash: `cashBalance` only sees the plain balance, so gift fees,
+  trades and "send the whole balance" all ignore it. The screen says which part is which.
+- Say the rate is variable, never "savings" or "interest guaranteed", and say plainly that a
+  take-back can wait if the market has lent out nearly everything.
+- The screen lists Kamino and Save beside our rate (`earnRoutes`, read-only, cached 5 minutes) so
+  "best rate" is something a person can check. Kamino was measured and rejected as a venue: its
+  first deposit opens an obligation plus user metadata, 0.0250 SOL against Jupiter's 0.00149, for a
+  lower rate. Before adding any venue, build one deposit and price the accounts it opens.
+
 ### Cash out flow
 
 1. `POST /api/cashouts/quote` prices it: `planCashout` validates the address, checks the balance and returns the fee. Nothing is recorded.
@@ -101,6 +144,15 @@ Server modules in `src/lib/server`:
 3. `POST /api/cashouts/submit` reads the signed transaction back and only broadcasts when the cash leaves the user's own account for the address and amount on the draft row, with nothing else but the recorded fee.
 
 The address must be on-curve and either unused or system-owned, so a pasted cash-account address or a program is refused rather than sent to. That rules out multisigs; refusing what we can't check beats sending and hoping.
+
+### After a gift is opened
+
+An opened gift keeps being worth looking at: `/gift/[id]` shows what it was worth when it was sent,
+what it's worth today and the change, then the recipient's note back to the giver. `toGiftViews`
+computes `valueNow` from the amounts on the row, with any transfer fee taken off twice (into the
+vault and out of it), and returns nothing rather than a number it can't price. The note is
+`gifts.thanks_note`, written once by the recipient through `POST /api/gifts/[id]/thanks`, seen only
+by the two of them, and it rides the sender's existing "they opened it" notification switch.
 
 ### Ask a friend
 

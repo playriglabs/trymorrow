@@ -246,6 +246,57 @@
 
 /* App tour below lg: pin the phone and show one caption at a time as the page scrolls.
    Only once motion has started (.tour-live), so reduced motion keeps the stacked list. */
+/* Feature cards walk sideways while the section is pinned, above lg only and only once motion
+   has started (.features-live), so reduced motion keeps the ordinary two-column grid. */
+@media (min-width: 1024px) {
+  #made-for-you.features-live {
+    height: 320svh;
+    padding-block: 0;
+  }
+  /* Full bleed, so cards run off the right edge of the screen rather than the page column.
+     The left gutter keeps the heading and the first card on the column they belong to. */
+  .features-live .features-pin {
+    --features-gutter: max(40px, calc((100vw - 70rem) / 2));
+    position: sticky;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    width: 100vw;
+    max-width: none;
+    height: 100svh;
+    margin-left: calc(50% - 50vw);
+    margin-right: 0;
+    padding-left: var(--features-gutter);
+    padding-right: 0;
+    overflow: hidden;
+  }
+  /* The heading keeps the page column, so "Find your tomorrow" lands on its right edge. The
+     pin's left padding is that column's left gutter, so the width alone places both sides. */
+  .features-live .features-head {
+    width: 100%;
+    max-width: 70rem;
+  }
+  .features-live .features-track {
+    display: flex;
+    width: max-content;
+    grid-template-columns: none;
+    gap: 24px;
+    will-change: transform;
+  }
+  /* One width and one art height for every card, so the row reads as a single band */
+  .features-live .features-track > article {
+    width: 34rem;
+  }
+  .features-live .features-track > article .feature-art {
+    aspect-ratio: auto;
+    height: 21rem;
+  }
+  .features-live .feature-mock {
+    width: 75%;
+  }
+}
+
 @media (max-width: 1023px) {
   #app-tour.tour-live {
     height: 480svh;

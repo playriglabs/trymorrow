@@ -243,7 +243,72 @@ export type GiftView = {
   expiresAt: string
   createdAt: string
   claimedAt: string | null
+  /**
+   * What the gift is worth now, once it has been opened: null while it's still locked, and null
+   * when we can't price every item. Transfer fees are taken off first, so it never overstates.
+   */
+  valueNow: number | null
+  /** The recipient's note back to the giver; both of them see it, nobody else */
+  thanks: { note: string; at: string } | null
   viewer: 'sender' | 'recipient' | 'other' | 'anonymous'
+}
+
+/** One place cash could sit, with the rate it pays right now */
+export type EarnRouteView = {
+  id: string
+  name: string
+  ratePct: number
+  poolUsd: number
+  /** Whether Morrow can move cash there today; the rest are shown for comparison */
+  executable: boolean
+}
+
+/** Cash that earns, and what this person has in it. Every number comes from the market, live. */
+export type EarnView = {
+  /** Every venue we track, best rate first */
+  routes: EarnRouteView[]
+  checkedAt: string
+  /** Percent a year, variable: what the market pays right now, never a promise */
+  ratePct: number
+  lendingRatePct: number
+  rewardsRatePct: number
+  /** Cash the market holds; a take-back draws on it */
+  poolUsd: number
+  earningUsd: number
+  earnedUsd: number
+  /** Cash still sitting in the account, free to spend */
+  readyUsd: number
+}
+
+/** One send of shares to an account outside Morrow */
+export type StockSendView = {
+  id: string
+  destination: string
+  mint: string
+  name: string
+  ticker: string
+  iconUrl: string | null
+  amountRaw: string
+  netRaw: string
+  /** Shares landing with them, as people see them */
+  sharesSent: number
+  feeUsd: number
+  /** True when there was no cash, so the fee came out of the shares */
+  feePaidInShares: boolean
+  status: 'draft' | 'sent'
+  signature: string | null
+  createdAt: string
+}
+
+/** What sending shares would cost, before anything is recorded */
+export type StockSendQuote = {
+  destination: string
+  recipient: PublicProfile | null
+  amountRaw: string
+  netRaw: string
+  feeUsd: number
+  feePaidInShares: boolean
+  opensAccount: boolean
 }
 
 export type NotificationSettings = {
@@ -261,6 +326,8 @@ export type NotificationKind =
   | 'gift_received'
   | 'gift_opened'
   | 'gift_returned'
+  /** The person you gave to sent a note back */
+  | 'gift_thanks'
   | 'trade_bought'
   | 'trade_sold'
   /** You put money into a fund */
@@ -274,6 +341,8 @@ export type NotificationKind =
   | 'cash_sent'
   /** A stock landed from an outside wallet (not a gift, trade, or fund payout) */
   | 'stock_deposited'
+  /** You sent shares out to an account of your own */
+  | 'stock_sent'
 
 export type NotificationView = {
   id: string
@@ -357,6 +426,8 @@ export type FundCardView = {
   purpose: FundPurpose
   status: FundStatus
   contributedUsd: number
+  /** What the vaults hold today; null when we couldn't read or price them */
+  valueUsd: number | null
   goalUsd: number | null
   progressPct: number | null
   unlockAt: string

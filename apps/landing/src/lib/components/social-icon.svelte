@@ -3,8 +3,11 @@ let { name, small = false }: { name: 'x' | 'reddit' | 'linkedin'; small?: boolea
 
 // Reddit's mark reads smaller than the others at the same box, so it gets a step up.
 const sizes = {
+  // svelte-ignore state_referenced_locally
   x: small ? 'size-4' : 'size-5',
+  // svelte-ignore state_referenced_locally
   linkedin: small ? 'size-4' : 'size-5',
+  // svelte-ignore state_referenced_locally
   reddit: small ? 'size-5' : 'size-6',
 }
 </script>

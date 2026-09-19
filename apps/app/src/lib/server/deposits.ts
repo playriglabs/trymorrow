@@ -118,20 +118,25 @@ export async function noteStockTransfers(user: UserRow, holdings: StockHolding[]
       continue
     }
 
-    // A buy lands as a plain transfer from a market maker; rule it out by its fill signature
-    const { data: fills, error: fillsError } = await db
-      .from('trade_fills')
-      .select('signature')
-      .in(
-        'signature',
-        fresh.map((entry) => entry.signature),
-      )
+    const signaturesIn = fresh.map((entry) => entry.signature)
+    // A buy lands as a plain transfer from a market maker; rule it out by its fill signature.
+    // A send from another Morrow user is announced the moment it lands, naming them, so it's
+    // ruled out the same way rather than turning up later as an anonymous deposit.
+    const [{ data: fills, error: fillsError }, { data: sends, error: sendsError }] =
+      await Promise.all([
+        db.from('trade_fills').select('signature').in('signature', signaturesIn),
+        db.from('stock_sends').select('signature').in('signature', signaturesIn),
+      ])
     if (fillsError) throw fillsError
-    const traded = new Set((fills ?? []).map((fill) => fill.signature as string))
+    if (sendsError) throw sendsError
+    const known = new Set([
+      ...(fills ?? []).map((fill) => fill.signature as string),
+      ...(sends ?? []).map((send) => send.signature as string),
+    ])
 
     let gainedRaw = 0n
     for (const entry of fresh.reverse()) {
-      if (traded.has(entry.signature)) continue
+      if (known.has(entry.signature)) continue
       gainedRaw += await depositIn(entry.signature, account)
     }
 

@@ -37,6 +37,7 @@ export const RESERVED_HANDLES = new Set([
   'app',
   'ask',
   'buy',
+  'earn',
   'fund',
   'funds',
   'gift',
@@ -53,6 +54,7 @@ export const RESERVED_HANDLES = new Set([
   'stocks',
   'support',
   'trade',
+  'watchlist',
 ])
 
 /** Pulls email + wallet from Privy (never from the client) and upserts our row */

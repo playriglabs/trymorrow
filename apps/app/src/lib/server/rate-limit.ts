@@ -8,6 +8,7 @@ export const RATE_LIMITS = {
   giftQuote: { limit: 20, windowMs: 60_000 },
   createGifts: { limit: 5, windowMs: 60_000 },
   createGiftCards: { limit: 5, windowMs: 60_000 },
+  earnMove: { limit: 10, windowMs: 60_000 },
   redeemLookup: { limit: 10, windowMs: 60_000 },
 } as const
 

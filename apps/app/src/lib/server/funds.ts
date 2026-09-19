@@ -101,6 +101,38 @@ export async function vaultBalances(fund: FundRow): Promise<Map<string, bigint>>
   return balances
 }
 
+/**
+ * What each fund is worth right now, by fund id. A list has to show the same number as the fund
+ * page — what went in months ago isn't what a card should claim — so it reads the vaults too:
+ * one call per fund, one for every price between them.
+ */
+export async function fundValues(funds: FundRow[]): Promise<Map<string, number>> {
+  const values = new Map<string, number>()
+  if (funds.length === 0) return values
+
+  const [balances, stocks] = await Promise.all([
+    Promise.all(funds.map((fund) => vaultBalances(fund))),
+    getStocks(),
+  ])
+  const stockByMint = new Map(stocks.map((stock) => [stock.mint.toBase58(), stock]))
+  const mints = [...new Set(balances.flatMap((held) => [...held.keys()]))]
+  const prices = mints.length > 0 ? await getPriceData(mints) : {}
+
+  funds.forEach((fund, index) => {
+    let total = 0
+    for (const [mint, raw] of balances[index] ?? []) {
+      const stock = stockByMint.get(mint)
+      if (!stock || raw === 0n) continue
+      // Raw balances are valued at the raw token price, never the per-share one
+      const priceUsd = prices[mint]?.tokenPriceUsd ?? stock.priceUsd
+      if (priceUsd == null) continue
+      total += (Number(raw) / 10 ** stock.decimals) * priceUsd
+    }
+    values.set(fund.id, total)
+  })
+  return values
+}
+
 export function viewerRole(fund: FundRow, viewer: UserRow | null): FundView['viewer'] {
   if (!viewer) return 'anonymous'
   if (viewer.id === fund.creator_id) return 'creator'
@@ -293,9 +325,14 @@ async function contributorProfiles(rows: FundContributionRow[]) {
   )
 }
 
-/** The short card a list shows: no on-chain reads, so a page of funds stays one query */
-export function toFundCard(fund: FundRow, contributedUsd: number): FundCardView {
+/** The short card a list shows. `valueUsd` comes from `fundValues`, so it agrees with the page. */
+export function toFundCard(
+  fund: FundRow,
+  contributedUsd: number,
+  valueUsd: number | null,
+): FundCardView {
   const goalUsd = toUsd(fund.goal_usd)
+  const against = valueUsd ?? contributedUsd
   return {
     id: fund.id,
     name: fund.name ?? `${fund.beneficiary_name}’s fund`,
@@ -303,8 +340,9 @@ export function toFundCard(fund: FundRow, contributedUsd: number): FundCardView 
     purpose: fund.purpose,
     status: fund.status,
     contributedUsd,
+    valueUsd,
     goalUsd,
-    progressPct: goalUsd ? Math.min(100, (contributedUsd / goalUsd) * 100) : null,
+    progressPct: goalUsd ? Math.min(100, (against / goalUsd) * 100) : null,
     unlockAt: fund.unlock_at,
     yearsToGo: Math.max(0, (new Date(fund.unlock_at).getTime() - Date.now()) / YEAR_MS),
   }

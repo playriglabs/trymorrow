@@ -384,138 +384,193 @@ onMount(() => {
       </div>
     </section>
 
+    <!-- Above lg this section is tall and pinned: scrolling down walks the cards sideways, and
+         normal scrolling picks up again once the last one has passed. -->
     <section
       id="made-for-you"
       aria-labelledby="features-title"
-      class="mx-auto max-w-280 scroll-mt-10 px-5 pt-24 pb-20 md:px-10 md:pt-32 md:pb-28"
+      class="scroll-mt-10 pt-24 pb-20 md:pt-32 md:pb-28"
     >
-      <div class="reveal mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end">
-        <div>
-          <h2 id="features-title" class="section-title mt-4">
-            A little app.<br />A whole lot of good.
-          </h2>
-        </div>
-        <a
-          href="https://app.trymorrow.money/login"
-          class="group flex min-h-11 w-fit items-center gap-5 text-sm"
-          >Find your tomorrow <span class="transition-transform group-hover:translate-x-1"
-            ><Icon size={19} /></span
-          ></a
+      <div class="features-pin mx-auto max-w-280 px-5 md:px-10">
+        <div
+          class="features-head reveal mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end"
         >
-      </div>
-      <!-- Below lg these swipe sideways like the section above, bleeding to the screen edge. -->
-      <div
-        class="-mx-5 flex snap-x snap-mandatory scroll-px-5 gap-5 overflow-x-auto px-5 pb-2 [scrollbar-width:none] md:-mx-10 md:scroll-px-10 md:gap-6 md:px-10 lg:mx-0 lg:grid lg:snap-none lg:grid-cols-2 lg:gap-x-6 lg:gap-y-12 lg:overflow-visible lg:px-0 lg:pb-0 [&::-webkit-scrollbar]:hidden"
-      >
-        <article class="reveal w-[82%] shrink-0 snap-start md:w-[46%] lg:w-auto">
-          <div
-            class="feature-art relative flex aspect-[0.92] items-center justify-center overflow-hidden rounded-3xl bg-[#e4ead9] lg:aspect-[1.35]"
+          <div>
+            <h2 id="features-title" class="section-title mt-4">
+              A little app.<br />A whole lot of good.
+            </h2>
+          </div>
+          <a
+            href="https://app.trymorrow.money/login"
+            class="group flex min-h-11 w-fit items-center gap-5 text-sm"
+            >Find your tomorrow <span class="transition-transform group-hover:translate-x-1"
+              ><Icon size={19} /></span
+            ></a
           >
-            <CardOrnament variant="orbit" />
-            <div class="relative w-[75%] max-w-78.75 -rotate-6 rounded-[22px] bg-surface p-5">
-              <div class="mb-5 flex justify-between text-xs">
-                <span>Meet your next little investment</span><Icon name="diagonal" size={17} />
-              </div>
-              {#each [{ name: 'Apple', logo: 'apple', color: '#eeeae2', detail: 'A piece of your everyday.' }, { name: 'Nvidia', logo: 'nvidia', color: '#d5efb2', detail: 'A little of the next big thing.' }, { name: 'Tesla', logo: 'tesla', color: '#f1d5cc', detail: 'A share of what’s ahead.' }] as stock}<div
-                  class="flex items-center gap-3 border-t border-line py-3"
-                >
-                  <StockMark stock={stock.logo} color={stock.color} size={36} />
-                  <div>
-                    <p class="font-sans text-sm">{stock.name}</p>
-                    <p class="text-[10px] text-stone">{stock.detail}</p>
-                  </div>
-                  <span class="ml-auto text-stone">↗</span>
-                </div>{/each}
-            </div>
-          </div>
-          <div class="px-2 pt-5">
-            <h3 class="text-xl">Buy and sell, a little at a time.</h3>
-            <p class="mt-2 max-w-92.5 text-sm leading-relaxed text-stone">
-              Buy a fraction of a share in companies you know, watch live prices and simple charts,
-              and sell back to cash whenever you like.
-            </p>
-          </div>
-        </article>
-        <article class="reveal w-[82%] shrink-0 snap-start md:w-[46%] lg:w-auto">
-          <div
-            class="feature-art relative flex aspect-[0.92] items-center justify-center overflow-hidden rounded-3xl bg-[#eddbc3] lg:aspect-[1.35]"
-          >
-            <CardOrnament variant="sparkles" />
-            <div class="absolute top-8 left-10 w-55 -rotate-12 opacity-45">
-              <GiftPreview compact stock="apple" markColor="#eeeae2" />
-            </div>
-            <div class="relative mt-8 ml-12 w-62.5 rotate-10"><GiftPreview compact /></div>
-          </div>
-          <div class="px-2 pt-5">
-            <h3 class="text-xl">More thoughtful than a gift card.</h3>
-            <p class="mt-2 max-w-92.5 text-sm leading-relaxed text-stone">
-              Choose shares or cash, add your words, and send to their email or Morrow handle. Big
-              gift, tiny fee: most cost under 50¢ to send.
-            </p>
-          </div>
-        </article>
-        <article class="reveal w-[82%] shrink-0 snap-start md:w-[46%] lg:w-auto">
-          <div
-            class="feature-art relative flex aspect-[0.92] items-center justify-center overflow-hidden rounded-3xl bg-[#e0d5ed] lg:aspect-[1.35]"
-          >
-            <CardOrnament variant="sunburst" />
-            <div class="relative w-[75%] max-w-77.5 rotate-[-5deg] rounded-[22px] bg-surface p-6">
-              <div class="flex items-center justify-between">
-                <span
-                  class="flex size-11 items-center justify-center rounded-full bg-[#e9ddf3] text-[#775298]"
-                  ><Icon name="grow" /></span
-                ><span class="rounded-full bg-cream px-3 py-1.5 text-[10px] text-stone"
-                  >For Maya</span
-                >
-              </div>
-              <p class="mt-5 font-sans text-2xl">Their future.<br />A family effort.</p>
-              <div class="mt-5 flex justify-between text-[11px] text-stone">
-                <span>College fund</span><span>$2,450 / $5,000</span>
-              </div>
-              <div class="mt-2 h-2 rounded-full bg-cream">
-                <div class="h-full w-[49%] rounded-full bg-[#ad8dcc]"></div>
-              </div>
-              <div class="mt-5 flex items-center gap-2 text-[10px] text-stone">
-                <LockMark class="size-3.5" />Set a date. Give it time.
-              </div>
-            </div>
-          </div>
-          <div class="px-2 pt-5">
-            <h3 class="text-xl">Some dreams take a village.</h3>
-            <p class="mt-2 max-w-92.5 text-sm leading-relaxed text-stone">
-              Start a fund, choose an unlock date, and let the people who care add to it together.
-            </p>
-          </div>
-        </article>
-        <article class="reveal w-[82%] shrink-0 snap-start md:w-[46%] lg:w-auto">
-          <div
-            class="feature-art relative flex aspect-[0.92] items-center justify-center overflow-hidden rounded-3xl bg-[#f6cfa9] lg:aspect-[1.35]"
-          >
-            <CardOrnament variant="security" />
+        </div>
+        <!-- Below lg these swipe sideways like the section above, bleeding to the screen edge. -->
+        <div
+          class="features-track -mx-5 flex snap-x snap-mandatory scroll-px-5 gap-5 overflow-x-auto px-5 pb-2 [scrollbar-width:none] md:-mx-10 md:scroll-px-10 md:gap-6 md:px-10 lg:mx-0 lg:grid lg:snap-none lg:grid-cols-2 lg:gap-x-6 lg:gap-y-12 lg:overflow-visible lg:px-0 lg:pb-0 [&::-webkit-scrollbar]:hidden"
+        >
+          <article class="reveal w-[82%] shrink-0 snap-start md:w-[46%] lg:w-auto">
             <div
-              class="relative w-[73%] max-w-73.75 rotate-6 rounded-[22px] bg-surface p-6 text-center"
+              class="feature-art relative flex aspect-[0.92] items-center justify-center overflow-hidden rounded-3xl bg-[#e4ead9] lg:aspect-[1.35]"
             >
-              <div
-                class="mx-auto flex size-14 items-center justify-center rounded-[18px] bg-orange-wash text-orange"
-              >
-                <LockMark class="size-9" />
-              </div>
-              <p class="mt-4 font-sans text-[22px] leading-[1.15] tracking-[-0.04em]">
-                For them.<br />And send it privately.
-              </p>
-              <div class="mt-4 rounded-full bg-cream px-3 py-3 text-[11px] text-stone">
-                Made personal. Kept personal.
+              <CardOrnament variant="orbit" />
+              <div class="relative w-[75%] max-w-78.75 -rotate-6 rounded-[22px] bg-surface p-5">
+                <div class="mb-5 flex justify-between text-xs">
+                  <span>Meet your next little investment</span><Icon name="diagonal" size={17} />
+                </div>
+                {#each [{ name: 'OpenAI', logo: 'openai', color: '#10a37f', detail: 'Pre-IPO, before it lists.' }, { name: 'Anthropic', logo: 'anthropic', color: '#d4a27f', detail: 'Pre-IPO, owned early.' }, { name: 'Nvidia', logo: 'nvidia', color: '#d5efb2', detail: 'A little of the next big thing.' }] as stock}<div
+                    class="flex items-center gap-3 border-t border-line py-3"
+                  >
+                    <StockMark stock={stock.logo} color={stock.color} size={36} scale={0.68} />
+                    <div>
+                      <p class="font-sans text-sm">{stock.name}</p>
+                      <p class="text-[10px] text-stone">{stock.detail}</p>
+                    </div>
+                    <span class="ml-auto text-stone">↗</span>
+                  </div>{/each}
               </div>
             </div>
-          </div>
-          <div class="px-2 pt-5">
-            <h3 class="text-xl">A gift with their name on it.</h3>
-            <p class="mt-2 max-w-108.5 text-sm leading-relaxed text-stone">
-              Only your recipient can open their gift. If it’s left unopened, it comes back after 30
-              days. zero-knowledge privacy to keep gift details private.
-            </p>
-          </div>
-        </article>
+            <div class="px-2 pt-5">
+              <h3 class="text-xl">Buy and sell, a little at a time.</h3>
+              <p class="mt-2 max-w-114.5 text-sm leading-relaxed text-stone">
+                A fraction of a share in companies you know, plus Pre-IPO names like OpenAI and
+                Anthropic before they list. Sell back to cash whenever you like.
+              </p>
+            </div>
+          </article>
+          <article class="reveal w-[82%] shrink-0 snap-start md:w-[46%] lg:w-auto">
+            <div
+              class="feature-art relative flex aspect-[0.92] items-center justify-center overflow-hidden rounded-3xl bg-[#eddbc3] lg:aspect-[1.35]"
+            >
+              <CardOrnament variant="sparkles" />
+              <div class="absolute top-8 left-10 w-55 -rotate-12 opacity-45">
+                <GiftPreview compact stock="apple" markColor="#eeeae2" />
+              </div>
+              <div class="relative mt-8 ml-12 w-62.5 rotate-10"><GiftPreview compact /></div>
+            </div>
+            <div class="px-2 pt-5">
+              <h3 class="text-xl">More thoughtful than a gift card.</h3>
+              <p class="mt-2 max-w-100.5 text-sm leading-relaxed text-stone">
+                Choose shares or cash, add your words, and send to their email or Morrow handle. Big
+                gift, tiny fee: most cost under 50¢ to send.
+              </p>
+            </div>
+          </article>
+          <article class="reveal w-[82%] shrink-0 snap-start md:w-[46%] lg:w-auto">
+            <div
+              class="feature-art relative flex aspect-[0.92] items-center justify-center overflow-hidden rounded-3xl bg-[#e0d5ed] lg:aspect-[1.35]"
+            >
+              <CardOrnament variant="sunburst" />
+              <div class="relative w-[75%] max-w-77.5 rotate-[-5deg] rounded-[22px] bg-surface p-6">
+                <div class="flex items-center justify-between">
+                  <span
+                    class="flex size-11 items-center justify-center rounded-full bg-[#e9ddf3] text-[#775298]"
+                    ><Icon name="grow" /></span
+                  ><span class="rounded-full bg-cream px-3 py-1.5 text-[10px] text-stone"
+                    >For Maya</span
+                  >
+                </div>
+                <p class="mt-5 font-sans text-2xl">Their future.<br />A family effort.</p>
+                <div class="mt-5 flex justify-between text-[11px] text-stone">
+                  <span>College fund</span><span>$2,450 / $5,000</span>
+                </div>
+                <div class="mt-2 h-2 rounded-full bg-cream">
+                  <div class="h-full w-[49%] rounded-full bg-[#ad8dcc]"></div>
+                </div>
+                <div class="mt-5 flex items-center gap-2 text-[10px] text-stone">
+                  <LockMark class="size-3.5" />Set a date. Give it time.
+                </div>
+              </div>
+            </div>
+            <div class="px-2 pt-5">
+              <h3 class="text-xl">Some dreams take a village.</h3>
+              <p class="mt-2 max-w-92.5 text-sm leading-relaxed text-stone">
+                Start a fund, choose an unlock date, and let the people who care add to it together.
+              </p>
+            </div>
+          </article>
+          <article class="reveal w-[82%] shrink-0 snap-start md:w-[46%] lg:w-auto">
+            <div
+              class="feature-art relative flex aspect-[0.92] items-center justify-center overflow-hidden rounded-3xl bg-[#f6cfa9] lg:aspect-[1.35]"
+            >
+              <CardOrnament variant="security" />
+              <div
+                class="relative w-[73%] max-w-73.75 rotate-6 rounded-[22px] bg-surface p-6 text-center"
+              >
+                <div
+                  class="mx-auto flex size-14 items-center justify-center rounded-[18px] bg-orange-wash text-orange"
+                >
+                  <LockMark class="size-9" />
+                </div>
+                <p class="mt-4 font-sans text-[22px] leading-[1.15] tracking-[-0.04em]">
+                  For them.<br />And send it privately.
+                </p>
+                <div class="mt-4 rounded-full bg-cream px-3 py-3 text-[11px] text-stone">
+                  Made personal. Kept personal.
+                </div>
+              </div>
+            </div>
+            <div class="px-2 pt-5">
+              <h3 class="text-xl">A gift with their name on it.</h3>
+              <p class="mt-2 max-w-116.5 text-sm leading-relaxed text-stone">
+                Only your recipient can open their gift. If it’s left unopened, it comes back after
+                30 days. zero-knowledge privacy to keep gift details private.
+              </p>
+            </div>
+          </article>
+          <!-- Wide on desktop so the last row doesn't sit half empty -->
+          <article class="reveal w-[82%] shrink-0 snap-start md:w-[46%] lg:col-span-2 lg:w-auto">
+            <div
+              class="feature-art relative flex aspect-[0.92] items-center justify-center overflow-hidden rounded-3xl bg-[#dde9e0] lg:aspect-[2.75]"
+            >
+              <CardOrnament variant="growth" />
+              <div
+                class="feature-mock relative w-[75%] max-w-78.75 rotate-2 rounded-[22px] bg-surface p-5 lg:w-[42%]"
+              >
+                <div class="mb-4 flex items-center justify-between text-xs">
+                  <span>Your cash</span><span class="text-stone">Today</span>
+                </div>
+                <div class="flex items-center gap-3 border-t border-line py-3">
+                  <span
+                    class="flex size-9 items-center justify-center rounded-full bg-[#e8f1e9] text-base"
+                    aria-hidden="true">🌱</span
+                  >
+                  <div>
+                    <p class="font-sans text-sm">Earning</p>
+                    <p class="text-[10px] text-stone">Take it back any time</p>
+                  </div>
+                  <span class="ml-auto font-sans text-sm">$250.00</span>
+                </div>
+                <div class="flex items-center gap-3 border-t border-line py-3">
+                  <span
+                    class="flex size-9 items-center justify-center rounded-full bg-cream text-base"
+                    aria-hidden="true">💵</span
+                  >
+                  <div>
+                    <p class="font-sans text-sm">Ready to spend</p>
+                    <p class="text-[10px] text-stone">Stocks, gifts, funds</p>
+                  </div>
+                  <span class="ml-auto font-sans text-sm">$50.00</span>
+                </div>
+                <div
+                  class="mt-3 rounded-full bg-[#e8f1e9] px-3 py-2 text-center text-[11px] text-stone"
+                >
+                  Rate moves with the market
+                </div>
+              </div>
+            </div>
+            <div class="px-2 pt-5">
+              <h3 class="text-xl">Cash that doesn’t sit still.</h3>
+              <p class="mt-2 max-w-116.5 text-sm leading-relaxed text-stone">
+                Cash waiting for its next stock earns at the best rate we can find. Nothing is
+                locked, it stays in your own account, and the rate moves with the market.
+              </p>
+            </div>
+          </article>
+        </div>
       </div>
     </section>
 

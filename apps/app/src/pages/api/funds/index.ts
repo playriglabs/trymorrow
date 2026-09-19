@@ -15,6 +15,7 @@ import {
   FUND_COLUMNS,
   type FundContributionRow,
   type FundRow,
+  fundValues,
   toFundCard,
   toFundView,
 } from '@/lib/server/funds'
@@ -68,7 +69,12 @@ export const GET = route(async ({ request }) => {
       (contributedUsd.get(row.fund_id) ?? 0) + Number(row.usd_value ?? 0),
     )
   }
-  return json({ funds: funds.map((fund) => toFundCard(fund, contributedUsd.get(fund.id) ?? 0)) })
+  const values = await fundValues(funds)
+  return json({
+    funds: funds.map((fund) =>
+      toFundCard(fund, contributedUsd.get(fund.id) ?? 0, values.get(fund.id) ?? null),
+    ),
+  })
 })
 
 const allocationSchema = z.object({

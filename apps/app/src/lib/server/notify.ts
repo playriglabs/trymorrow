@@ -32,6 +32,8 @@ type SettingsRow = {
 const TOGGLE: Partial<Record<NotificationKind, keyof SettingsRow>> = {
   gift_received: 'gift_received',
   gift_opened: 'gift_opened',
+  // A thank-you is the other half of "they opened it", so it rides the same switch
+  gift_thanks: 'gift_opened',
   gift_returned: 'gift_returned',
   fund_contribution: 'fund_contribution',
   fund_unlocked: 'fund_unlocked',

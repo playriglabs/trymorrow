@@ -4,8 +4,9 @@ import { PublicKey, type TransactionInstruction } from '@solana/web3.js'
 import { match, P } from 'ts-pattern'
 import { CASH_MINT, giftAmountLabel } from '@/lib/gifts'
 import { CODE_LENGTH, normalizeCode } from '@/lib/redeem-code'
-import { getStocks } from '@/lib/server/catalog'
+import { getStocks, type StockAsset } from '@/lib/server/catalog'
 import { notFound } from '@/lib/server/http'
+import { getTokenPrices } from '@/lib/server/prices'
 import { avatarUrl, db } from '@/lib/server/supabase'
 import { harvestsBeforeClosing } from '@/lib/server/tokens'
 import type { UserRow } from '@/lib/server/users'
@@ -59,6 +60,9 @@ export type GiftRow = {
   settle_signature: string | null
   claimed_at: string | null
   created_at: string
+  /** The recipient's note back to the giver, once they've opened it */
+  thanks_note: string | null
+  thanked_at: string | null
   /** Fee in base units of `fee_mint`, or of USDC when that is null */
   fee_raw: string
   fee_mint: string | null
@@ -69,7 +73,7 @@ export type GiftRow = {
 }
 
 export const GIFT_COLUMNS =
-  'id, sender_id, sender_wallet, recipient_id, recipient_email, recipient_wallet, message, status, rent_payer, expires_at, create_signature, settle_signature, claimed_at, created_at, fee_raw, fee_mint, fee_usd, code_hash, gift_items (id, mint, amount_raw, usd_value)'
+  'id, sender_id, sender_wallet, recipient_id, recipient_email, recipient_wallet, message, status, rent_payer, expires_at, create_signature, settle_signature, claimed_at, created_at, thanks_note, thanked_at, fee_raw, fee_mint, fee_usd, code_hash, gift_items (id, mint, amount_raw, usd_value)'
 
 export const GIFT_LIFETIME_DAYS = 30
 
@@ -110,6 +114,31 @@ export function viewerRole(gift: GiftRow, viewer: UserRow | null): GiftView['vie
 
 const toUsd = (value: string | null) => (value == null ? null : Number(value))
 
+/**
+ * What an opened gift is worth today. A stock with a transfer fee pays it twice — once into the
+ * vault, once out of it — so the recipient holds a little less than was sent, and this counts
+ * what they actually hold. One unpriced item means no number at all rather than a wrong one.
+ */
+function currentValue(
+  gift: GiftRow,
+  stocks: Map<string, StockAsset>,
+  prices: Record<string, number>,
+): number | null {
+  let total = 0
+  for (const item of gift.gift_items) {
+    if (item.mint === CASH_MINT) {
+      total += Number(item.amount_raw) / 1_000_000
+      continue
+    }
+    const asset = stocks.get(item.mint)
+    const price = prices[item.mint]
+    if (!asset || !price) return null
+    const kept = Number(item.amount_raw) * (1 - asset.transferFeeBps / 10_000) ** 2
+    total += (kept / 10 ** asset.decimals) * price
+  }
+  return total
+}
+
 export async function toGiftViews(gifts: GiftRow[], viewer: UserRow | null): Promise<GiftView[]> {
   const ids = [
     ...new Set(gifts.flatMap((gift) => [gift.sender_id, gift.recipient_id]).filter(Boolean)),
@@ -128,6 +157,16 @@ export async function toGiftViews(gifts: GiftRow[], viewer: UserRow | null): Pro
       user,
     ]),
   )
+
+  // Only an opened gift has a value to follow, and pricing is one call for all of them
+  const openMints = [
+    ...new Set(
+      gifts.flatMap((gift) =>
+        gift.status === 'claimed' ? gift.gift_items.map((item) => item.mint) : [],
+      ),
+    ),
+  ]
+  const prices = openMints.length > 0 ? await getTokenPrices(openMints) : {}
 
   return gifts.map((gift) => {
     const sender = users.get(gift.sender_id)
@@ -191,6 +230,11 @@ export async function toGiftViews(gifts: GiftRow[], viewer: UserRow | null): Pro
       expiresAt: gift.expires_at,
       createdAt: gift.created_at,
       claimedAt: gift.claimed_at,
+      valueNow: gift.status === 'claimed' ? currentValue(gift, stockByMint, prices) : null,
+      thanks:
+        gift.thanks_note && gift.thanked_at && (role === 'sender' || role === 'recipient')
+          ? { note: gift.thanks_note, at: gift.thanked_at }
+          : null,
       viewer: role,
     }
   })

@@ -20,7 +20,7 @@ export function FundCard({ fund }: { fund: FundCardView }) {
             </span>
           </div>
           <span className="shrink-0 font-sans text-[17px] font-medium tabular-nums">
-            {formatUsd(fund.contributedUsd)}
+            {formatUsd(fund.valueUsd ?? fund.contributedUsd)}
           </span>
         </div>
         {fund.goalUsd == null ? (

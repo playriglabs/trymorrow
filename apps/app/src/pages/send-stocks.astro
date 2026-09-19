@@ -1,0 +1,14 @@
+---
+import AppScreen from '@/components/app-screen'
+import AppLayout from '@/layouts/app-layout.astro'
+---
+
+<AppLayout title="Send stocks — Morrow">
+  <AppScreen
+    client:only="react"
+    transition:persist="morrow-app"
+    screen="send-stocks-screen"
+    screenProps={{}}
+    routeKey={Astro.url.pathname + Astro.url.search}
+  />
+</AppLayout>

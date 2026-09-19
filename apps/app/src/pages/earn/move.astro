@@ -1,0 +1,16 @@
+---
+import AppScreen from '@/components/app-screen'
+import AppLayout from '@/layouts/app-layout.astro'
+
+const direction = Astro.url.searchParams.get('direction') === 'out' ? 'out' : 'in'
+---
+
+<AppLayout title={direction === 'in' ? 'Start earning — Morrow' : 'Take your cash back — Morrow'}>
+  <AppScreen
+    client:only="react"
+    transition:persist="morrow-app"
+    screen="earn-move-screen"
+    screenProps={{ direction }}
+    routeKey={Astro.url.pathname + Astro.url.search}
+  />
+</AppLayout>

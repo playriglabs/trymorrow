@@ -9,6 +9,7 @@ import type {
   CashoutView,
   ChartRange,
   CompanyProfile,
+  EarnView,
   FundBuyOrder,
   FundCardView,
   FundFeeQuote,
@@ -23,6 +24,8 @@ import type {
   PriceChart,
   Profile,
   RecipientResolution,
+  StockSendQuote,
+  StockSendView,
   StocksResponse,
   TradeQuote,
   TradeResult,
@@ -54,12 +57,15 @@ export const queryKeys = {
   fundFee: () => ['fund-fee'] as const,
   fundContributionFee: (fundId: string, mints: string[]) =>
     ['fund-contribution-fee', fundId, [...mints].sort().join(',')] as const,
+  earn: () => ['earn'] as const,
   notifications: () => ['notifications'] as const,
   notificationFeed: () => ['notification-feed'] as const,
   tradeQuote: ({ side, mint, amountRaw }: TradeQuoteParams) =>
     ['trade-quote', side, mint, amountRaw] as const,
   cashoutQuote: (target: string, amountRaw: string) =>
     ['cashout-quote', target, amountRaw] as const,
+  stockSendQuote: (target: string, mint: string, amountRaw: string) =>
+    ['stock-send-quote', target, mint, amountRaw] as const,
 }
 
 type Options = { enabled?: boolean }
@@ -409,6 +415,35 @@ export function useWithdrawFundMutation(fundId: string) {
       queryClient.invalidateQueries({ queryKey: queryKeys.funds() })
       queryClient.invalidateQueries({ queryKey: queryKeys.portfolio() })
     },
+  })
+}
+
+/** What cash earns today, and what this person has earning; read from the market, not our books */
+export function useEarnQuery({ enabled = true }: Options = {}) {
+  const api = useApi()
+  return useQuery({
+    queryKey: queryKeys.earn(),
+    enabled,
+    staleTime: 30_000,
+    queryFn: () => api<EarnView>('/api/earn'),
+  })
+}
+
+/** What sending these shares would cost, before anything is recorded */
+export function useStockSendQuoteQuery(
+  { target, mint, amountRaw }: { target: string; mint: string; amountRaw: string },
+  { enabled = true }: Options = {},
+) {
+  const api = useApi()
+  return useQuery({
+    queryKey: queryKeys.stockSendQuote(target, mint, amountRaw),
+    enabled: enabled && target.length > 0 && mint.length > 0 && amountRaw !== '0',
+    retry: false,
+    queryFn: () =>
+      api<StockSendQuote>('/api/stock-sends/quote', {
+        method: 'POST',
+        body: { target, mint, amountRaw },
+      }),
   })
 }
 
@@ -879,6 +914,92 @@ export function useCashoutMutation() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.portfolio() })
       queryClient.invalidateQueries({ queryKey: queryKeys.stocks() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.notificationFeed() })
+    },
+  })
+}
+
+/** The note back to the giver, once the gift is open; only the person who opened it can send one */
+export function useThankGiftMutation(giftId: string) {
+  const api = useApi()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ note }: { note: string }) =>
+      api<{ gift: GiftView }>(`/api/gifts/${giftId}/thanks`, {
+        method: 'POST',
+        body: { note },
+      }).then((data) => data.gift),
+    onSuccess: (gift) => {
+      queryClient.setQueriesData({ queryKey: queryKeys.gift(giftId) }, gift)
+      queryClient.invalidateQueries({ queryKey: queryKeys.gifts() })
+    },
+  })
+}
+
+/**
+ * Moves cash into Earn or back out. The server builds it, the browser adds the signature, and the
+ * position is read back from the market afterwards rather than guessed at here.
+ */
+export function useEarnMoveMutation() {
+  const api = useApi()
+  const sign = useSignRelayed()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      direction,
+      amountRaw,
+      all,
+    }: {
+      direction: 'in' | 'out'
+      amountRaw?: string
+      all?: boolean
+    }) => {
+      const { transaction } = await api<{ transaction: string; amountUsd: number }>(
+        '/api/earn/move',
+        { method: 'POST', body: { direction, amountRaw, all } },
+      )
+      return api<{ signature: string }>('/api/earn/submit', {
+        method: 'POST',
+        body: { transaction: await sign(transaction), direction },
+      })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.earn() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.portfolio() })
+    },
+  })
+}
+
+/**
+ * Sends shares to an account outside Morrow. The server records what it's meant to do, the
+ * browser signs, and the server checks the signature against its own row before broadcasting.
+ */
+export function useStockSendMutation() {
+  const api = useApi()
+  const sign = useSignRelayed()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      target,
+      mint,
+      amountRaw,
+    }: {
+      target: string
+      mint: string
+      amountRaw: string
+    }): Promise<StockSendView> => {
+      const created = await api<{ send: StockSendView; transaction: string }>('/api/stock-sends', {
+        method: 'POST',
+        body: { target, mint, amountRaw },
+      })
+      const { send } = await api<{ send: StockSendView }>('/api/stock-sends/submit', {
+        method: 'POST',
+        body: { sendId: created.send.id, transaction: await sign(created.transaction) },
+      })
+      return send
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.portfolio() })
       queryClient.invalidateQueries({ queryKey: queryKeys.notificationFeed() })
     },
   })

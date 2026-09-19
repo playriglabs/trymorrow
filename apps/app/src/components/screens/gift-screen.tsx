@@ -1,4 +1,5 @@
 import { LockIcon, UserCircleIcon } from '@phosphor-icons/react'
+import clsx from 'clsx'
 import { useEffect, useState } from 'react'
 import Confetti from 'react-confetti'
 import { match } from 'ts-pattern'
@@ -6,9 +7,14 @@ import { EmailLogin } from '@/components/email-login'
 import { withProviders } from '@/components/providers'
 import { CashLogo, StockLogo } from '@/components/stock-logo'
 import { SuccessMark } from '@/components/success-mark'
-import { Avatar, Button, LinkButton, Loading, Notice, Screen } from '@/components/ui'
+import { Avatar, Button, Label, LinkButton, Loading, Notice, Screen } from '@/components/ui'
 import { ApiError, errorMessage } from '@/lib/client/api'
-import { useClaimGiftMutation, useGiftQuery, useRefundGiftMutation } from '@/lib/client/queries'
+import {
+  useClaimGiftMutation,
+  useGiftQuery,
+  useRefundGiftMutation,
+  useThankGiftMutation,
+} from '@/lib/client/queries'
 import { useSession } from '@/lib/client/session'
 import { formatDate, formatUsd } from '@/lib/format'
 import { giftAmountLabel, giftAssetsLabel, giftContentsLabel } from '@/lib/gifts'
@@ -117,10 +123,106 @@ function GiftCard({ gift }: { gift: GiftView }) {
   )
 }
 
+function JourneyRow({
+  label,
+  value,
+  tone,
+}: {
+  label: string
+  value: string
+  tone?: 'gain' | 'loss'
+}) {
+  return (
+    <div className="flex justify-between gap-3 py-3.5">
+      <span className="text-stone">{label}</span>
+      <span
+        className={clsx(
+          'text-right',
+          tone === 'gain' && 'text-gain',
+          tone === 'loss' && 'text-loss',
+        )}
+      >
+        {value}
+      </span>
+    </div>
+  )
+}
+
+/** What the gift was worth the day it was sent, and what it has done since */
+function GiftJourney({ gift }: { gift: GiftView }) {
+  const sent = gift.usdValue
+  const now = gift.valueNow
+  const change = sent != null && sent > 0 && now != null ? now - sent : null
+  const pct = change != null && sent ? (change / sent) * 100 : null
+  const flat = change == null || pct == null || (Math.abs(change) < 0.005 && Math.abs(pct) < 0.05)
+
+  return (
+    <div className="flex flex-col divide-y divide-line rounded-button border border-line bg-surface px-4">
+      <JourneyRow label="Sent" value={formatDate(gift.createdAt)} />
+      {gift.claimedAt && <JourneyRow label="Opened" value={formatDate(gift.claimedAt)} />}
+      <JourneyRow label="Worth when sent" value={formatUsd(sent)} />
+      {now != null && <JourneyRow label="Worth today" value={formatUsd(now)} />}
+      {change != null && pct != null && (
+        <JourneyRow
+          label="Since it was sent"
+          // We print one decimal and the cent, so anything smaller is flat: no colour, no sign
+          value={
+            flat
+              ? 'No change yet'
+              : `${change < 0 ? '−' : '+'}${formatUsd(Math.abs(change))} (${Math.abs(pct).toFixed(1)}%)`
+          }
+          tone={flat ? undefined : change < 0 ? 'loss' : 'gain'}
+        />
+      )}
+    </div>
+  )
+}
+
+/**
+ * The note back to the giver. Only the field lives here: sending it sits in the footer beside the
+ * way out, so both ways off this screen are in the same place.
+ */
+function ThanksForm({
+  senderName,
+  note,
+  onChange,
+  onSubmit,
+}: {
+  senderName: string
+  note: string
+  onChange: (note: string) => void
+  onSubmit: () => void
+}) {
+  return (
+    <form
+      id="thanks-form"
+      className="flex flex-col gap-1.5"
+      onSubmit={(event) => {
+        event.preventDefault()
+        onSubmit()
+      }}
+    >
+      <Label htmlFor="thanks-note">Say thanks to {senderName}</Label>
+      <textarea
+        id="thanks-note"
+        rows={2}
+        maxLength={140}
+        placeholder="Thank you! I’ve wanted this one for ages."
+        value={note}
+        onChange={(event) => onChange(event.target.value)}
+        className="resize-none rounded-button border border-line bg-surface px-4 py-3 text-base outline-none placeholder:text-steel focus:border-orange focus:ring-4 focus:ring-orange-wash"
+      />
+    </form>
+  )
+}
+
 function Gift({ giftId }: { giftId: string }) {
   const session = useSession({ required: false })
   const [opened, setOpened] = useState(false)
   const [tookBack, setTookBack] = useState(false)
+  const [thanking, setThanking] = useState(false)
+  const [note, setNote] = useState('')
+  const thank = useThankGiftMutation(giftId)
   const [confirming, setConfirming] = useState(false)
   const gift = useGiftQuery(giftId, session.profile?.id ?? null, { enabled: session.ready })
   const claim = useClaimGiftMutation(giftId)
@@ -143,6 +245,12 @@ function Gift({ giftId }: { giftId: string }) {
   const assets = giftAssetsLabel(view.items)
   const bundle = view.items.length > 1
   const hasCash = view.items.some((item) => item.isCash)
+  const canThank = view.viewer === 'recipient' && !view.thanks
+  const sendThanks = () => {
+    const text = note.trim()
+    if (text.length === 0 || thank.isPending) return
+    thank.mutate({ note: text })
+  }
   const heading = match({ viewer: view.viewer, bundle, hasCash })
     .with({ viewer: 'sender' }, () => `${view.recipientLabel} claimed your gift`)
     .with({ hasCash: true, bundle: false }, () => 'The cash is yours')
@@ -187,33 +295,90 @@ function Gift({ giftId }: { giftId: string }) {
     )
   }
 
-  if (view.status === 'claimed' || opened) {
+  // The moment it opens, before anything else has a chance to distract from it
+  if (opened && !thanking) {
     return (
       <Screen
         footer={
-          view.viewer === 'recipient' || opened ? (
+          <>
             <LinkButton href={session.profile?.onboarded ? '/' : '/onboarding'}>
               {session.profile?.onboarded ? 'See your stocks' : 'Finish setting up'}
             </LinkButton>
-          ) : (
-            <LinkButton href="/">Go home</LinkButton>
-          )
+            {view.viewer === 'recipient' && !view.thanks && (
+              <Button variant="ghost" onClick={() => setThanking(true)}>
+                Say thanks to {view.sender.name}
+              </Button>
+            )}
+          </>
         }
       >
-        {opened && <ClaimConfetti />}
+        <ClaimConfetti />
         <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
           <SuccessMark />
           <div className="flex flex-col gap-1.5">
             <h1 className="font-sans text-[30px] leading-[1.15] font-medium tracking-[-0.02em] text-balance">
               {heading}
             </h1>
-            <p className="text-stone">
-              {view.viewer === 'sender'
-                ? giftAmountLabel(view.usdValue, view.items)
-                : 'Hold it, sell it, or send it on.'}
-            </p>
+            <p className="text-stone">Hold it, sell it, or send it on.</p>
           </div>
         </div>
+      </Screen>
+    )
+  }
+
+  // Coming back to a gift that's already open: what it was, what it's done since, and the note
+  if (view.status === 'claimed') {
+    return (
+      <Screen
+        back="/gifts"
+        title="Gift"
+        footer={
+          <>
+            {thank.isError && (
+              <p className="text-center text-[13px] text-loss">{errorMessage(thank.error)}</p>
+            )}
+            {canThank ? (
+              <div className="grid grid-cols-2 gap-2">
+                <LinkButton href="/" variant="outline">
+                  See your stocks
+                </LinkButton>
+                <Button
+                  type="submit"
+                  form="thanks-form"
+                  disabled={note.trim().length === 0}
+                  loading={thank.isPending}
+                >
+                  Send it
+                </Button>
+              </div>
+            ) : (
+              <LinkButton href={view.viewer === 'recipient' ? '/' : '/gifts'}>
+                {view.viewer === 'recipient' ? 'See your stocks' : 'Your gifts'}
+              </LinkButton>
+            )}
+          </>
+        }
+      >
+        <GiftCard gift={view} />
+        {/* What it's done since is between the two of them, like the message */}
+        {(view.viewer === 'sender' || view.viewer === 'recipient') && <GiftJourney gift={view} />}
+        {view.thanks ? (
+          <div className="flex flex-col gap-1.5 rounded-button border border-line bg-surface px-4 py-3.5">
+            <span className="text-[13px] text-stone">
+              {view.viewer === 'sender' ? `${view.recipientLabel} said` : 'You said'}
+            </span>
+            <p className="leading-[1.45]">“{view.thanks.note}”</p>
+          </div>
+        ) : (
+          canThank && (
+            <ThanksForm
+              senderName={view.sender.name}
+              note={note}
+              onChange={setNote}
+              onSubmit={sendThanks}
+            />
+          )
+        )}
       </Screen>
     )
   }

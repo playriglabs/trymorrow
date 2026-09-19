@@ -3,9 +3,9 @@ import HomeContent from '$lib/components/home-content.svelte'
 import SeoHead from '$lib/components/seo-head.svelte'
 import { siteUrl } from '$lib/site'
 
-const title = 'Morrow — Buy stocks, gift them, grow together'
+const title = 'Morrow — Send cash, buy stocks, gift them, grow together'
 const description =
-  'Buy and sell shares of real companies from a few dollars, gift stocks or cash to someone you care about, and start a fund for their future. All in Morrow.'
+  'Buy and sell shares of real companies from a few dollars, gift stocks or cash to someone you care about, start a fund for their future, and earn on the cash you have not spent yet. All in Morrow.'
 const url = new URL('/', siteUrl).href
 const imageUrl = new URL('/og-image.jpg', siteUrl).href
 const structuredData = JSON.stringify({

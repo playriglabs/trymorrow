@@ -122,6 +122,54 @@ export function initHomeMotion(root: HTMLElement) {
             cleanupFns.push(() => window.removeEventListener('scroll', onScroll))
           }
         }
+        // Feature cards: while the section is pinned, scrolling down walks the row sideways.
+        // Only above lg — below it the same row is an ordinary swipe list.
+        const featureSection = root.querySelector<HTMLElement>('#made-for-you')
+        const featureTrack = featureSection?.querySelector<HTMLElement>('.features-track')
+        const featurePin = featureSection?.querySelector<HTMLElement>('.features-pin')
+        if (featureSection && featureTrack && featurePin) {
+          const wide = window.matchMedia('(min-width: 1024px)')
+          let onScroll: (() => void) | undefined
+
+          const start = () => {
+            if (onScroll) return
+            featureSection.classList.add('features-live')
+            onScroll = () => {
+              const rect = featureSection.getBoundingClientRect()
+              const distance = rect.height - window.innerHeight
+              if (distance <= 0) return
+              const progress = Math.min(1, Math.max(0, -rect.top / distance))
+              // Measured live, so the last card comes to rest against the same gutter the first
+              // one starts on, whatever the window width
+              const gutter = Number.parseFloat(getComputedStyle(featurePin).paddingLeft) || 0
+              const travel = Math.max(
+                0,
+                featureTrack.scrollWidth + 2 * gutter - featurePin.clientWidth,
+              )
+              gsap.set(featureTrack, { x: -travel * progress })
+            }
+            onScroll()
+            window.addEventListener('scroll', onScroll, { passive: true })
+            window.addEventListener('resize', onScroll, { passive: true })
+          }
+          const stop = () => {
+            featureSection.classList.remove('features-live')
+            if (!onScroll) return
+            window.removeEventListener('scroll', onScroll)
+            window.removeEventListener('resize', onScroll)
+            onScroll = undefined
+            gsap.set(featureTrack, { clearProps: 'transform' })
+          }
+          const sync = () => (wide.matches ? start() : stop())
+
+          sync()
+          wide.addEventListener('change', sync)
+          cleanupFns.push(() => {
+            wide.removeEventListener('change', sync)
+            stop()
+          })
+        }
+
         const stage = root.querySelector<HTMLElement>('.together-stage')
         const canvas = root.querySelector<HTMLElement>('.together-canvas')
         if (!stage || !canvas) return
