@@ -340,10 +340,6 @@ function House() {
                   })}
                   {portfolio.data.stocksPnl24hPct != null &&
                     ` (${!dayFlat && Math.round(portfolio.data.stocksPnl24hPct) > 0 ? '+' : ''}${dayFlat ? Math.abs(Math.round(portfolio.data.stocksPnl24hPct)) : Math.round(portfolio.data.stocksPnl24hPct)}%)`}
-                  {/* Today's move on the stocks alone, next to a balance that also holds cash.
-                      Without the word it reads as the whole balance being up, and the percentage
-                      as a percentage of it — neither is what this number means. */}
-                  <span className="text-stone"> today, stocks</span>
                 </p>
               )}
             </div>
