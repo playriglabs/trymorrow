@@ -48,9 +48,17 @@ export async function buildRelayedTransaction(
 /** Ceiling for simulation, and the limit used if simulation can't report usage */
 const MAX_COMPUTE_UNITS = 400_000
 
-/** Priority fee bounds in micro-lamports per compute unit */
-const MIN_PRIORITY_FEE = 50_000
-const MAX_PRIORITY_FEE = 1_000_000
+/**
+ * Priority fee bounds in micro-lamports per compute unit.
+ *
+ * The floor sits above what "High" usually quotes, because a relayed transaction is broadcast
+ * with only part of its blockhash left: it was built before the person signed, and whatever they
+ * spent on the confirm screen comes out of the same sixty seconds. Bidding at the going rate for
+ * a full window loses that race. At 60k compute units the floor costs 9,000 lamports and the
+ * ceiling 120,000 — under a cent either way, against a gift that fails in someone's hands.
+ */
+const MIN_PRIORITY_FEE = 150_000
+const MAX_PRIORITY_FEE = 2_000_000
 
 const PRIORITY_FEE_TTL_MS = 20_000
 let priorityFee: { microLamports: number; at: number } | undefined
