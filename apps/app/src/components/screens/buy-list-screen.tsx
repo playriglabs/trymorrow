@@ -180,7 +180,7 @@ function BuyList() {
                 <li key={stock.mint} className="shrink-0">
                   <a
                     href={tradeHref(stock.ticker)}
-                    className="flex w-42 flex-col gap-3.5 rounded-card border border-line bg-surface p-4 shadow-elevated"
+                    className="flex w-50 flex-col gap-3.5 rounded-card border border-line bg-surface p-4 shadow-elevated"
                   >
                     <div className="flex items-center justify-between">
                       <StockLogo iconUrl={stock.iconUrl} ticker={stock.ticker} size={40} />

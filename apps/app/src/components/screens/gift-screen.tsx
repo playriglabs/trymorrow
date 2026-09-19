@@ -99,7 +99,7 @@ function GiftCard({ gift }: { gift: GiftView }) {
       {bundle && (
         <ul className="relative flex flex-col divide-y divide-line rounded-button bg-white/90 px-4 text-ink">
           {gift.items.map((item) => (
-            <li key={item.mint} className="flex items-center gap-3 py-2.5">
+            <li key={item.mint} className="flex items-center gap-y-2 gap-x-3 py-2.5">
               {item.isCash ? (
                 <CashLogo size={32} />
               ) : (
