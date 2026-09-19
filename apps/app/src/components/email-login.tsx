@@ -6,8 +6,23 @@ import { Button, Label, TextInput } from '@/components/ui'
 const CODE_LENGTH = 6
 const RESEND_SECONDS = 45
 
-/** Email → 6-digit code. Privy handles both sign-in and sign-up behind the same flow */
-export function EmailLogin({ intro }: { intro?: string }) {
+/**
+ * Email → 6-digit code. Privy handles both sign-in and sign-up behind the same flow.
+ *
+ * On its own screen it fills the height and sits its button at the bottom like a footer. Inside
+ * another screen that already has one, `compact` makes it flow with what's around it instead, so
+ * a host never ends up showing two primary buttons and a hole between them.
+ */
+export function EmailLogin({
+  intro,
+  title,
+  compact = false,
+}: {
+  intro?: string
+  /** Replaces "What's your email?" when the screen around it needs to say something else */
+  title?: string
+  compact?: boolean
+}) {
   const [step, setStep] = useState<'email' | 'code'>('email')
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
@@ -15,6 +30,14 @@ export function EmailLogin({ intro }: { intro?: string }) {
   const [resendIn, setResendIn] = useState(0)
   const codeInput = useRef<HTMLInputElement>(null)
   const { sendCode, loginWithCode, state } = useLoginWithEmail()
+
+  const frame = compact ? 'flex flex-col gap-6' : 'flex flex-1 flex-col gap-7 mt-3'
+  const actions = compact
+    ? 'flex flex-col gap-2.5'
+    : 'mt-auto flex flex-col gap-2.5 pb-[max(28px,env(safe-area-inset-bottom))]'
+  const headingClass = compact
+    ? 'font-sans text-[22px] leading-[1.15] font-medium tracking-[-0.02em]'
+    : 'font-sans text-[30px] leading-[1.12] font-medium tracking-[-0.02em]'
 
   useEffect(() => {
     if (resendIn <= 0) return
@@ -47,11 +70,13 @@ export function EmailLogin({ intro }: { intro?: string }) {
 
   if (step === 'email') {
     return (
-      <form onSubmit={requestCode} className="flex flex-1 flex-col gap-7 mt-3">
+      <form onSubmit={requestCode} className={frame}>
         <div className="flex flex-col gap-2">
-          <h1 className="font-sans text-[30px] leading-[1.12] font-medium tracking-[-0.02em]">
-            What’s your email?
-          </h1>
+          {compact ? (
+            <h2 className={headingClass}>{title ?? 'What’s your email?'}</h2>
+          ) : (
+            <h1 className={headingClass}>{title ?? 'What’s your email?'}</h1>
+          )}
           <p className="text-stone">
             {intro ?? 'We’ll send you a 6-digit code. No password needed.'}
           </p>
@@ -66,12 +91,12 @@ export function EmailLogin({ intro }: { intro?: string }) {
             placeholder="you@example.com"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            autoFocus
+            autoFocus={!compact}
             required
           />
           {error && <p className="text-[13px] text-loss">{error}</p>}
         </div>
-        <div className="mt-auto flex flex-col gap-2.5 pb-[max(28px,env(safe-area-inset-bottom))]">
+        <div className={actions}>
           <Button
             type="submit"
             loading={state.status === 'sending-code'}
@@ -88,11 +113,13 @@ export function EmailLogin({ intro }: { intro?: string }) {
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-7 mt-3">
+    <div className={frame}>
       <div className="flex flex-col gap-2">
-        <h1 className="font-sans text-[30px] leading-[1.12] font-medium tracking-[-0.02em]">
-          Enter the code
-        </h1>
+        {compact ? (
+          <h2 className={headingClass}>Enter the code</h2>
+        ) : (
+          <h1 className={headingClass}>Enter the code</h1>
+        )}
         <p className="text-stone">
           Sent to <span className="text-ink">{email}</span> ·{' '}
           <button type="button" className="text-ink underline" onClick={() => setStep('email')}>
@@ -152,7 +179,7 @@ export function EmailLogin({ intro }: { intro?: string }) {
         )}
       </p>
 
-      <div className="mt-auto flex flex-col gap-2.5 pb-[max(28px,env(safe-area-inset-bottom))]">
+      <div className={actions}>
         <Button
           loading={state.status === 'submitting-code'}
           disabled={code.length < CODE_LENGTH}

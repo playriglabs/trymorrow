@@ -48,6 +48,7 @@ export const queryKeys = {
     ['gift-fee', [...recipients].sort().join(','), [...mints].sort().join(',')] as const,
   giftCardFee: (mints: string[]) => ['gift-card-fee', [...mints].sort().join(',')] as const,
   redeem: (code: string) => ['redeem', code] as const,
+  redeemPreview: (code: string) => ['redeem-preview', code] as const,
   handle: (handle: string) => ['handle', handle] as const,
   stocks: () => ['stocks'] as const,
   stockProfile: (mint: string) => ['stock-profile', mint] as const,
@@ -709,7 +710,32 @@ export function useRedeemLookupQuery(code: string, { enabled = true }: Options =
   })
 }
 
+/**
+ * What a code holds, for someone who hasn't signed in. Same shape as the lookup above, its own
+ * cache key: one answers as a viewer, the other as nobody.
+ */
+export function useRedeemPreviewQuery(code: string, { enabled = true }: Options = {}) {
+  const api = useApi()
+  const normalized = normalizeCode(code)
+  return useQuery({
+    queryKey: queryKeys.redeemPreview(normalized),
+    enabled: enabled && normalized.length === 16,
+    retry: false,
+    staleTime: Infinity,
+    queryFn: () =>
+      api<{ gift: GiftView }>('/api/redeem/preview', {
+        method: 'POST',
+        body: { code: normalized },
+      }).then((data) => data.gift),
+  })
+}
+
 export type CreateGiftCardInput = {
+  /**
+   * A chosen code instead of a random one. The server only accepts the one promo code it holds,
+   * so this is a request, never a guarantee.
+   */
+  code?: string
   items: {
     mint: string
     /** Raw base units as a string (bigint-safe) */

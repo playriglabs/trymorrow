@@ -17,7 +17,11 @@ import {
   TextInput,
 } from '@/components/ui'
 import { ApiError, errorMessage } from '@/lib/client/api'
-import { useClaimGiftCardMutation, useRedeemLookupQuery } from '@/lib/client/queries'
+import {
+  useClaimGiftCardMutation,
+  useRedeemLookupQuery,
+  useRedeemPreviewQuery,
+} from '@/lib/client/queries'
 import { useSession } from '@/lib/client/session'
 import { formatDate, formatUsd } from '@/lib/format'
 import { giftAmountLabel } from '@/lib/gifts'
@@ -54,46 +58,53 @@ function ClaimConfetti() {
 function CardPreview({ gift }: { gift: GiftView }) {
   const bundle = gift.items.length > 1
   return (
-    <div className="flex flex-col gap-4.5 rounded-sheet bg-orange p-6 text-white">
-      <div className="flex items-center gap-2.5">
-        <Avatar
-          name={gift.sender.name}
-          url={gift.sender.avatarUrl}
-          size={40}
-          className="bg-white"
-          alt={`${gift.sender.name} profile photo`}
-        />
-        <span className="text-[15px]">{gift.sender.name} sent you a gift card</span>
-      </div>
-      <h2 className="font-sans text-[34px] leading-[1.08] font-medium tracking-[-0.02em]">
-        {gift.usdValue != null ? giftAmountLabel(gift.usdValue, gift.items) : 'A gift'}
-      </h2>
-      {bundle && (
-        <ul className="flex flex-col divide-y divide-line rounded-button bg-white/90 px-4 text-ink">
-          {gift.items.map((item) => (
-            <li key={item.mint} className="flex items-center gap-3 py-2.5">
-              {item.isCash ? (
-                <CashLogo size={32} />
-              ) : (
-                <StockLogo iconUrl={item.iconUrl} ticker={item.ticker} size={32} />
-              )}
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate">{item.name}</span>
-                {!item.isCash && <span className="text-[12px] text-stone">${item.ticker}</span>}
-              </span>
-              <span className="shrink-0">{formatUsd(item.usdValue)}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-      {gift.message && (
-        <p className="rounded-button bg-white/85 px-4 py-3.5 leading-[1.45] text-ink">
-          “{gift.message}”
+    <div className="relative mt-3 overflow-hidden rounded-sheet bg-orange p-6 text-white">
+      {/* The sunrise off the Earn card: a sun clipped into the corner, a lighter disc past it,
+          and one more out of the bottom-left. Decoration only, and nothing reads on top of it. */}
+      <div className="absolute -top-24 -right-16 size-48 rounded-full bg-[#ff8f33]" aria-hidden />
+      <div className="absolute -top-8 -right-8 size-24 rounded-full bg-sun" aria-hidden />
+      <div className="absolute -bottom-16 -left-12 size-40 rounded-full bg-white/10" aria-hidden />
+      <div className="relative flex flex-col gap-4.5">
+        <div className="flex items-center gap-2.5">
+          <Avatar
+            name={gift.sender.name}
+            url={gift.sender.avatarUrl}
+            size={40}
+            className="bg-white"
+            alt={`${gift.sender.name} profile photo`}
+          />
+          <span className="text-[15px]">{gift.sender.name} sent you a gift card</span>
+        </div>
+        <h2 className="font-sans text-[34px] leading-[1.08] font-medium tracking-[-0.02em]">
+          {gift.usdValue != null ? giftAmountLabel(gift.usdValue, gift.items) : 'A gift'}
+        </h2>
+        {bundle && (
+          <ul className="flex flex-col divide-y divide-line rounded-button bg-white/90 px-4 text-ink">
+            {gift.items.map((item) => (
+              <li key={item.mint} className="flex items-center gap-3 py-2.5">
+                {item.isCash ? (
+                  <CashLogo size={32} />
+                ) : (
+                  <StockLogo iconUrl={item.iconUrl} ticker={item.ticker} size={32} />
+                )}
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate">{item.name}</span>
+                  {!item.isCash && <span className="text-[12px] text-stone">${item.ticker}</span>}
+                </span>
+                <span className="shrink-0">{formatUsd(item.usdValue)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {gift.message && (
+          <p className="rounded-button bg-white/85 px-4 py-3.5 leading-[1.45] text-ink">
+            “{gift.message}”
+          </p>
+        )}
+        <p className="text-[13px] text-white/85">
+          Redeem it by {formatDate(gift.expiresAt)} or it goes back to {gift.sender.name}.
         </p>
-      )}
-      <p className="text-[13px] text-white/85">
-        Redeem it by {formatDate(gift.expiresAt)} or it goes back to {gift.sender.name}.
-      </p>
+      </div>
     </div>
   )
 }
@@ -110,6 +121,12 @@ function Redeem() {
 
   const lookup = useRedeemLookupQuery(code, {
     enabled: session.ready && session.authenticated && submitted,
+  })
+  // Signed out the card still shows: the code is the lock, so whoever holds it can see what's
+  // inside before being asked to make an account. Being asked to sign up for something you can't
+  // see yet is how a gift card gets abandoned.
+  const preview = useRedeemPreviewQuery(code, {
+    enabled: session.ready && !session.authenticated && submitted,
   })
   const claim = useClaimGiftCardMutation(lookup.data?.id ?? '')
 
@@ -169,9 +186,11 @@ function Redeem() {
 
   // The code is the whole lock: the server said no, and only a different code changes that.
   // While signed out the lookup never runs, so an unchecked code shows nothing yet.
+  const query = session.authenticated ? lookup : preview
+  const checking = submitted && query.isFetching
   const problem =
-    submitted && lookup.isError
-      ? match(lookup.error)
+    submitted && query.isError
+      ? match(query.error)
           .when(
             (error) => error instanceof ApiError && error.code === 'expired',
             () => 'This code expired and the gift went back.',
@@ -183,30 +202,68 @@ function Redeem() {
           .otherwise(() => 'No gift card has that code. Check it and try again.')
       : null
 
+  // A card waiting for someone who isn't signed in: show what's inside, then ask who they are.
+  // Being asked to make an account for something you can't see yet is how a gift card gets
+  // abandoned, and the code is the lock either way.
+  if (!session.authenticated && preview.data) {
+    const gift = preview.data
+    return (
+      <Screen title="Gift card" back="/">
+        <CardPreview gift={gift} />
+        <EmailLogin
+          compact
+          title="Sign in to keep it"
+          intro="We’ll send a 6-digit code. It goes straight into your own account."
+        />
+        <button
+          type="button"
+          className="self-center text-[13px] text-stone underline"
+          onClick={() => {
+            setSubmitted(false)
+            setCodeText('')
+          }}
+        >
+          Use a different code
+        </button>
+      </Screen>
+    )
+  }
+
+  // Signed out the Create tab is gone with it — a card can't be made without an account either.
   return (
     <Screen
       title="Gift card"
-      back="/profile"
+      back={session.authenticated ? '/profile' : '/'}
       footer={
-        <Button
-          type="submit"
-          form="redeem-code-form"
-          disabled={!complete || !session.authenticated}
-          loading={submitted && lookup.isFetching}
-        >
-          {submitted && lookup.isFetching ? 'Checking your card…' : 'Continue'}
+        <Button type="submit" form="redeem-code-form" disabled={!complete} loading={checking}>
+          {checking
+            ? 'Checking your card…'
+            : session.authenticated
+              ? 'Continue'
+              : 'See what’s inside'}
         </Button>
       }
     >
-      <GiftCardTabs active="redeem" />
+      {session.authenticated ? (
+        <GiftCardTabs active="redeem" />
+      ) : (
+        <div className="flex flex-col gap-1.5 mt-5">
+          <h1 className="font-sans text-[30px] leading-[1.12] font-medium tracking-[-0.02em]">
+            Open your gift card
+          </h1>
+          <p className="text-stone">
+            Type the code to see what’s inside. You only sign in when you keep it.
+          </p>
+        </div>
+      )}
       <form
         id="redeem-code-form"
         className="flex flex-col gap-1.5"
         onSubmit={(event) => {
           event.preventDefault()
-          if (!complete || !session.authenticated || lookup.isFetching) return
+          if (!complete || checking) return
           setSubmitted(true)
-          if (submitted) void lookup.refetch()
+          if (submitted) void query.refetch()
         }}
       >
         <Label htmlFor="redeem-code">Redeem code</Label>
@@ -229,15 +286,6 @@ function Redeem() {
       </form>
 
       {problem && <Notice tone="warning">{problem}</Notice>}
-
-      {!session.authenticated && (
-        <>
-          <p className="text-[15px] text-stone">
-            Sign in with your email to see what’s on the card and keep it.
-          </p>
-          <EmailLogin intro="We’ll send a 6-digit code to prove it’s you. No password needed." />
-        </>
-      )}
     </Screen>
   )
 }

@@ -703,7 +703,7 @@ function Fund({ fundId }: { fundId: string }) {
                 {formatUnlock(view.unlockAt)}.
               </p>
             </div>
-            <EmailLogin intro="Sign in with your email to add to this fund." />
+            <EmailLogin compact intro="Sign in with your email to add to this fund." />
           </>
         )}
 

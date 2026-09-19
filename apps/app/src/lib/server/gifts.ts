@@ -5,7 +5,7 @@ import { match, P } from 'ts-pattern'
 import { CASH_MINT, giftAmountLabel } from '@/lib/gifts'
 import { CODE_LENGTH, normalizeCode } from '@/lib/redeem-code'
 import { getStocks, type StockAsset } from '@/lib/server/catalog'
-import { notFound } from '@/lib/server/http'
+import { badRequest, notFound } from '@/lib/server/http'
 import { getTokenPrices } from '@/lib/server/prices'
 import { avatarUrl, db } from '@/lib/server/supabase'
 import { harvestsBeforeClosing } from '@/lib/server/tokens'
@@ -89,6 +89,40 @@ export function hashCode(code: string): string {
 /** A well-formed redeem code once normalized; anything else can't have a row behind it */
 export function isRedeemCode(input: string): boolean {
   return normalizeCode(input).length === CODE_LENGTH
+}
+
+/**
+ * The card a code unlocks, with every reason it can't be opened turned into its own message.
+ *
+ * The code is the whole lock: 16 Crockford base32 symbols, so 2^80 of them, which is why this can
+ * answer someone who hasn't signed in yet. Showing what's inside to whoever already holds the code
+ * gives away nothing they couldn't get by signing in — and a gift link already does the same.
+ */
+export async function giftCardForCode(code: string): Promise<GiftRow> {
+  if (!isRedeemCode(code)) throw badRequest('Check the code and try again.', 'wrong_code')
+
+  // A code is unique in practice but not by construction: a chosen one can be minted again after
+  // its card is taken back, leaving a dead row beside the live one. So take them all, newest
+  // first, and let the living card win — a card that's gone shouldn't block the one that isn't.
+  const { data, error } = await db
+    .from('gifts')
+    .select(GIFT_COLUMNS)
+    .eq('code_hash', hashCode(code))
+    .neq('status', 'draft')
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  const cards = (data ?? []) as GiftRow[]
+  if (cards.length === 0) throw notFound('No gift card has that code.')
+
+  const open = cards.find(
+    (card) => card.status === 'pending' && new Date(card.expires_at).getTime() > Date.now(),
+  )
+  if (open) return open
+
+  // Nothing to open, so the newest one says why rather than pretending the code never existed
+  const newest = cards[0] as GiftRow
+  if (newest.status === 'claimed') throw badRequest('This code was already used.', 'already_used')
+  throw badRequest('This code expired and the gift went back.', 'expired')
 }
 
 export async function getGift(id: string | undefined): Promise<GiftRow> {

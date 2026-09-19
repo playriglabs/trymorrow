@@ -456,7 +456,7 @@ function Gift({ giftId }: { giftId: string }) {
               : `This gift is for ${view.recipientLabel}. Sign in to their Morrow account to open it.`}
           </p>
         </div>
-        <EmailLogin intro="We’ll send a code to prove it’s you. No password needed." />
+        <EmailLogin compact intro="We’ll send a code to prove it’s you. No password needed." />
       </Screen>
     )
   }
