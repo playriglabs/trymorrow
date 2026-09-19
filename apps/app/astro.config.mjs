@@ -93,6 +93,11 @@ export default defineConfig({
       // needed to send a push; without them notifications stay in the feed.
       VAPID_PRIVATE_KEY: envField.string({ context: 'server', access: 'secret', optional: true }),
       VAPID_SUBJECT: envField.string({ context: 'server', access: 'secret', optional: true }),
+      // Resend key for the emails that announce what happened while someone was away.
+      // Unset means no email: everything still lands in the feed and on the phone.
+      RESEND_API_KEY: envField.string({ context: 'server', access: 'secret', optional: true }),
+      // Who the email comes from. Defaults to the address on our sending subdomain.
+      EMAIL_FROM: envField.string({ context: 'server', access: 'secret', optional: true }),
       // Financial Modeling Prep key, for the one-line company descriptions on a stock page.
       // Unset means no descriptions: every stock page just leaves the section out.
       FMP_API_KEY: envField.string({ context: 'server', access: 'secret', optional: true }),

@@ -1,7 +1,7 @@
 import { USDC } from '@morrow/sdk'
 import { PublicKey } from '@solana/web3.js'
 import { z } from 'astro/zod'
-import { formatShares } from '@/lib/format'
+import { formatShares, tickerLabel } from '@/lib/format'
 import { findStock } from '@/lib/server/catalog'
 import { isFeeTransfer, shareAccount } from '@/lib/server/fees'
 import { badRequest, json, readBody, route } from '@/lib/server/http'
@@ -94,6 +94,7 @@ export const POST = route(async ({ request }) => {
       .maybeSingle()
     const receiver = recipient as Pick<UserRow, 'id' | 'name' | 'handle'> | null
     const senderName = user.name ?? (user.handle ? `@${user.handle}` : 'Someone')
+    const ticker = tickerLabel(asset.ticker)
 
     await notify([
       {
@@ -111,6 +112,20 @@ export const POST = route(async ({ request }) => {
               kind: 'stock_deposited' as const,
               title: `${senderName} sent you ${formatShares(view.sharesSent)} ${asset.ticker} shares`,
               body: `$${asset.ticker} landed in your account.`,
+              url: `/holding/${asset.ticker}`,
+              email: {
+                subject: `${senderName} sent you ${formatShares(view.sharesSent)} ${ticker} shares`,
+                preview: 'They’re already in your account — nothing to open.',
+                eyebrow: `${senderName} sent you shares`,
+                // The ticker, never the company: some names are far too long for a hero line
+                hero: `${formatShares(view.sharesSent)} ${ticker} shares`,
+                subhero: 'They’re already in your account.',
+                rows: [
+                  { label: 'From', value: senderName },
+                  { label: 'Shares', value: formatShares(view.sharesSent) },
+                ],
+                cta: { label: 'See your shares', path: `/holding/${asset.ticker}` },
+              },
             },
           ]
         : []),

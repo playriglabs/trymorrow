@@ -27,3 +27,6 @@ supabase/.temp
 supabase/.branches
 .aider*
 .env*
+
+# Rendered email previews (pnpm preview:emails)
+.email-preview/

@@ -71,8 +71,9 @@ Server modules in `src/lib/server`:
 | `jupiter.ts`    | Ultra `/order` and `/execute` (keyless `lite-api`), optional referral fee                                                           |
 | `trades.ts`     | Quotes, fair-price check (3%, fee excluded), fee-with-gasless-fallback, trade transaction checks                                    |
 | `charts.ts`     | Jupiter chart candles (per share, split-adjusted) with sanity checks, cached in `price_candles`                                     |
-| `notify.ts`     | The only way into the feed: settings filter, insert, then push for what happened while away                                         |
+| `notify.ts`     | The only way into the feed: settings filter, insert, then push and email for what happened while away                               |
 | `push.ts`       | Web push through VAPID; inert with no keys set, prunes subscriptions the browser dropped                                            |
+| `email.ts`      | Resend; inert with no key set, addresses read from the profile, never from the caller                                               |
 | `pnl.ts`        | Average-cost basis per stock from claimed gifts and `trade_fills`; no basis rather than a wrong one                                 |
 | `posthog.ts`    | Analytics events from the routes that moved money; no keys means a no-op, amounts only as bands, people only by Privy id            |
 
@@ -180,7 +181,14 @@ PostHog, and only as much as it needs. The browser (`components/posthog.astro`) 
 
 ### Notifications
 
-Everything goes through `notify()`. It reads `notification_settings` (no row means the defaults, all on), inserts the feed rows, and pushes only the kinds someone can switch off — those are exactly the things that happened while they were away, so a person's own buys and sends never buzz. Push needs `PUBLIC_VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY`; without them the feed still works and the browser is never asked for permission. `public/sw.js` holds the push handlers and the offline shell, and ships from `/public` unbundled.
+Everything goes through `notify()`. It reads `notification_settings` (no row means the defaults, all on), inserts the feed rows, and reaches out only for the kinds someone can switch off — those are exactly the things that happened while they were away, so a person's own buys and sends never buzz. Push needs `PUBLIC_VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY`; without them the feed still works and the browser is never asked for permission. `public/sw.js` holds the push handlers and the offline shell, and ships from `/public` unbundled.
+
+Email rides the same switch plus `email_enabled`, and only when the call site wrote an `email` for that notification: a feed line is a glance, an email is an interruption, so each one is written on purpose. Four exist today — a gift arriving, cash arriving, shares arriving (named when they came from another Morrow account, anonymous when they came from outside) and someone adding to your fund. One of each per person per `notify()` call, so a run of deposits isn't a run of emails.
+
+- `lib/email-template.ts` draws every one of them: an orange panel carrying the news, a cream receipt of labelled facts under it, one button. Same language as the share card. Tables and inline styles only — Gmail drops a `<style>` block — and no images, so nothing has to load before it reads. Aeonik and Pilat can't be loaded in mail, so the brand carries on colour and shape.
+- `lib/server/email.ts` sends through Resend from `notification@send.trymorrow.money`. Addresses are read from `users.email` by id, never taken from the caller. Unset `RESEND_API_KEY` and nothing is sent; the feed and push are unaffected.
+- `pnpm preview:emails` renders every template to `.email-preview/index.html` without sending anything. Add a sample there whenever you add an email.
+- The word rules apply harder here than on screen: an inbox is outside the app, so still no token, wallet or network.
 
 ### Money rules (don't regress these)
 

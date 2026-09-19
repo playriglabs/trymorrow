@@ -1,11 +1,14 @@
+import type { EmailContent } from '@/lib/email-template'
+import { sendEmails } from '@/lib/server/email'
 import { sendPush } from '@/lib/server/push'
 import { db } from '@/lib/server/supabase'
 import type { NotificationKind } from '@/lib/types'
 
 /**
  * One way into the feed. Everything lands in `notifications`, and anything the person can be
- * reached about also goes to their phone. Best effort by design: whatever triggered a
- * notification has already happened on-chain, so this must never fail the request that called it.
+ * reached about also goes to their phone and, when the caller wrote one, their inbox. Best effort
+ * by design: whatever triggered a notification has already happened on-chain, so this must never
+ * fail the request that called it.
  */
 export type NotificationInput = {
   userId: string
@@ -16,6 +19,11 @@ export type NotificationInput = {
   fundId?: string | null
   /** Where tapping the phone notification lands; the feed otherwise */
   url?: string
+  /**
+   * The same news written for an inbox. Leave it off and nothing is emailed: a feed line is a
+   * glance, an email is an interruption, so every one of them is written on purpose.
+   */
+  email?: EmailContent
 }
 
 type SettingsRow = {
@@ -25,7 +33,10 @@ type SettingsRow = {
   gift_returned: boolean
   fund_contribution: boolean
   fund_unlocked: boolean
+  cash_deposited: boolean
+  stock_deposited: boolean
   push_enabled: boolean
+  email_enabled: boolean
 }
 
 /** Kinds someone can turn off. The rest are their own actions, which always land in the feed */
@@ -37,6 +48,8 @@ const TOGGLE: Partial<Record<NotificationKind, keyof SettingsRow>> = {
   gift_returned: 'gift_returned',
   fund_contribution: 'fund_contribution',
   fund_unlocked: 'fund_unlocked',
+  cash_deposited: 'cash_deposited',
+  stock_deposited: 'stock_deposited',
 }
 
 export async function notify(inputs: NotificationInput[]): Promise<void> {
@@ -45,7 +58,7 @@ export async function notify(inputs: NotificationInput[]): Promise<void> {
   const { data, error } = await db
     .from('notification_settings')
     .select(
-      'user_id, gift_received, gift_opened, gift_returned, fund_contribution, fund_unlocked, push_enabled',
+      'user_id, gift_received, gift_opened, gift_returned, fund_contribution, fund_unlocked, cash_deposited, stock_deposited, push_enabled, email_enabled',
     )
     .in('user_id', [...new Set(inputs.map((input) => input.userId))])
   if (error) throw error
@@ -74,17 +87,25 @@ export async function notify(inputs: NotificationInput[]): Promise<void> {
   )
   if (insertError) throw insertError
 
-  // Only what happened while they were away is worth a buzz: their own actions are already
-  // on screen. Those are exactly the kinds with a toggle. One push per person, too.
+  // Only what happened while they were away is worth reaching for: their own actions are already
+  // on screen. Those are exactly the kinds with a toggle. One of each per person, too, so a run
+  // of deposits in a single call doesn't arrive as a run of emails.
   const messages = new Map<string, { title: string; body: string; url: string }>()
+  const mail = new Map<string, EmailContent>()
   for (const input of wanted) {
-    if (!TOGGLE[input.kind] || messages.has(input.userId)) continue
-    if (settings.get(input.userId)?.push_enabled === false) continue
-    messages.set(input.userId, {
-      title: input.title,
-      body: input.body ?? '',
-      url: input.url ?? '/notifications',
-    })
+    if (!TOGGLE[input.kind]) continue
+    const row = settings.get(input.userId)
+    if (!messages.has(input.userId) && row?.push_enabled !== false) {
+      messages.set(input.userId, {
+        title: input.title,
+        body: input.body ?? '',
+        url: input.url ?? '/notifications',
+      })
+    }
+    if (input.email && !mail.has(input.userId) && row?.email_enabled !== false) {
+      mail.set(input.userId, input.email)
+    }
   }
-  await sendPush(messages)
+  // Neither can fail the other, or a dead subscription would cost someone their email
+  await Promise.allSettled([sendPush(messages), sendEmails(mail)])
 }

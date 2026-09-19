@@ -16,14 +16,21 @@ What's left, in the order it matters. Hackathon deadline: **Thu 2026-09-25** (ex
   - [x] Confirm the daily cron shows up in Vercel and `/api/cron/refund-gifts` returns 401 without the secret
 - [x] **Jupiter referral fee**: create the referral account under the Ultra project at referral.jup.ag, open token accounts for USDC and SOL, set `JUPITER_REFERRAL_ACCOUNT`. Then check in logs how often the fee survives (gasless) versus falls back.
 - [x] **Commit the work.** Nothing is in git yet.
-- [ ] **Apply `20260919090000_gift_thanks.sql` before the next deploy.** `GIFT_COLUMNS` now selects
-      `thanks_note` and `thanked_at`, so every gift query fails until the migration has run.
-- [ ] **Apply `20260919100000_stock_sends.sql`** before the next deploy: `/send-stocks` reads and
-      writes the new `stock_sends` table, and the feed's `stock_sent` kind is in the same file.
-- [ ] **Push for shares arriving.** The recipient's `stock_deposited` row lands in the feed but
-      never buzzes, because `notify()` only pushes kinds with a settings toggle and this one has
-      none. Add a toggle column (and a settings row) if incoming shares should reach a phone.
-- [ ] **Run one share send on mainnet**: to an address that already holds the stock (free), then to
+- [x] **Apply `20260919090000_gift_thanks.sql`.** Applied; `gifts.thanks_note` and `thanked_at`
+      answer through the service-role REST API (checked 2026-09-19).
+- [x] **Apply `20260919100000_stock_sends.sql`.** Applied; `stock_sends` answers through the
+      service-role REST API and the feed's `stock_sent` kind came with it (checked 2026-09-19).
+- [x] **Push for shares arriving.** Fixed by `20260919140000_email_notifications.sql`:
+      `cash_deposited` and `stock_deposited` now have toggle columns, so both reach a phone as
+      well as the feed. `deposits.ts` was inserting into `notifications` directly, which is why
+      neither could — both now go through `notify()`, as everything is supposed to.
+- [ ] **Apply `20260919140000_email_notifications.sql`.** Adds `email_enabled`, `cash_deposited`
+      and `stock_deposited` to `notification_settings`. Email and the two new phone notifications
+      stay silent until it has run.
+- [ ] **Set `RESEND_API_KEY` in Vercel**, after verifying `send.trymorrow.money` in Resend (SPF,
+      DKIM and the return-path record). Unset means no email is sent at all. Send one of each to a
+      real inbox before the demo — Gmail, Apple Mail and Outlook all render differently.
+- [x] **Run one share send on mainnet**: to an address that already holds the stock (free), then to
       one that doesn't (fee opens their account). Only the cash-out twin has been proven on chain.
 - [ ] **Submission**: demo video (buy → gift → open), pitch, README screenshots, program address and a Solscan link.
 
@@ -79,9 +86,16 @@ A fund is a long-term pot for someone ("Aisyah's college fund"): locked until a 
 - [x] **Rate limits** on `/api/recipients` (30/min), `/api/gifts/quote` (20/min) and `/api/gifts` (5/min), per user, in `lib/server/rate-limit.ts`. In-memory, so a soft cap across Vercel instances — revisit a shared store before real traffic.
 - [ ] **Upgrade authority to a multisig** (e.g. Squads) and back up the deployer seed phrase and `programs/target/deploy/morrow-keypair.json` offline.
 - [ ] **Tests**
-  - [ ] Unit: `tokenTransfers`, `isFeeTransfer`, `planFeePayment`, `giftFees`, fair-price math
-  - [ ] Program tests on localnet with a Token-2022 mint that mirrors xStocks extensions
-  - [ ] A transaction-size test that fails when a gift transaction goes over 1,232 bytes
+  - [ ] Unit: `tokenTransfers`, `isFeeTransfer`, `planFeePayment`, `giftFees`, fair-price math. No
+        unit test file exists yet; everything proven so far runs against a validator
+  - [x] Program tests on localnet with a Token-2022 mint that mirrors xStocks extensions:
+        `pnpm test:prestocks` runs gift, claim, refund and fund against a mint carrying the same
+        0.5% transfer fee and asserts recipient amounts to the unit. The validator's Token-2022
+        has no pausable or scaled UI, so those two were covered by simulating create → harvest →
+        claim/refund against the real mainnet mints (2026-09-17)
+  - [x] A transaction-size test that fails when a gift transaction goes over 1,232 bytes:
+        `pnpm test:gifts` measures the biggest gift (2 stocks + cash + cash fee, 1,139 bytes) and
+        `pnpm test:program` fails if a full withdrawal batch goes over
 - [ ] **Migration tracking**: migrations were run by hand in the SQL editor. Adopt `supabase db push` (or record which files ran) so a fresh database matches production.
 
 ## P1.5 — key export on a phone (decided, not built)
@@ -148,11 +162,49 @@ origin, so "the button does nothing" may just have been the clipboard failing si
       and are cached in `price_candles`, shared across serverless instances and served while
       rate-limited
 - [x] **Trade screen**: `?side=sell` opens at the full position
-- [ ] **Landing site** (`apps/landing`): basic homepage is in place; expand it into a full marketing page
+- [x] **Landing site** (`apps/landing`): homepage with swipeable feature cards and a gift card in
+      the hero, plus `/how-it-works`, `/privacy-policy`, `/terms-conditions`, a sitemap, robots and
+      Organization/WebSite structured data
 - [x] **PWA polish**: install prompt on Home (iOS gets the manual steps), offline shell via
       `public/sw.js` with an `/offline` page, and web push. Gifts now write feed events at all
       (sent, received, opened, returned) and anything that happened while you were away also goes
       to the phone. Needs `PUBLIC_VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` set in Vercel
+
+### Shipped after this list was first written
+
+These landed without ever having a line here. Recorded so the list matches the code.
+
+- [x] **PreStocks** (the $5k bounty): pre-IPO shares ride buy, sell, gift, gift card and fund with
+      no program change. 9 decimals and a 0.5% transfer fee, so `harvestsBeforeClosing` goes in
+      front of every close; `LISTED_PRESTOCKS` hides companies that have since listed as xStocks;
+      logos are ours (`public/logos/prestocks/`) because both vendors serve the mark inside a
+      PreStocks hexagon. Proven by `pnpm test:prestocks` plus mainnet simulation
+- [x] **Cash gifts**: a `gift_items` row with the USDC mint, resolved by `findGiftAsset` the way
+      `findStock` resolves xStocks — no `kind` column, no second flow. Cash left after the gift
+      pays the fee first and any shortfall comes out of the locked cash, so sending the whole
+      balance still works
+- [x] **Gift cards** (`20260916140000_gift_cards.sql`): `/gift-cards` mints a redeem code with a
+      shareable card and QR, `/redeem` opens it. `POST /api/gift-cards` and `/quote`
+- [x] **Send stocks out** (`/send-stocks`): the cash-out twin for shares. Address, `@handle` or a
+      Morrow user; quote, draft row, relayer-signed transfer, strict `submit`. The fee is only the
+      unrecoverable part (opening a share account the destination lacks) and comes out of cash, or
+      out of the shares when there is none. Both sides hear about it (`stock_sent`,
+      `stock_deposited`)
+- [x] **After a gift is opened**: `/gift/[id]` shows what it was worth when sent, what it's worth
+      now and the change, with the transfer fee taken off twice, plus the recipient's note back to
+      the giver (`gifts.thanks_note`, written once through `POST /api/gifts/[id]/thanks`, riding
+      the sender's existing "they opened it" switch). This is Phase 2's gift journey and
+      thank-you flow, below
+- [x] **Watchlists**: named baskets with an emoji, `localStorage` per Privy user id
+      (`lib/client/watchlists.ts`, read through `useSyncExternalStore`). Nothing reaches the
+      server. `/watchlist` holds the tabs and editing, the trade-screen heart saves, and Home
+      shows the same baskets. Max 5 lists, 16-character names
+- [x] **Analytics**: PostHog, page views and unhandled errors from the browser, money events
+      (`gift_sent`, `gift_claimed`, `gift_refunded`, `trade_completed`, `cashout_completed`,
+      `fund_created`, `fund_contributed`, `fund_withdrawn`, plus earn and stock-send) from the
+      submit routes after the transaction lands. Autocapture and session replay stay off; amounts
+      only as bands, people only by Privy id. This is the Scorecard's "instrument these events"
+      groundwork — the baseline still has to be read
 
 ## P3 — growth and earning roadmap (proposed for review)
 
@@ -193,10 +245,11 @@ failed transactions or support contacts.
 
 ### Phase 2 — make a gift worth returning to
 
-- [ ] **Gift journey:** keep the original message, starting value, current value and change since
-      the gift was opened in one durable view
-- [ ] **Thank-you flow:** after opening, send a lightweight thank-you card back to the giver and
-      bring them to the gift's current journey
+- [x] **Gift journey:** shipped. `/gift/[id]` keeps the message, the value when sent, the value
+      today and the change; `toGiftViews` returns nothing rather than a number it can't price
+- [x] **Thank-you flow:** shipped. The recipient writes one note back through
+      `POST /api/gifts/[id]/thanks`, seen only by the two of them, notified on the sender's
+      existing "they opened it" switch
 - [ ] **Growth updates:** optional, infrequent milestones for meaningful value changes; never send
       noisy daily price alerts or imply that gains are guaranteed
 - [ ] **Private-by-default milestone cards:** share growth, time held or fund progress with the
@@ -296,9 +349,9 @@ Two shapes of Earn, very different in effort:
         itself; Save comes through DefiLlama.
   - [x] `submit` checks: relayer pays, the person signs, no lookup tables, and every instruction
         belongs to the lending program, the token programs or the compute budget
-  - [ ] **Run it once on mainnet with about $1**: deposit, part take-back, then all of it. The
+  - [x] **Run it once on mainnet with about $1**: deposit, part take-back, then all of it. The
         redeem-then-close pair has only been built and type-checked, never landed.
-  - [ ] Keep ready cash: leave enough outside Earn for trades and fees, or unwind in the same
+  - [x] Keep ready cash: leave enough outside Earn for trades and fees, or unwind in the same
         transaction as a buy, gift or cash out (measure the size first)
   - [ ] Fee and share-paid fee rules: cash in Earn does not count as cash today, so a gift fee and
         "send the whole balance" both ignore it. Decide whether that stays.

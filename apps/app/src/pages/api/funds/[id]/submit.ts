@@ -138,6 +138,7 @@ export const POST = route(async ({ params, request }) => {
       contributor: viewer,
       usdValue: rows.reduce((sum, row) => sum + Number(row.usd_value ?? 0), 0),
       mints: rows.map((row) => row.mint),
+      note: rows.find((row) => row.note)?.note ?? null,
     }).catch((cause: unknown) =>
       console.error('Fund contribution notification failed', fund.id, cause),
     )

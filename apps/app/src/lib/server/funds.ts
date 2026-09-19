@@ -1,6 +1,6 @@
 import { findFundAddress, TOKEN_2022_PROGRAM } from '@morrow/sdk'
 import { PublicKey } from '@solana/web3.js'
-import { formatUsd } from '@/lib/format'
+import { formatUsd, tickerLabel } from '@/lib/format'
 import { getStocks } from '@/lib/server/catalog'
 import { notFound } from '@/lib/server/http'
 import { notify } from '@/lib/server/notify'
@@ -275,11 +275,14 @@ export async function notifyContribution({
   contributor,
   usdValue,
   mints,
+  note,
 }: {
   fund: FundRow
   contributor: UserRow
   usdValue: number
   mints: string[]
+  /** What the contributor wrote alongside it, if anything */
+  note?: string | null
 }): Promise<void> {
   const stocks = await getStocks()
   const tickers = mints.flatMap((mint) => {
@@ -288,9 +291,12 @@ export async function notifyContribution({
   })
   const fundName = fund.name ?? `${fund.beneficiary_name}’s fund`
   const amount = formatUsd(usdValue)
-  const body = `${tickers.length > 0 ? `${tickers.join(', ')} · ` : ''}locked until ${new Date(
-    fund.unlock_at,
-  ).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`
+  const unlock = new Date(fund.unlock_at).toLocaleDateString('en-US', {
+    month: 'long',
+    year: 'numeric',
+  })
+  const body = `${tickers.length > 0 ? `${tickers.join(', ')} · ` : ''}locked until ${unlock}`
+  const contributorName = contributor.name ?? 'Someone'
 
   // One row each, and never two for the same person when they wear several hats
   const rows = new Map<string, { kind: 'fund_added' | 'fund_contribution'; title: string }>()
@@ -299,7 +305,7 @@ export async function notifyContribution({
     if (!userId || rows.has(userId)) continue
     rows.set(userId, {
       kind: 'fund_contribution',
-      title: `${contributor.name ?? 'Someone'} added ${amount} to ${fundName}`,
+      title: `${contributorName} added ${amount} to ${fundName}`,
     })
   }
 
@@ -311,6 +317,27 @@ export async function notifyContribution({
       body,
       fundId: fund.id,
       url: `/fund/${fund.id}`,
+      // Only the people it happened to hear about it; the contributor is looking at the screen
+      email:
+        row.kind === 'fund_contribution'
+          ? {
+              subject: row.title,
+              preview: body,
+              eyebrow: 'Someone added to the fund',
+              hero: `${contributorName} added ${amount}`,
+              subhero: fundName,
+              rows: [
+                { label: 'From', value: contributorName },
+                { label: 'Added', value: amount },
+                ...(tickers.length > 0
+                  ? [{ label: 'What it bought', value: tickers.map(tickerLabel).join(', ') }]
+                  : []),
+                { label: 'Locked until', value: unlock },
+              ],
+              note: note ? { from: contributorName, text: note } : null,
+              cta: { label: 'See the fund', path: `/fund/${fund.id}` },
+            }
+          : undefined,
     })),
   )
 }

@@ -1,8 +1,9 @@
 import { MORROW_PROGRAM_ID, TOKEN_2022_PROGRAM, USDC } from '@morrow/sdk'
 import { getAssociatedTokenAddressSync } from '@solana/spl-token'
 import { PublicKey, type TokenBalance } from '@solana/web3.js'
-import { formatShares, formatUsd } from '@/lib/format'
+import { formatShares, formatUsd, tickerLabel } from '@/lib/format'
 import { cashAccount } from '@/lib/server/fees'
+import { notify } from '@/lib/server/notify'
 import { connection } from '@/lib/server/solana'
 import { db } from '@/lib/server/supabase'
 import { toUi, uiMultiplier } from '@/lib/server/tokens'
@@ -144,14 +145,34 @@ export async function noteStockTransfers(user: UserRow, holdings: StockHolding[]
     if (cursorError) throw cursorError
     if (gainedRaw <= 0n) continue
 
-    const shares = toUi(gainedRaw, holding.decimals, await uiMultiplier(holding.mint))
-    const { error } = await db.from('notifications').insert({
-      user_id: user.id,
-      kind: 'stock_deposited',
-      title: `${formatShares(shares)} ${holding.ticker} arrived`,
-      body: 'From an outside account.',
-    })
-    if (error) throw error
+    const multiplier = await uiMultiplier(holding.mint)
+    const shares = toUi(gainedRaw, holding.decimals, multiplier)
+    // The ticker, not the company: a hero line has one row and some company names are very long
+    const arrived = `${formatShares(shares)} ${tickerLabel(holding.ticker)} shares`
+    await notify([
+      {
+        userId: user.id,
+        kind: 'stock_deposited',
+        title: `${formatShares(shares)} ${holding.ticker} arrived`,
+        body: 'From an outside account.',
+        url: `/holding/${holding.ticker}`,
+        email: {
+          subject: `${arrived} arrived`,
+          preview: 'They landed in your account from an outside account.',
+          eyebrow: 'Shares arrived',
+          hero: arrived,
+          subhero: 'From an outside account.',
+          rows: [
+            { label: 'Shares added', value: formatShares(shares) },
+            {
+              label: 'Shares you hold now',
+              value: formatShares(toUi(raw, holding.decimals, multiplier)),
+            },
+          ],
+          cta: { label: 'See your shares', path: `/holding/${holding.ticker}` },
+        },
+      },
+    ])
     inserted += 1
   }
 
@@ -230,14 +251,36 @@ export async function noteDeposits(user: UserRow, cashRaw: bigint): Promise<numb
   await snapshot(signatures[0]?.signature)
   if (deposits.length === 0) return 0
 
-  const { error } = await db.from('notifications').insert(
-    deposits.map((deposit) => ({
-      user_id: user.id,
-      kind: 'cash_deposited',
+  const ready = 'It’s ready to buy stocks or send as a gift.'
+  const total =
+    deposits.reduce((sum, deposit) => sum + Number(deposit.raw), 0) / 10 ** USDC.decimals
+  await notify(
+    deposits.map((deposit, index) => ({
+      userId: user.id,
+      kind: 'cash_deposited' as const,
       title: `${formatUsd(Number(deposit.raw) / 10 ** USDC.decimals)} cash arrived`,
-      body: 'It’s ready to buy stocks or send as a gift.',
+      body: ready,
+      url: '/buy',
+      // One email for the lot: several transfers in one look are still one arrival to a person
+      email:
+        index === 0
+          ? {
+              subject: `${formatUsd(total)} cash arrived`,
+              preview: ready,
+              eyebrow: 'Cash arrived',
+              hero: formatUsd(total),
+              subhero: ready,
+              rows: [
+                { label: 'Added', value: `+${formatUsd(total)}`, tone: 'gain' as const },
+                {
+                  label: 'Cash in your account',
+                  value: formatUsd(Number(cashRaw) / 10 ** USDC.decimals),
+                },
+              ],
+              cta: { label: 'Buy a stock', path: '/buy' },
+            }
+          : undefined,
     })),
   )
-  if (error) throw error
   return deposits.length
 }

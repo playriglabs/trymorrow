@@ -1,6 +1,9 @@
 import {
   ArrowUUpLeftIcon,
+  ChartLineUpIcon,
+  CoinsIcon,
   ConfettiIcon,
+  EnvelopeSimpleIcon,
   GiftIcon,
   LockOpenIcon,
   UsersThreeIcon,
@@ -32,13 +35,21 @@ const FUND_ROWS: Row[] = [
   { key: 'fundUnlocked', label: 'A fund unlocks', icon: LockOpenIcon },
 ]
 
+const ARRIVAL_ROWS: Row[] = [
+  { key: 'cashDeposited', label: 'Cash arrives', icon: CoinsIcon },
+  { key: 'stockDeposited', label: 'Shares arrive', icon: ChartLineUpIcon },
+]
+
 const DEFAULTS: NotificationSettings = {
   giftReceived: true,
   giftOpened: true,
   giftReturned: true,
   fundContribution: true,
   fundUnlocked: true,
+  cashDeposited: true,
+  stockDeposited: true,
   pushEnabled: true,
+  emailEnabled: true,
 }
 
 function NotificationSettingsScreen() {
@@ -77,6 +88,11 @@ function NotificationSettingsScreen() {
       </div>
 
       <div className="flex flex-col gap-2">
+        <Label>Money arriving</Label>
+        <Card className="flex flex-col divide-y divide-line px-4">{rows(ARRIVAL_ROWS)}</Card>
+      </div>
+
+      <div className="flex flex-col gap-2">
         <Label>Where they arrive</Label>
         <Card className="flex flex-col divide-y divide-line px-4">
           <PushToggle />
@@ -87,6 +103,15 @@ function NotificationSettingsScreen() {
               checked={current.pushEnabled}
               label="Notifications on every device"
               onChange={(checked) => update.mutate({ pushEnabled: checked })}
+            />
+          </div>
+          <div className="flex h-13 items-center gap-3">
+            <EnvelopeSimpleIcon className="size-5" />
+            <span className="flex-1">Email as well</span>
+            <Switch
+              checked={current.emailEnabled}
+              label="Email as well"
+              onChange={(checked) => update.mutate({ emailEnabled: checked })}
             />
           </div>
         </Card>

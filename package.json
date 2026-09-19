@@ -20,7 +20,9 @@
     "format": "biome check --write . && prettier --write .",
     "prepare": "test ! -e .git || lefthook install",
     "test:gifts": "pnpm --filter @morrow/sdk test:gifts",
-    "test:prestocks": "pnpm --filter @morrow/sdk test:prestocks"
+    "test:prestocks": "pnpm --filter @morrow/sdk test:prestocks",
+    "preview:emails": "node scripts/preview-emails.ts",
+    "send:emails": "node --env-file-if-exists=apps/app/.env scripts/send-test-emails.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.13",

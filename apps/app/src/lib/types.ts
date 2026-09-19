@@ -317,8 +317,12 @@ export type NotificationSettings = {
   giftReturned: boolean
   fundContribution: boolean
   fundUnlocked: boolean
+  cashDeposited: boolean
+  stockDeposited: boolean
   /** Whether this person's phones get a buzz at all; the feed keeps everything either way */
   pushEnabled: boolean
+  /** Whether the same things also reach their inbox */
+  emailEnabled: boolean
 }
 
 export type NotificationKind =

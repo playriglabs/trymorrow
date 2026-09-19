@@ -2,10 +2,18 @@ import { findGiftAddress, findGiftCardAddress, USDC } from '@morrow/sdk'
 import { PublicKey } from '@solana/web3.js'
 import { z } from 'astro/zod'
 import { match } from 'ts-pattern'
+import { formatFullDate, formatUsd } from '@/lib/format'
 import { CASH_MINT } from '@/lib/gifts'
 import { findGiftAsset } from '@/lib/server/catalog'
 import { isFeeTransfer } from '@/lib/server/fees'
-import { GIFT_COLUMNS, type GiftRow, getGift, giftLabel, toGiftView } from '@/lib/server/gifts'
+import {
+  GIFT_COLUMNS,
+  GIFT_LIFETIME_DAYS,
+  type GiftRow,
+  getGift,
+  giftLabel,
+  toGiftView,
+} from '@/lib/server/gifts'
 import { badRequest, forbidden, json, readBody, route } from '@/lib/server/http'
 import { type NotificationInput, notify } from '@/lib/server/notify'
 import { captureServerEvent } from '@/lib/server/posthog'
@@ -119,6 +127,11 @@ export const POST = route(async ({ params, request }) => {
   // The gift is on-chain by now, so nothing here may fail the request
   try {
     const label = await giftLabel(sent)
+    const senderName = viewer.name ?? 'Someone'
+    const sentUsd = sent.gift_items.reduce((sum, item) => sum + (Number(item.usd_value) || 0), 0)
+    const opening = sent.gift_items.some((item) => item.mint === CASH_MINT)
+      ? 'Open it to keep it.'
+      : 'Open it to keep the shares.'
     // A take-back doesn't notify: the sender did it themselves and sees the result on screen,
     // and notify only buzzes for things that happened while someone was away
     const rows = match(action)
@@ -141,11 +154,24 @@ export const POST = route(async ({ params, request }) => {
                 userId: sent.recipient_id,
                 kind: 'gift_received' as const,
                 title: `${viewer.name ?? 'Someone'} sent you ${label}`,
-                body: sent.gift_items.some((item) => item.mint === CASH_MINT)
-                  ? 'Open it to keep it.'
-                  : 'Open it to keep the shares.',
+                body: opening,
                 giftId: sent.id,
                 url: `/gift/${sent.id}`,
+                email: {
+                  subject: `${senderName} sent you ${label}`,
+                  preview: `${opening} It goes back to ${senderName} in ${GIFT_LIFETIME_DAYS} days.`,
+                  eyebrow: `${senderName} sent you a gift`,
+                  hero: label,
+                  subhero: 'Only you can open it.',
+                  rows: [
+                    { label: 'From', value: senderName },
+                    { label: 'Worth when sent', value: formatUsd(sentUsd) },
+                    { label: 'Open before', value: formatFullDate(sent.expires_at) },
+                  ],
+                  note: sent.message ? { from: senderName, text: sent.message } : null,
+                  cta: { label: 'Open your gift', path: `/gift/${sent.id}` },
+                  footnote: `Not opened in ${GIFT_LIFETIME_DAYS} days? It goes back to ${senderName}, in full.`,
+                },
               },
             ]
           : []),

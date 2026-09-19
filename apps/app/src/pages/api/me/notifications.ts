@@ -10,7 +10,10 @@ type SettingsRow = {
   gift_returned: boolean
   fund_contribution: boolean
   fund_unlocked: boolean
+  cash_deposited: boolean
+  stock_deposited: boolean
   push_enabled: boolean
+  email_enabled: boolean
 }
 
 const toSettings = (row: SettingsRow): NotificationSettings => ({
@@ -19,7 +22,10 @@ const toSettings = (row: SettingsRow): NotificationSettings => ({
   giftReturned: row.gift_returned,
   fundContribution: row.fund_contribution,
   fundUnlocked: row.fund_unlocked,
+  cashDeposited: row.cash_deposited,
+  stockDeposited: row.stock_deposited,
   pushEnabled: row.push_enabled,
+  emailEnabled: row.email_enabled,
 })
 
 /** No row yet means the user is still on the defaults */
@@ -29,11 +35,14 @@ const DEFAULTS: NotificationSettings = {
   giftReturned: true,
   fundContribution: true,
   fundUnlocked: true,
+  cashDeposited: true,
+  stockDeposited: true,
   pushEnabled: true,
+  emailEnabled: true,
 }
 
 const columns =
-  'gift_received, gift_opened, gift_returned, fund_contribution, fund_unlocked, push_enabled'
+  'gift_received, gift_opened, gift_returned, fund_contribution, fund_unlocked, cash_deposited, stock_deposited, push_enabled, email_enabled'
 
 /** What lands in the feed, and whether any of it also reaches a phone */
 export const GET = route(async ({ request }) => {
@@ -52,7 +61,10 @@ const updateSchema = z.object({
   giftReturned: z.boolean().optional(),
   fundContribution: z.boolean().optional(),
   fundUnlocked: z.boolean().optional(),
+  cashDeposited: z.boolean().optional(),
+  stockDeposited: z.boolean().optional(),
   pushEnabled: z.boolean().optional(),
+  emailEnabled: z.boolean().optional(),
 })
 
 export const PATCH = route(async ({ request }) => {
@@ -65,7 +77,10 @@ export const PATCH = route(async ({ request }) => {
   if (body.giftReturned !== undefined) patch.gift_returned = body.giftReturned
   if (body.fundContribution !== undefined) patch.fund_contribution = body.fundContribution
   if (body.fundUnlocked !== undefined) patch.fund_unlocked = body.fundUnlocked
+  if (body.cashDeposited !== undefined) patch.cash_deposited = body.cashDeposited
+  if (body.stockDeposited !== undefined) patch.stock_deposited = body.stockDeposited
   if (body.pushEnabled !== undefined) patch.push_enabled = body.pushEnabled
+  if (body.emailEnabled !== undefined) patch.email_enabled = body.emailEnabled
 
   const { data, error } = await db
     .from('notification_settings')

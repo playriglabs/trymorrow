@@ -37,6 +37,23 @@ export function formatDate(value: string): string {
   return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
+/**
+ * A stock written the way people write one: "$TSLA". Never the xStock symbol — `ticker` already
+ * drops that trailing x in `catalog.ts`, and a company name is too long to sit in a headline.
+ */
+export function tickerLabel(ticker: string): string {
+  return `$${ticker}`
+}
+
+/** A date that has to stand on its own, away from the app: "Oct 19, 2026" */
+export function formatFullDate(value: string): string {
+  return new Date(value).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
 /** Section label for a day: "Today", "Yesterday", else "Sep 12" (year added when not this one) */
 export function formatDayLabel(value: string): string {
   const date = new Date(value)

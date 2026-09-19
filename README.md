@@ -38,6 +38,7 @@ Program: needs the Solana CLI and Anchor 0.32.1. `pnpm build:program` uses platf
 | `pnpm deploy:app`     | Deploy the app to Vercel (preview; add `--prod`)     |
 | `pnpm deploy:landing` | Deploy landing to Vercel (preview; add `--prod`)     |
 | `pnpm build:program`  | Build the Anchor program and its IDL                 |
+| `pnpm preview:emails` | Render every email to `.email-preview` (sends none)  |
 | `pnpm test:program`   | Run the fund flow on a throwaway local validator     |
 | `pnpm typecheck`      | `svelte-check`, `astro check`, `tsc` across packages |
 | `pnpm lint`           | Biome check + Prettier check                         |
