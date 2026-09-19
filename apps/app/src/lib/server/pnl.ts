@@ -18,7 +18,14 @@ type Lot = {
   from: string | null
 }
 
-/** Every claimed gift and trade of one stock for one wallet, oldest first */
+/**
+ * Every lot of one stock for one wallet, oldest first: what came in, and what went out.
+ *
+ * Shares leave by more routes than a sale — a gift, a gift card, a fund, a transfer, a fee paid
+ * in shares — and each one has to take its share of the cost with it when it goes. Without that
+ * the pool keeps cost that no longer has shares behind it, and every later buy averages against
+ * it. A sell lot's `usd` is never read: cost leaves at the running average, not at a price.
+ */
 async function readLots(
   wallet: string,
   mint: string,
@@ -63,6 +70,83 @@ async function readLots(
       at: new Date(fill.created_at).getTime(),
       usd: Number(fill.usd),
       shares: toUi(fill.shares_raw, decimals, multiplier),
+      from: null,
+    })
+  }
+
+  // Gifts and gift cards this wallet sent. A draft never landed and a refund came back, so
+  // neither took anything with it
+  const { data: sent, error: sentError } = await db
+    .from('gift_items')
+    .select('amount_raw, gifts!inner(sender_wallet, status, created_at)')
+    .eq('mint', mint)
+    .eq('gifts.sender_wallet', wallet)
+    .in('gifts.status', ['pending', 'claimed'])
+  if (sentError) throw sentError
+  for (const item of sent ?? []) {
+    const gift = Array.isArray(item.gifts) ? item.gifts[0] : item.gifts
+    if (!gift) continue
+    lots.push({
+      side: 'sell',
+      at: new Date(gift.created_at).getTime(),
+      usd: 0,
+      shares: toUi(item.amount_raw, decimals, multiplier),
+      from: null,
+    })
+  }
+
+  // A fee paid in shares leaves for the treasury and doesn't come back, even on a refund
+  const { data: fees, error: feeError } = await db
+    .from('gifts')
+    .select('fee_raw, created_at')
+    .eq('sender_wallet', wallet)
+    .eq('fee_mint', mint)
+    .neq('status', 'draft')
+  if (feeError) throw feeError
+  for (const gift of fees ?? []) {
+    const shares = toUi(gift.fee_raw, decimals, multiplier)
+    if (shares <= 0) continue
+    lots.push({
+      side: 'sell',
+      at: new Date(gift.created_at).getTime(),
+      usd: 0,
+      shares,
+      from: null,
+    })
+  }
+
+  // Shares locked into a fund: out of the balance until the beneficiary takes them out
+  const { data: added, error: addedError } = await db
+    .from('fund_contributions')
+    .select('amount_raw, created_at')
+    .eq('contributor_wallet', wallet)
+    .eq('mint', mint)
+    .eq('status', 'confirmed')
+  if (addedError) throw addedError
+  for (const row of added ?? []) {
+    lots.push({
+      side: 'sell',
+      at: new Date(row.created_at).getTime(),
+      usd: 0,
+      shares: toUi(row.amount_raw, decimals, multiplier),
+      from: null,
+    })
+  }
+
+  // Sent out of Morrow entirely. `amount_raw` is everything that left, fee included
+  const { data: transfers, error: transferError } = await db
+    .from('stock_sends')
+    .select('amount_raw, created_at')
+    .eq('wallet', wallet)
+    .eq('mint', mint)
+    .eq('status', 'sent')
+  if (transferError) throw transferError
+  for (const row of transfers ?? []) {
+    lots.push({
+      side: 'sell',
+      at: new Date(row.created_at).getTime(),
+      usd: 0,
+      shares: toUi(row.amount_raw, decimals, multiplier),
       from: null,
     })
   }
