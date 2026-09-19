@@ -174,6 +174,10 @@ function GiftCardScreen() {
     { enabled: session.ready },
   )
   const create = useCreateGiftCardMutation()
+  // `?code=` asks for the one promo code the server holds, for a card whose code has to be
+  // printed in a submission. Every other card gets a random one, and the server refuses anything
+  // that isn't its own.
+  const asked = useMemo(() => new URLSearchParams(location.search).get('code') ?? '', [])
 
   if (!session.ready || portfolio.isPending) return <Loading />
   if (result) return <CardReady result={result} senderName={session.profile?.name ?? 'you'} />
@@ -282,7 +286,10 @@ function GiftCardScreen() {
         usdValue: Math.round(perStock * 100) / 100,
       }
     })
-    create.mutate({ items, message: message.trim() || undefined }, { onSuccess: setResult })
+    create.mutate(
+      { items, message: message.trim() || undefined, code: asked || undefined },
+      { onSuccess: setResult },
+    )
   }
 
   return (

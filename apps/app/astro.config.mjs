@@ -93,6 +93,15 @@ export default defineConfig({
       // needed to send a push; without them notifications stay in the feed.
       VAPID_PRIVATE_KEY: envField.string({ context: 'server', access: 'secret', optional: true }),
       VAPID_SUBJECT: envField.string({ context: 'server', access: 'secret', optional: true }),
+      // One chosen gift-card code, for the promo card whose code has to be printed somewhere.
+      // A card's code hash is an on-chain argument, so the code can never be changed after
+      // minting — it has to be picked at creation. Only a code equal to this one is accepted;
+      // without it every card gets a random 16-character one, which is what real cards want.
+      PROMO_GIFT_CARD_CODE: envField.string({
+        context: 'server',
+        access: 'secret',
+        optional: true,
+      }),
       // Resend key for the emails that announce what happened while someone was away.
       // Unset means no email: everything still lands in the feed and on the phone.
       RESEND_API_KEY: envField.string({ context: 'server', access: 'secret', optional: true }),

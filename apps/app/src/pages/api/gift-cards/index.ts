@@ -1,3 +1,4 @@
+import { PROMO_GIFT_CARD_CODE } from 'astro:env/server'
 import { Buffer } from 'node:buffer'
 import { createGiftCardInstruction } from '@morrow/sdk'
 import { PublicKey } from '@solana/web3.js'
@@ -5,7 +6,7 @@ import { z } from 'astro/zod'
 import { cashGiftFeeDeductions } from '@/lib/fee-deductions'
 import { formatUsd } from '@/lib/format'
 import { MAX_GIFT_STOCKS } from '@/lib/gifts'
-import { generateCode } from '@/lib/redeem-code'
+import { generateCode, normalizeCode } from '@/lib/redeem-code'
 import { findGiftAsset } from '@/lib/server/catalog'
 import {
   cashBalance,
@@ -19,6 +20,7 @@ import {
   GIFT_LIFETIME_DAYS,
   type GiftRow,
   hashCode,
+  isRedeemCode,
   toGiftView,
 } from '@/lib/server/gifts'
 import { badRequest, forbidden, json, readBody, route } from '@/lib/server/http'
@@ -38,6 +40,12 @@ const itemSchema = z.object({
 const createSchema = z.object({
   items: z.array(itemSchema).min(1).max(MAX_GIFT_STOCKS),
   message: z.string().trim().max(280).optional(),
+  /**
+   * A code to use instead of a random one, for a promo card whose code has to be printed. Only
+   * the one in `PROMO_GIFT_CARD_CODE` is accepted: a code anyone could choose is a code anyone
+   * could guess, and a guessed code empties the card.
+   */
+  code: z.string().trim().max(32).optional(),
 })
 
 /**
@@ -46,6 +54,20 @@ const createSchema = z.object({
  * else; only its sha256 is stored here and on chain. Whoever signs in and presents the code claims
  * the card, so the fee always covers the accounts a first-time claimer would need.
  */
+/**
+ * A random code unless the caller asked for the one promo code we set ourselves. Anything else is
+ * refused rather than quietly ignored, so a caller never believes it got a code it didn't get.
+ */
+function chosenCode(asked: string | undefined): string {
+  if (!asked) return generateCode()
+  const wanted = normalizeCode(asked)
+  const promo = PROMO_GIFT_CARD_CODE ? normalizeCode(PROMO_GIFT_CARD_CODE) : null
+  if (!promo || wanted !== promo || !isRedeemCode(wanted)) {
+    throw badRequest('That code isn’t available.', 'wrong_code')
+  }
+  return wanted
+}
+
 export const POST = route(async ({ request }) => {
   const sender = await requireUser(request)
   enforceRateLimit(sender.id, 'createGiftCards')
@@ -126,7 +148,7 @@ export const POST = route(async ({ request }) => {
   }
   if (fee.raw > 0n) await ensureTreasuryAccount(plan.asset ?? undefined)
 
-  const code = generateCode()
+  const code = chosenCode(body.code)
   const codeHash = hashCode(code)
   const expiresAt = new Date(Date.now() + GIFT_LIFETIME_DAYS * 24 * 60 * 60 * 1000)
   const paidFee = plan.raws[0] ?? 0n
