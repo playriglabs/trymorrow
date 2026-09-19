@@ -35,6 +35,20 @@ const AMOUNT_PATTERN = /^\d{0,7}(\.\d{0,2})?$/
 /** Base58, the length every Solana account address falls in */
 const ADDRESS_PATTERN = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/
 
+/** The mirror of the steps on Add cash, read from the other end */
+const STEPS = [
+  <>
+    In your exchange, choose <b className="font-medium">Deposit</b> and pick USDC.
+  </>,
+  <>
+    Set the network to <b className="font-medium">Solana</b>, then copy the address it gives you.
+  </>,
+  <>
+    Paste it above and pick an amount. Sending to someone on Morrow? Use their @handle or email
+    instead.
+  </>,
+]
+
 function ShortAddress({ address }: { address: string }) {
   return (
     <span className="font-medium" title={address}>
@@ -505,6 +519,21 @@ function CashOut() {
         <b className="font-medium">Solana</b> network. Send it to an address that takes those, and
         check it twice: money sent to the wrong place is gone for good.
       </Notice>
+
+      <div className="flex flex-col gap-3">
+        <h2 className="font-sans font-medium">How to cash out</h2>
+        <ol className="flex flex-col gap-2.5 text-[14px]">
+          {STEPS.map((step, index) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: static ordered steps
+            <li key={index} className="flex items-start gap-3">
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-orange-wash text-[12px]">
+                {index + 1}
+              </span>
+              <span>{step}</span>
+            </li>
+          ))}
+        </ol>
+      </div>
       {feeInfoOpen && <FeeInfoSheet onClose={() => setFeeInfoOpen(false)} />}
     </Screen>
   )
