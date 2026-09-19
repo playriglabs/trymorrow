@@ -2,7 +2,7 @@
 
 Gift stocks that grow. Send a piece of a real company to anyone, and only they can open it. Built on Solana for the Stocklana hackathon.
 
-pnpm monorepo. Design system lives in [DESIGN.md](./DESIGN.md). Working on the code (or an AI agent is)? Start with [AGENT.md](./AGENT.md). What's next is in [TODO.md](./TODO.md).
+pnpm monorepo. Design system lives in [DESIGN.md](./DESIGN.md). Working on the code (or an AI agent is)? Start with [AGENT.md](./AGENT.md). What's next is in [TODO.md](./TODO.md). The submission video is scripted in [DEMO-VIDEO.md](./DEMO-VIDEO.md).
 
 ## Structure
 

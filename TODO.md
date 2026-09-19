@@ -32,7 +32,9 @@ What's left, in the order it matters. Hackathon deadline: **Thu 2026-09-25** (ex
       real inbox before the demo — Gmail, Apple Mail and Outlook all render differently.
 - [x] **Run one share send on mainnet**: to an address that already holds the stock (free), then to
       one that doesn't (fee opens their account). Only the cash-out twin has been proven on chain.
-- [ ] **Submission**: demo video (buy → gift → open), pitch, README screenshots, program address and a Solscan link.
+- [ ] **Submission**: the video is scripted shot by shot in [DEMO-VIDEO.md](./DEMO-VIDEO.md) —
+      4:30, product first, deck only between demo beats. Still to do: record it, mint the judge
+      redeem codes, and put the program address and a Solscan link in the README.
 
 ## P0 — family funds (next feature)
 
