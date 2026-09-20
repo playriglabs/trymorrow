@@ -148,8 +148,24 @@ onMount(() => {
             <p class="mt-3 font-sans text-[28px] leading-none tracking-[-0.05em]">$50.00</p>
           </div>
           <div class="border-t border-dashed border-line px-4 py-3">
-            <p class="text-[10px] text-stone">Redeem code</p>
-            <p class="mt-0.5 font-sans text-sm tracking-tight">7QF4-2M9K-8RD3</p>
+            <div class="flex items-end justify-between gap-2">
+              <div>
+                <p class="text-[10px] text-stone">Redeem code</p>
+                <p class="mt-0.5 font-sans text-sm tracking-tight">7QF4-2M9K-8RD3</p>
+              </div>
+              <!-- What's inside the card, so the code isn't the only thing it says. -->
+              <div class="flex shrink-0 items-center -space-x-1.5">
+                <span class="inline-flex rounded-full ring-2 ring-surface"
+                  ><StockMark stock="openai" size={22} /></span
+                >
+                <span class="inline-flex rounded-full ring-2 ring-surface"
+                  ><StockMark stock="anthropic" size={22} /></span
+                >
+                <span class="inline-flex rounded-full ring-2 ring-surface"
+                  ><StockMark stock="nvidia" size={22} scale={0.6} /></span
+                >
+              </div>
+            </div>
           </div>
         </div>
         <div
