@@ -55,27 +55,27 @@ Program changes: `pnpm build:program`, then confirm the discriminators in `progr
 
 Server modules in `src/lib/server`:
 
-| Module          | Owns                                                                                                                                |
-| --------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `http.ts`       | `route()` wrapper, `HttpError`, `badRequest`/`forbidden`/`notFound`, `readBody` (zod)                                               |
-| `privy.ts`      | Access-token auth, wallet lookup, `walletForEmail` (creates) vs `findWalletForEmail` (read-only)                                    |
-| `users.ts`      | Profile rows, `requireUser`, onboarding state                                                                                       |
-| `recipients.ts` | `@handle`/email resolution, `resolveGiftRecipients`                                                                                 |
-| `rate-limit.ts` | Per-user fixed windows on the recipient lookup and the gift routes; in-memory, so a soft cap across instances                       |
-| `solana.ts`     | Relayer, `signRelayed` (simulate, size compute, sign), `sendRelayedTransaction` (resend loop), transaction parsing and verification |
-| `gifts.ts`      | Gift rows (`gift_items` embedded) to `GiftView`                                                                                     |
-| `fees.ts`       | Gift fee math, fee payment plan (cash, else shares), treasury accounts, fee transfer checks                                         |
-| `catalog.ts`    | xStocks and PreStocks from Jupiter's verified tokens (PreStocks cross-checked with their API), 5-minute cache, name overrides       |
-| `funds.ts`      | Fund rows, vault balances on-chain, `toFundView` (value, all-time change, contributors)                                             |
-| `prices.ts`     | Jupiter Price v3: `usdPrice` per share, `tokenPriceUsd` per raw token                                                               |
-| `jupiter.ts`    | Ultra `/order` and `/execute` (keyless `lite-api`), optional referral fee                                                           |
-| `trades.ts`     | Quotes, fair-price check (3%, fee excluded), fee-with-gasless-fallback, trade transaction checks                                    |
-| `charts.ts`     | Jupiter chart candles (per share, split-adjusted) with sanity checks, cached in `price_candles`                                     |
-| `notify.ts`     | The only way into the feed: settings filter, insert, then push and email for what happened while away                               |
-| `push.ts`       | Web push through VAPID; inert with no keys set, prunes subscriptions the browser dropped                                            |
-| `email.ts`      | Resend; inert with no key set, addresses read from the profile, never from the caller                                               |
-| `pnl.ts`        | Average-cost basis per stock from claimed gifts and `trade_fills`; no basis rather than a wrong one                                 |
-| `posthog.ts`    | Analytics events from the routes that moved money; no keys means a no-op, amounts only as bands, people only by Privy id            |
+| Module          | Owns                                                                                                                                               |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `http.ts`       | `route()` wrapper, `HttpError`, `badRequest`/`forbidden`/`notFound`, `readBody` (zod)                                                              |
+| `privy.ts`      | Access-token auth, wallet lookup, `walletForEmail` (creates) vs `findWalletForEmail` (read-only)                                                   |
+| `users.ts`      | Profile rows, `requireUser`, onboarding state                                                                                                      |
+| `recipients.ts` | `@handle`/email resolution, `resolveGiftRecipients`                                                                                                |
+| `rate-limit.ts` | Per-user fixed windows on the recipient lookup and the gift routes; in-memory, so a soft cap across instances                                      |
+| `solana.ts`     | Relayer, `signRelayed` (simulate, size compute, sign), `sendRelayedTransaction` (resend loop), transaction parsing and verification                |
+| `gifts.ts`      | Gift rows (`gift_items` embedded) to `GiftView`                                                                                                    |
+| `fees.ts`       | Gift fee math, fee payment plan (cash, else shares), treasury accounts, fee transfer checks                                                        |
+| `catalog.ts`    | xStocks, PreStocks and Backpack Securities from Jupiter's verified tokens (PreStocks cross-checked with their API), 5-minute cache, name overrides |
+| `funds.ts`      | Fund rows, vault balances on-chain, `toFundView` (value, all-time change, contributors)                                                            |
+| `prices.ts`     | Jupiter Price v3: `usdPrice` per share, `tokenPriceUsd` per raw token                                                                              |
+| `jupiter.ts`    | Ultra `/order` and `/execute` (keyless `lite-api`), optional referral fee                                                                          |
+| `trades.ts`     | Quotes, fair-price check (3%, fee excluded), fee-with-gasless-fallback, trade transaction checks                                                   |
+| `charts.ts`     | Jupiter chart candles (per share, split-adjusted) with sanity checks, cached in `price_candles`                                                    |
+| `notify.ts`     | The only way into the feed: settings filter, insert, then push and email for what happened while away                                              |
+| `push.ts`       | Web push through VAPID; inert with no keys set, prunes subscriptions the browser dropped                                                           |
+| `email.ts`      | Resend; inert with no key set, addresses read from the profile, never from the caller                                                              |
+| `pnl.ts`        | Average-cost basis per stock from claimed gifts and `trade_fills`; no basis rather than a wrong one                                                |
+| `posthog.ts`    | Analytics events from the routes that moved money; no keys means a no-op, amounts only as bands, people only by Privy id                           |
 
 ### Fund flow
 
@@ -213,11 +213,35 @@ Email rides the same switch plus `email_enabled`, and only when the call site wr
 
 Tokenized pre-IPO shares (Anthropic, OpenAI, Kalshi…) from prestocks.com. They ride every existing flow (buy, sell, gift, gift card, fund) with no program change, but they differ from xStocks where it matters:
 
-- **9 decimals and a 0.5% Token-2022 transfer fee** on every move. A gift arrives about 1% lighter (fee on the way into the vault and on the way out), a fund withdrawal likewise. The UI says so on the send screen and the stock page; never promise a recipient the full amount.
+- **9 decimals and a Token-2022 transfer fee** on every move (the issuer raised it from 0.5% to 1% at epoch 1039; `transferFeeBps` takes the higher of the current and scheduled rates, so never hard-code the number). A gift arrives about 1% lighter (fee on the way into the vault and on the way out), a fund withdrawal likewise. The UI says so on the send screen and the stock page; never promise a recipient the full amount.
 - **Vaults can't close while holding withheld fees** (`AccountHasWithheldTransferFees`). Every claim, refund, cron refund and withdrawal puts `harvestsBeforeClosing` (`tokens.ts`) in front, which adds a permissionless `HarvestWithheldTokensToMint` for transfer-fee mints only. `tokenTransfers` lets that instruction through and nothing else new. Any new flow that closes a vault needs the same.
 - `LISTED_PRESTOCKS` in `catalog.ts` hides companies that have since listed as xStocks (SpaceX, xAI).
 - **Logos are ours, not the issuer's.** Both Jupiter and PreStocks serve the company mark inside a PreStocks hexagon, so `PRESTOCK_LOGOS` (`catalog.ts`) points at the plain marks in `public/logos/prestocks/<SYMBOL>.png` instead. They're same-origin, so the share card canvas stays exportable; `/api/stocks/[mint]/logo` redirects rather than proxies, and the OG card resolves the path against `PUBLIC_APP_URL`. A new PreStock with no file falls back to the issuer's image. Marks that ship as black on white are repainted onto the company's own colour (OpenAI white on `#10A37F`, Anthropic black on kraft `#D4A27F`), so no logo reads as an empty white disc.
 - `pnpm test:prestocks` runs gift, claim, refund and fund on a throwaway validator with a mint carrying the same fee, and asserts the recipient amounts to the unit. Measured: 3 PreStocks + cash fee = 1,171 bytes, withdrawing 3 with harvests = 828. The validator's Token-2022 lacks pausable and scaled UI, so those were covered by simulating create → harvest → claim/refund against the real mainnet mints (2026-09-17, all ok; without the harvest the claim fails).
+
+### Backpack Securities
+
+A third issuer of tokenized stocks, tagged `backpack` in Jupiter's verified list. The mints are the
+same shape as xStocks — Token-2022, permanent delegate, pausable, unset transfer hook, no transfer
+fee, scaled UI multiplier, 179-byte accounts — so they ride every flow with no program change. They
+differ only in having 6 decimals instead of 8, which the catalog already reads per mint.
+
+- **They are often where the trading actually is.** xStocks lists 929 mints and most have no pool:
+  Roblox has $2 of liquidity as `RBLXx` against $128k as Backpack's `RBLX`, which is why a buy on
+  our side showed no price. 36 companies are minted by both issuers.
+- `markSuperseded` (`catalog.ts`) keeps the more liquid mint per ticker and flags the other.
+  **Both stay in `byMint`**, so a holding, gift or fund of the thin one still has a name and a
+  price; only browsing and buying (`/api/stocks`) skip it, unless the person holds it.
+- `findStockByTicker` returns the most liquid mint because the catalog is sorted by liquidity, so
+  `/trade/[ticker]`, `/holding/[ticker]` and an `/ask` link all land on the tradeable one.
+- Logos come from `backpack.exchange/api/stock-logo/<TICKER>` (SVG, no CORS headers), so the host is
+  allowlisted in `/api/stocks/[mint]/logo`, which proxies rather than redirects for exactly that
+  reason — a cross-origin image taints the share-card canvas.
+- These mints trade at a premium or discount to the issuer's mark (Roblox was +7% the day they were
+  added). The 3% fair-price check in `trades.ts` compares against Jupiter's price, not the mark, so
+  it isn't affected — but never show the mark as the price.
+- `primeMints` (`tokens.ts`) reads every listed mint in one `getMultipleAccounts` call before the
+  catalog asks for fees. One request per mint rate-limited the RPC: 23 of 55 failed.
 
 ## Don'ts
 

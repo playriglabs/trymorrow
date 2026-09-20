@@ -2,7 +2,7 @@ import { findStock } from '@/lib/server/catalog'
 import { notFound, route } from '@/lib/server/http'
 
 /** Only the issuer's logo host is fetched, so this can't be pointed at arbitrary URLs */
-const LOGO_HOSTS = new Set(['xstocks-metadata.backed.fi'])
+const LOGO_HOSTS = new Set(['xstocks-metadata.backed.fi', 'backpack.exchange'])
 
 /**
  * Serves a stock logo from our own origin. Drawing a cross-origin image taints a canvas and blocks

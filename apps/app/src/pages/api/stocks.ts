@@ -11,9 +11,11 @@ export const GET = route(async ({ request }) => {
   const [catalog, portfolio] = await Promise.all([getStocks(), getPortfolio(requireWallet(user))])
   const owned = new Map(portfolio.holdings.map((holding) => [holding.mint, holding]))
 
-  // Everything with a market price, plus anything this person already holds
+  // Everything with a market price from the issuer that actually trades it, plus anything held
   const stocks: StockListing[] = catalog
-    .filter((stock) => stock.priceUsd != null || owned.has(stock.mint.toBase58()))
+    .filter(
+      (stock) => (stock.priceUsd != null && !stock.superseded) || owned.has(stock.mint.toBase58()),
+    )
     .map((stock) => {
       const mint = stock.mint.toBase58()
       const holding = owned.get(mint)

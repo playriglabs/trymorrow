@@ -20,22 +20,18 @@ type Extension = { extension: string; state?: Record<string, unknown> }
 const CACHE_MS = 5 * 60_000
 const cache = new Map<string, MintInfo>()
 
-async function mintInfo(mint: string): Promise<MintInfo> {
-  const now = Date.now()
-  const cached = cache.get(mint)
-  if (cached && now - cached.fetchedAt <= CACHE_MS) return cached
+type ParsedData = { parsed?: { info?: { extensions?: Extension[] } } } | null | undefined
 
-  const { value } = await connection.getParsedAccountInfo(new PublicKey(mint))
-  const data = value?.data
-  const extensions: Extension[] =
-    data && 'parsed' in data ? (data.parsed?.info?.extensions ?? []) : []
+function parseMint(data: unknown): MintInfo {
+  const parsed = data && typeof data === 'object' && 'parsed' in data ? (data as ParsedData) : null
+  const extensions: Extension[] = parsed?.parsed?.info?.extensions ?? []
   const stateOf = (name: string) => extensions.find((item) => item.extension === name)?.state
   const scaled = stateOf('scaledUiAmountConfig')
   const fee = stateOf('transferFeeConfig') as
     | Record<'olderTransferFee' | 'newerTransferFee', { transferFeeBasisPoints?: number }>
     | undefined
   const multiplier = Number(scaled?.multiplier ?? 1)
-  const info: MintInfo = {
+  return {
     multiplier,
     newMultiplier: Number(scaled?.newMultiplier ?? multiplier),
     effectiveAt: Number(scaled?.newMultiplierEffectiveTimestamp ?? 0) * 1000,
@@ -44,10 +40,46 @@ async function mintInfo(mint: string): Promise<MintInfo> {
       fee?.olderTransferFee?.transferFeeBasisPoints ?? 0,
       fee?.newerTransferFee?.transferFeeBasisPoints ?? 0,
     ),
-    fetchedAt: now,
+    fetchedAt: Date.now(),
   }
+}
+
+const fresh = (mint: string) => {
+  const cached = cache.get(mint)
+  return cached && Date.now() - cached.fetchedAt <= CACHE_MS ? cached : null
+}
+
+async function mintInfo(mint: string): Promise<MintInfo> {
+  const cached = fresh(mint)
+  if (cached) return cached
+
+  const { value } = await connection.getParsedAccountInfo(new PublicKey(mint))
+  const info = parseMint(value?.data)
   cache.set(mint, info)
   return info
+}
+
+/**
+ * The catalog needs a fee off every mint it lists, and one request each is enough to get the RPC
+ * rate-limiting us. This fills the cache in batches instead, so the per-mint reads that follow hit
+ * it. Failures are left uncached rather than guessed at, so the next read tries again.
+ */
+export async function primeMints(mints: string[]): Promise<void> {
+  const wanted = [...new Set(mints)].filter((mint) => !fresh(mint))
+  for (let from = 0; from < wanted.length; from += 100) {
+    const batch = wanted.slice(from, from + 100)
+    try {
+      const { value } = await connection.getMultipleParsedAccounts(
+        batch.map((mint) => new PublicKey(mint)),
+      )
+      batch.forEach((mint, index) => {
+        const account = value[index]
+        if (account) cache.set(mint, parseMint(account.data))
+      })
+    } catch (error) {
+      console.error('Mint details unavailable for a batch', error)
+    }
+  }
 }
 
 const multiplierOf = (info: MintInfo, at: number) =>

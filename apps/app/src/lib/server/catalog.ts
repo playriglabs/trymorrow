@@ -1,7 +1,7 @@
 import { type Asset, STOCKS, TOKEN_2022_PROGRAM, USDC } from '@morrow/sdk'
 import { PublicKey } from '@solana/web3.js'
 import { CASH_MINT } from '@/lib/gifts'
-import { transferFeeBps } from '@/lib/server/tokens'
+import { primeMints, transferFeeBps } from '@/lib/server/tokens'
 
 const VERIFIED_TOKENS_API = 'https://lite-api.jup.ag/tokens/v2/tag?query=verified'
 const PRESTOCKS_API = 'https://prestocks.com/api/prestocks'
@@ -39,6 +39,8 @@ export type StockAsset = Asset & {
   preIpo: PreIpoInfo | null
   /** What the issuer keeps each time these shares move, in basis points; 0 for most stocks */
   transferFeeBps: number
+  /** Another issuer mints the same company with more liquidity, so this one isn't worth offering */
+  superseded: boolean
 }
 
 type JupiterToken = {
@@ -51,6 +53,7 @@ type JupiterToken = {
   usdPrice?: number | null
   liquidity?: number | null
   stats24h?: { priceChange?: number | null } | null
+  tags?: string[] | null
 }
 
 type PreStock = {
@@ -104,6 +107,7 @@ const toStock = (token: JupiterToken): StockAsset => ({
   liquidityUsd: token.liquidity ?? 0,
   preIpo: null,
   transferFeeBps: 0,
+  superseded: false,
 })
 
 const builtIn = (): StockAsset[] =>
@@ -115,6 +119,7 @@ const builtIn = (): StockAsset[] =>
     liquidityUsd: 0,
     preIpo: null,
     transferFeeBps: 0,
+    superseded: false,
   }))
 
 /** The issuer's list, or null when it's down; Jupiter's verified list still names the stocks */
@@ -159,6 +164,53 @@ async function toPreStock(token: JupiterToken, issuer: PreStock | undefined): Pr
       markPriceUsd: positive(issuer?.markPrice),
     },
     transferFeeBps: feeBps,
+    superseded: false,
+  }
+}
+
+/**
+ * Backpack Securities mints the same companies as xStocks, in the same Token-2022 shape (6 decimals
+ * instead of 8, no transfer fee), and for a lot of them that's where the trading actually is:
+ * Roblox has $128k of liquidity there against $2 on its xStock. Jupiter tags them, so the tag is
+ * the gate, the same way verification is for the other two issuers.
+ */
+async function toBackpackStock(token: JupiterToken): Promise<StockAsset> {
+  const feeBps = await transferFeeBps(token.id).catch((error) => {
+    console.error('Backpack transfer fee unavailable', token.symbol, error)
+    return 0
+  })
+  return {
+    symbol: token.symbol,
+    name:
+      NAME_OVERRIDES[token.symbol] ?? token.name.replace(/\s*-\s*Backpack Securities$/i, '').trim(),
+    ticker: token.symbol,
+    mint: new PublicKey(token.id),
+    decimals: token.decimals,
+    tokenProgram: TOKEN_2022_PROGRAM,
+    iconUrl: token.icon || '',
+    priceUsd: token.usdPrice ?? null,
+    change24hPct: token.stats24h?.priceChange ?? null,
+    liquidityUsd: token.liquidity ?? 0,
+    preIpo: null,
+    transferFeeBps: feeBps,
+    superseded: false,
+  }
+}
+
+/**
+ * Two issuers minting one company would put two prices for it side by side, and the thinner of the
+ * two is the one that can't be filled. The thin one stays in the catalog, so someone already
+ * holding it still sees a name and a price; it just stops being offered.
+ */
+function markSuperseded(stocks: StockAsset[]): void {
+  const best = new Map<string, StockAsset>()
+  for (const stock of stocks) {
+    const ticker = stock.ticker.toUpperCase()
+    const rival = best.get(ticker)
+    if (!rival || stock.liquidityUsd > rival.liquidityUsd) best.set(ticker, stock)
+  }
+  for (const stock of stocks) {
+    stock.superseded = best.get(stock.ticker.toUpperCase()) !== stock
   }
 }
 
@@ -188,16 +240,25 @@ async function load(): Promise<Catalog> {
         !LISTED_PRESTOCKS.has(token.symbol.toUpperCase()) &&
         (preStocks ? preStocks.has(token.id) : /PreStocks$/i.test(token.name)),
     )
+    // Verified Backpack Securities stocks, by Jupiter's own tag
+    const backpack = tokens.filter(
+      (token) => token.tokenProgram === token2022 && (token.tags ?? []).includes('backpack'),
+    )
+
+    // Both issuers charge a transfer fee off the mint, read in one batch rather than one call each
+    await primeMints([...privateCompanies, ...backpack].map((token) => token.id))
     stocks.push(
-      ...(await Promise.all(
-        privateCompanies.map((token) => toPreStock(token, preStocks?.get(token.id))),
-      )),
+      ...(await Promise.all([
+        ...privateCompanies.map((token) => toPreStock(token, preStocks?.get(token.id))),
+        ...backpack.map(toBackpackStock),
+      ])),
     )
   } catch (error) {
     console.error('xStocks catalog unavailable, using the built-in list', error)
     stocks = builtIn()
   }
 
+  markSuperseded(stocks)
   stocks.sort((a, b) => b.liquidityUsd - a.liquidityUsd)
   return {
     at: Date.now(),
@@ -246,6 +307,7 @@ export function cashAsset(): GiftAsset {
     liquidityUsd: 0,
     preIpo: null,
     transferFeeBps: 0,
+    superseded: false,
     isCash: true,
   }
 }
