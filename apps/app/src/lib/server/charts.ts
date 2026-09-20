@@ -26,6 +26,13 @@ type RangeSpec = {
    * much further back; cutting to the span keeps "1D" meaning the last 24 hours.
    */
   windowSeconds: number | null
+  /**
+   * How far a candle may sit from the middle of the window before it's treated as the pool talking
+   * to itself rather than a price anyone could have traded at. Widens with the range, because a
+   * month of real movement is not a bad print; null on daily candles, where a year of real movement
+   * dwarfs any band worth setting and a whole session's close is robust anyway.
+   */
+  maxDeviation: number | null
 }
 
 const HOUR = 3600
@@ -38,6 +45,7 @@ const RANGES: Record<ChartRange, RangeSpec> = {
     cacheMs: 60_000,
     timeframeKey: '15m',
     windowSeconds: DAY,
+    maxDeviation: 0.25,
   },
   '3D': {
     interval: '1_HOUR',
@@ -45,6 +53,7 @@ const RANGES: Record<ChartRange, RangeSpec> = {
     cacheMs: 5 * 60_000,
     timeframeKey: '1h',
     windowSeconds: 3 * DAY,
+    maxDeviation: 0.35,
   },
   '1W': {
     interval: '4_HOUR',
@@ -52,6 +61,7 @@ const RANGES: Record<ChartRange, RangeSpec> = {
     cacheMs: 10 * 60_000,
     timeframeKey: '4h',
     windowSeconds: 7 * DAY,
+    maxDeviation: 0.45,
   },
   '1M': {
     interval: '12_HOUR',
@@ -59,6 +69,7 @@ const RANGES: Record<ChartRange, RangeSpec> = {
     cacheMs: 30 * 60_000,
     timeframeKey: '12h',
     windowSeconds: 30 * DAY,
+    maxDeviation: 0.7,
   },
   '1Y': {
     interval: '1_DAY',
@@ -66,6 +77,7 @@ const RANGES: Record<ChartRange, RangeSpec> = {
     cacheMs: 60 * 60_000,
     timeframeKey: '1d',
     windowSeconds: 365 * DAY,
+    maxDeviation: null,
   },
   ALL: {
     interval: '1_DAY',
@@ -73,6 +85,7 @@ const RANGES: Record<ChartRange, RangeSpec> = {
     cacheMs: 60 * 60_000,
     timeframeKey: '1d',
     windowSeconds: null,
+    maxDeviation: null,
   },
 }
 
@@ -101,13 +114,35 @@ async function candles(mint: string, spec: RangeSpec): Promise<PricePoint[]> {
   const body = (await response.json()) as ChartsResponse
 
   const cutoff = spec.windowSeconds ? Date.now() / 1000 - spec.windowSeconds : 0
-  return (body.candles ?? [])
+  const points = (body.candles ?? [])
     .flatMap(({ time, close }) =>
       typeof time === 'number' && typeof close === 'number' && close > 0 && time >= cutoff
         ? [{ t: time, price: close }]
         : [],
     )
     .sort((a, b) => a.t - b.t)
+  return dropOutliers(points, spec.maxDeviation)
+}
+
+/**
+ * A pool this thin prints prices nobody could have traded out of. Alibaba's ten-day-old pool ran
+ * from $117 to $263 and back inside an hour on 19 September: real trades, but the chart they draw
+ * rescales the axis and makes the day read +124%. The middle of the window is the honest anchor —
+ * half the candles sit either side of it whatever the pool did — so candles beyond the range's band
+ * around it are left out. Measured across the catalog, a stock with a working market never comes
+ * close: the worst over a day was 4%, against 79% for Alibaba and 42% for Lockheed Martin.
+ */
+const MAX_OUTLIER_SHARE = 0.2
+
+function dropOutliers(points: PricePoint[], maxDeviation: number | null): PricePoint[] {
+  if (maxDeviation === null || points.length < 5) return points
+  const sorted = points.map((point) => point.price).sort((a, b) => a - b)
+  const median = sorted[Math.floor(sorted.length / 2)]
+  if (!median) return points
+
+  const kept = points.filter((point) => Math.abs(point.price - median) / median <= maxDeviation)
+  // Past a point the outliers are the market and the anchor is the lie, so nothing is dropped
+  return kept.length >= points.length * (1 - MAX_OUTLIER_SHARE) ? kept : points
 }
 
 /** True when the latest price is close enough to the market price to trust the history */
@@ -141,7 +176,9 @@ async function readStored(mint: string, spec: RangeSpec): Promise<StoredCandles 
     return { t: Number(row.t), price: Number(row.price) }
   })
   points.reverse()
-  return { points, fetchedAt }
+  // Rows kept before the band existed are filtered on the way out too, not only on the way in
+  const kept = dropOutliers(points, spec.maxDeviation)
+  return kept.length < 2 ? null : { points: kept, fetchedAt }
 }
 
 /** Best effort: a chart that can't be cached is still a chart */
