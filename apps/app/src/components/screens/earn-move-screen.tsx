@@ -52,7 +52,7 @@ function EarnMove({ direction }: { direction: Direction }) {
           <>
             <LinkButton href="/earn">Back to Earn</LinkButton>
             <LinkButton href="/" variant="outline">
-              See your money
+              See money
             </LinkButton>
           </>
         }

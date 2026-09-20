@@ -74,7 +74,7 @@ export const SAMPLES: EmailSample[] = [
         { label: 'From', value: 'Maya Putri' },
         { label: 'Shares', value: '0.5' },
       ],
-      cta: { label: 'See your shares', path: '/holding/NVDAX' },
+      cta: { label: 'See shares', path: '/holding/NVDAX' },
     },
   },
   {

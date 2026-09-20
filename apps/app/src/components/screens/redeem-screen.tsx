@@ -137,7 +137,7 @@ function Redeem() {
       <Screen
         footer={
           <LinkButton href={session.profile?.onboarded ? '/' : '/onboarding'}>
-            {session.profile?.onboarded ? 'See your stocks' : 'Finish setting up'}
+            {session.profile?.onboarded ? 'See stocks' : 'Finish setting up'}
           </LinkButton>
         }
       >

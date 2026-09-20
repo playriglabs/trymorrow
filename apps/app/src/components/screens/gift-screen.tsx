@@ -265,7 +265,7 @@ function Gift({ giftId }: { giftId: string }) {
         <Screen
           footer={
             <LinkButton href={session.profile?.onboarded ? '/' : '/onboarding'}>
-              {session.profile?.onboarded ? 'See your stocks' : 'Finish setting up'}
+              {session.profile?.onboarded ? 'See stocks' : 'Finish setting up'}
             </LinkButton>
           }
         >
@@ -302,7 +302,7 @@ function Gift({ giftId }: { giftId: string }) {
         footer={
           <>
             <LinkButton href={session.profile?.onboarded ? '/' : '/onboarding'}>
-              {session.profile?.onboarded ? 'See your stocks' : 'Finish setting up'}
+              {session.profile?.onboarded ? 'See stocks' : 'Finish setting up'}
             </LinkButton>
             {view.viewer === 'recipient' && !view.thanks && (
               <Button variant="ghost" onClick={() => setThanking(true)}>
@@ -340,7 +340,7 @@ function Gift({ giftId }: { giftId: string }) {
             {canThank ? (
               <div className="grid grid-cols-2 gap-2">
                 <LinkButton href="/" variant="outline">
-                  See your stocks
+                  See stocks
                 </LinkButton>
                 <Button
                   type="submit"
@@ -353,7 +353,7 @@ function Gift({ giftId }: { giftId: string }) {
               </div>
             ) : (
               <LinkButton href={view.viewer === 'recipient' ? '/' : '/gifts'}>
-                {view.viewer === 'recipient' ? 'See your stocks' : 'Your gifts'}
+                {view.viewer === 'recipient' ? 'See stocks' : 'Your gifts'}
               </LinkButton>
             )}
           </>

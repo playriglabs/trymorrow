@@ -118,7 +118,7 @@ function SendStocks() {
 
   if (stage === 'done' && sent) {
     return (
-      <Screen footer={<LinkButton href="/">See your stocks</LinkButton>}>
+      <Screen footer={<LinkButton href="/">See stocks</LinkButton>}>
         <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
           <SuccessMark />
           <div className="flex flex-col gap-1.5">
@@ -255,7 +255,7 @@ function SendStocks() {
       <div className="flex flex-col gap-2">
         <Label>Which stock</Label>
         {/* Five rows fit; a sixth peeks in so it's obvious the rest are a scroll away */}
-        <ul className="flex max-h-[20.5rem] flex-col divide-y divide-line overflow-y-auto overscroll-contain rounded-button border border-line bg-surface px-4">
+        <ul className="flex max-h-82 flex-col divide-y divide-line overflow-y-auto overscroll-contain rounded-button border border-line bg-surface px-4">
           {stocks.map((stock) => (
             <li key={stock.mint}>
               <button
