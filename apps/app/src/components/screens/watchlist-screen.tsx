@@ -1,4 +1,4 @@
-import { MinusIcon, PencilSimpleIcon, PlusIcon } from '@phosphor-icons/react'
+import { HeartIcon, MinusIcon, PencilSimpleIcon, PlusIcon } from '@phosphor-icons/react'
 import { useState } from 'react'
 import { ChangePill } from '@/components/change-pill'
 import { withProviders } from '@/components/providers'
@@ -126,12 +126,19 @@ function Watchlists() {
         {stocks.isError && <Notice tone="warning">{errorMessage(stocks.error)}</Notice>}
 
         {!active ? (
-          <Card className="flex flex-col gap-3 px-4 py-5">
-            <p className="text-[15px] text-stone">
-              Nothing on your watchlist yet. Open a stock and tap the heart to keep an eye on it,
-              without buying anything.
-            </p>
-          </Card>
+          <div className="flex flex-1 items-center justify-center py-12">
+            <div className="flex w-full max-w-sm flex-col items-center gap-3 text-center">
+              <span className="flex size-20 items-center justify-center rounded-full bg-orange-wash">
+                <HeartIcon className="size-10 text-orange" weight="duotone" />
+              </span>
+              <h2 className="mt-2 font-sans text-2xl font-medium tracking-[-0.02em]">
+                Nothing watched yet
+              </h2>
+              <p className="text-[15px] leading-[1.45] text-stone">
+                Open a stock and tap the heart to keep an eye on it, without buying anything.
+              </p>
+            </div>
+          </div>
         ) : (
           <>
             <div className="-mt-2 flex items-center justify-between gap-3 text-[13px] text-stone">
@@ -174,9 +181,11 @@ function Watchlists() {
           </>
         )}
 
-        <p className="text-[13px] text-stone">
-          Watchlists are kept on this device, so they don’t follow you to another phone.
-        </p>
+        {active && (
+          <p className="text-[13px] text-stone">
+            Watchlists are kept on this device, so they don’t follow you to another phone.
+          </p>
+        )}
       </Screen>
 
       {creating && <WatchlistFormSheet onSaved={setPickedId} onClose={() => setCreating(false)} />}
