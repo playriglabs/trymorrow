@@ -18,7 +18,7 @@ const tourScreens = [
   {
     src: '/images/buy-screen.png',
     title: 'Buy a little',
-    text: 'Search 142 stocks and Pre-IPO stocks, then start trade.',
+    text: 'Search 188 stocks, Pre-IPO ones included, then start trade.',
     icon: MagnifyingGlassIcon,
   },
   {

@@ -97,7 +97,7 @@ const flows = [
       },
       {
         title: 'Find a company',
-        text: 'Search 142 stocks and Pre-IPO stocks and check live prices and simple charts.',
+        text: 'Search 188 stocks, Pre-IPO ones included, and check live prices and simple charts.',
       },
       {
         title: 'Buy or sell',
