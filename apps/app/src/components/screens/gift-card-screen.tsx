@@ -225,7 +225,7 @@ function GiftCardScreen() {
     .with(
       { shortStock: P.nonNullable },
       ({ shortStock: stock }) =>
-        `Not enough ${stock.isCash ? 'cash' : stock.name}: you have ${formatUsd(stock.valueUsd)}, this needs ${formatUsd(perStock)}.`,
+        `Not enough ${stock.isCash ? 'cash' : `$${stock.ticker}`}: you have ${formatUsd(stock.valueUsd)}, this needs ${formatUsd(perStock)}.`,
     )
     .otherwise(() => null)
 
@@ -460,7 +460,7 @@ function GiftCardScreen() {
         <textarea
           id="message"
           rows={2}
-          maxLength={280}
+          maxLength={160}
           placeholder="Happy birthday! This one’s yours."
           value={message}
           onChange={(event) => setMessage(event.target.value)}

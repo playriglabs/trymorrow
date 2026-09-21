@@ -112,7 +112,7 @@ function Watchlists() {
       >
         {lists.length > 0 && active && (
           <WatchlistTabs
-            className="-mt-1"
+            className="mt-2"
             lists={lists}
             activeId={active.id}
             onPick={(id) => {

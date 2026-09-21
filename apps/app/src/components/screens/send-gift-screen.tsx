@@ -369,7 +369,7 @@ function SendGift() {
     .with(
       { shortStock: P.nonNullable },
       ({ shortStock: stock }) =>
-        `Not enough ${stock.isCash ? 'cash' : stock.name}: you have ${formatUsd(stock.valueUsd)}, this needs ${formatUsd(perStock * people)}.`,
+        `Not enough ${stock.isCash ? 'cash' : `$${stock.ticker}`}: you have ${formatUsd(stock.valueUsd)}, this needs ${formatUsd(perStock * people)}.`,
     )
     .otherwise(() => null)
 
@@ -704,7 +704,7 @@ function SendGift() {
         <textarea
           id="message"
           rows={2}
-          maxLength={280}
+          maxLength={160}
           placeholder="Happy birthday! Hold this one for a while."
           value={message}
           onChange={(event) => setMessage(event.target.value)}
