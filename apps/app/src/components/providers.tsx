@@ -55,7 +55,9 @@ export function Providers({ children }: { children: ReactNode }) {
       appId={PUBLIC_PRIVY_APP_ID}
       clientId={PUBLIC_PRIVY_CLIENT_ID}
       config={{
-        loginMethods: ['email', 'google'],
+        // Telegram rides last so it stays the fallback rather than the front door; inside a
+        // Telegram Mini App Privy logs people in seamlessly without ever showing this list
+        loginMethods: ['email', 'google', 'telegram'],
         appearance: {
           theme: 'light',
           accentColor: '#F66F00',

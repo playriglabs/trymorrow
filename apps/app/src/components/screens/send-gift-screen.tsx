@@ -101,7 +101,9 @@ function RecipientHint({ resolution }: { resolution: RecipientResolution | undef
       return <p className="text-[13px] text-loss">That’s you. Pick someone else.</p>
     case 'not_found':
       return (
-        <p className="text-[13px] text-loss">No one has that gift link yet. Try their email.</p>
+        <p className="text-[13px] text-loss">
+          No one has that gift link yet. Try their email or Telegram name.
+        </p>
       )
     default:
       return null

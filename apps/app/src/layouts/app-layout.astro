@@ -111,6 +111,32 @@ const structuredData = JSON.stringify({
         delete window.__morrowInstallPrompt
       })
     </script>
+    <script is:inline>
+      // Telegram Mini Apps announce themselves through launch params in the URL (query on
+      // current clients, hash on old ones). Only then is telegram-web-app.js worth loading —
+      // everyone else would fetch a script they never use, and web push never works in there.
+      ;(function () {
+        var search = new URLSearchParams(location.search)
+        var hash = new URLSearchParams(location.hash.slice(1))
+        if (!search.get('tgWebAppData') && !hash.get('tgWebAppData')) return
+        window.__morrowTelegram = true
+        var script = document.createElement('script')
+        script.src = 'https://telegram.org/js/telegram-web-app.js'
+        script.onload = function () {
+          var app = window.Telegram && window.Telegram.WebApp
+          if (!app) return
+          app.ready()
+          app.expand()
+          // A money flow shouldn't die because someone swiped down; keep that gesture ours
+          if (app.disableVerticalSwipes) app.disableVerticalSwipes()
+          try {
+            app.setHeaderColor('#fff7e9')
+            app.setBackgroundColor('#fff7e9')
+          } catch (e) {}
+        }
+        document.head.appendChild(script)
+      })()
+    </script>
   </head>
   <body class="min-h-dvh bg-cream text-ink">
     <main class="mx-auto flex min-h-dvh w-full max-w-107.5 flex-col">

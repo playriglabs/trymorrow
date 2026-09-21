@@ -60,7 +60,7 @@ Server modules in `src/lib/server`:
 | `http.ts`       | `route()` wrapper, `HttpError`, `badRequest`/`forbidden`/`notFound`, `readBody` (zod)                                                              |
 | `privy.ts`      | Access-token auth, wallet lookup, `walletForEmail` (creates) vs `findWalletForEmail` (read-only)                                                   |
 | `users.ts`      | Profile rows, `requireUser`, onboarding state                                                                                                      |
-| `recipients.ts` | `@handle`/email resolution, `resolveGiftRecipients`                                                                                                |
+| `recipients.ts` | `@handle`/email/Telegram-name resolution, `resolveGiftRecipients`                                                                                  |
 | `rate-limit.ts` | Per-user fixed windows on the recipient lookup and the gift routes; in-memory, so a soft cap across instances                                      |
 | `solana.ts`     | Relayer, `signRelayed` (simulate, size compute, sign), `sendRelayedTransaction` (resend loop), transaction parsing and verification                |
 | `gifts.ts`      | Gift rows (`gift_items` embedded) to `GiftView`                                                                                                    |
@@ -192,6 +192,15 @@ by the two of them, and it rides the sender's existing "they opened it" notifica
 ### Ask a friend
 
 `/ask` builds a link to the asker's own handle page carrying the wish: `app.trymorrow.money/maya?stock=AAPLX&amount=25&note=Birthday`. Nothing is stored, so there's no row to abuse and no cleanup. `[handle].astro` renders the ask with its own OG preview and points at `/send` with the same values; `send-gift-screen.tsx` preselects the stock only when the sender actually holds it, and says so when they don't.
+
+### Telegram
+
+The app also runs as a Telegram Mini App, and Telegram names work wherever a handle does. No bot code runs in this repo — the setup lives in BotFather and the Privy dashboard (checklist in TODO).
+
+- **Login is Privy's seamless Telegram auth.** With `'telegram'` in `loginMethods`, Privy reads the Mini App launch params itself and logs the person in with no UI, creating the same embedded Solana wallet as email; every server route is unchanged. The bot's credentials and the seamless toggle are in the Privy dashboard, and the bot's domain is set with `/setdomain`.
+- **`telegram-web-app.js` loads only when Telegram is actually there.** The detection script in `app-layout.astro` looks for `tgWebAppData` in the URL (query on current clients, hash on old ones), sets `window.__morrowTelegram` and then loads the script for the one thing Privy doesn't do: `ready()`, `expand()`, `disableVerticalSwipes()` and the cream header colour. `lib/client/telegram.ts` is how anything else asks "are we inside Telegram?".
+- **Web push is off inside Telegram** (`pushAvailable` checks `inTelegram()`): the webview never offers it. Feed and email are unaffected.
+- **A Telegram name resolves only to someone who has already signed in.** `telegramRowByUsername` (`users.ts`) maps a Telegram username through Privy to our row, and never creates or pregenerates anything — the opposite of email, which pregenerates so a gift can wait. Names 11–32 characters (longer than any handle) parse as Telegram outright; shorter ones fall back to Telegram only when no Morrow handle matches, and never when the word is one of `RESERVED_HANDLES`. Gifts, cash outs and share sends all resolve the same way, so `resolveCashoutTarget` and `resolveGiftRecipients` agree on who a name is.
 
 ### Watchlists
 

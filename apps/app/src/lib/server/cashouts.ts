@@ -7,7 +7,13 @@ import { badRequest, notFound } from '@/lib/server/http'
 import { parseRecipient } from '@/lib/server/recipients'
 import { connection, relayer, sendRelayedTransaction, signRelayed } from '@/lib/server/solana'
 import { db } from '@/lib/server/supabase'
-import { toPublicProfile, USER_COLUMNS, type UserRow } from '@/lib/server/users'
+import {
+  RESERVED_HANDLES,
+  telegramRowByUsername,
+  toPublicProfile,
+  USER_COLUMNS,
+  type UserRow,
+} from '@/lib/server/users'
 import type { CashoutView, PublicProfile } from '@/lib/types'
 
 /** Smallest cash out worth making; below this the fee is most of it */
@@ -65,10 +71,10 @@ export async function resolveDestination(address: string, self: PublicKey): Prom
 }
 
 /**
- * A cash out can go to a pasted account address or to someone on Morrow, by @handle or email.
- * Addresses pass through to the on-chain checks in `resolveDestination`; handles and emails map to
- * a wallet from our users, so the cash only ever lands in an account that belongs to someone who
- * signed in. We never pregenerate a wallet here — the recipient has to already have one.
+ * A cash out can go to a pasted account address or to someone on Morrow, by @handle, email, or
+ * their Telegram name. Addresses pass through to the on-chain checks in `resolveDestination`;
+ * names map to a wallet from our users, so the cash only ever lands in an account that belongs to
+ * someone who signed in. We never pregenerate a wallet here — the recipient has to already have one.
  */
 export async function resolveCashoutTarget(
   target: string,
@@ -79,10 +85,27 @@ export async function resolveCashoutTarget(
 
   const parsed = parseRecipient(trimmed)
   if (!parsed) throw badRequest('That isn’t an account address, @handle, or email.')
-  const column = 'email' in parsed ? 'email' : 'handle'
-  const value = 'email' in parsed ? parsed.email : parsed.handle
-  const { data } = await db.from('users').select(USER_COLUMNS).eq(column, value).maybeSingle()
-  const row = data as UserRow | null
+  let row: UserRow | null
+  if ('email' in parsed) {
+    const { data } = await db
+      .from('users')
+      .select(USER_COLUMNS)
+      .eq('email', parsed.email)
+      .maybeSingle()
+    row = data as UserRow | null
+  } else {
+    // A handle no one on Morrow has can still be someone's Telegram name, but never one of ours
+    const username = 'telegram' in parsed ? parsed.telegram : parsed.handle
+    const { data } = await db
+      .from('users')
+      .select(USER_COLUMNS)
+      .eq('handle', username)
+      .maybeSingle()
+    row = data as UserRow | null
+    if (!row?.wallet_address && ('telegram' in parsed || !RESERVED_HANDLES.has(parsed.handle))) {
+      row = await telegramRowByUsername(username)
+    }
+  }
   if (!row?.wallet_address) {
     throw badRequest('No one on Morrow has that account yet. Try an account address instead.')
   }

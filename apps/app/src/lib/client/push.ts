@@ -1,9 +1,11 @@
 import { PUBLIC_VAPID_PUBLIC_KEY } from 'astro:env/client'
+import { inTelegram } from '@/lib/client/telegram'
 
-/** Nothing to offer when no VAPID key is configured, or on a browser without push */
+/** Nothing to offer when no VAPID key is configured, on a browser without push, or inside Telegram */
 export const pushAvailable = () =>
   Boolean(PUBLIC_VAPID_PUBLIC_KEY) &&
   typeof window !== 'undefined' &&
+  !inTelegram() &&
   'serviceWorker' in navigator &&
   'PushManager' in window &&
   'Notification' in window

@@ -1,10 +1,19 @@
 import { badRequest } from '@/lib/server/http'
 import { findWalletForEmail, walletForEmail } from '@/lib/server/privy'
 import { db } from '@/lib/server/supabase'
-import { HANDLE_PATTERN, toPublicProfile, USER_COLUMNS, type UserRow } from '@/lib/server/users'
+import {
+  HANDLE_PATTERN,
+  RESERVED_HANDLES,
+  telegramRowByUsername,
+  toPublicProfile,
+  USER_COLUMNS,
+  type UserRow,
+} from '@/lib/server/users'
 import type { RecipientResolution } from '@/lib/types'
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+/** Telegram names run longer than ours, so a bare string can only be one once ours can't fit it */
+const TELEGRAM_PATTERN = /^[a-z0-9_]{11,32}$/
 
 export type RecipientTarget = {
   userId: string | null
@@ -14,12 +23,15 @@ export type RecipientTarget = {
   wallet: string | null
 }
 
-/** Accepts `maya@example.com`, `@maya`, `maya`, or a pasted `app.trymorrow.money/maya` link */
-export function parseRecipient(query: string): { email: string } | { handle: string } | null {
+/** Accepts `maya@example.com`, `@maya`, `maya`, a pasted `app.trymorrow.money/maya` link, or a Telegram name */
+export function parseRecipient(
+  query: string,
+): { email: string } | { handle: string } | { telegram: string } | null {
   const value = query.trim().toLowerCase()
   if (EMAIL_PATTERN.test(value)) return { email: value }
   const handle = value.split('/').pop()?.replace(/^@/, '') ?? ''
-  return HANDLE_PATTERN.test(handle) ? { handle } : null
+  if (HANDLE_PATTERN.test(handle)) return { handle }
+  return TELEGRAM_PATTERN.test(handle) ? { telegram: handle } : null
 }
 
 export async function resolveRecipient(
@@ -44,12 +56,28 @@ export async function resolveRecipient(
     }
   }
 
+  // Too long to be one of our handles, so it can only be a Telegram name
+  if ('telegram' in parsed) {
+    const row = await telegramRowByUsername(parsed.telegram)
+    if (!row?.wallet_address) return { resolution: { kind: 'not_found' }, target: null }
+    if (row.id === sender.id) return { resolution: { kind: 'self' }, target: null }
+    return {
+      resolution: { kind: 'user', profile: toPublicProfile(row) },
+      target: { userId: row.id, email: null, wallet: row.wallet_address },
+    }
+  }
+
   const { data } = await db
     .from('users')
     .select(USER_COLUMNS)
     .eq('handle', parsed.handle)
     .maybeSingle()
-  const row = data as UserRow | null
+  let row = data as UserRow | null
+  // A handle no one on Morrow has can still be someone's Telegram name; our own page
+  // names are never treated as Telegram, so a route can't become an accidental person
+  if (!row?.wallet_address && !RESERVED_HANDLES.has(parsed.handle)) {
+    row = await telegramRowByUsername(parsed.handle)
+  }
   if (!row?.wallet_address) return { resolution: { kind: 'not_found' }, target: null }
   if (row.id === sender.id) return { resolution: { kind: 'self' }, target: null }
   return {
@@ -79,7 +107,7 @@ export async function resolveGiftRecipients(
       const { resolution, target } = await resolveRecipient(query, sender)
       if (resolution.kind === 'self') throw badRequest('You can’t send a gift to yourself.')
       if (resolution.kind === 'not_found') {
-        throw badRequest(`No one has the gift link ${query} yet. Try their email instead.`)
+        throw badRequest(`No one has the gift link ${query} yet. Try their email or Telegram name.`)
       }
       if (!target) throw badRequest(`${query} isn’t a gift link like @maya, or an email.`)
 

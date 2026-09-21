@@ -1,3 +1,4 @@
+import { NotFoundError } from '@privy-io/node'
 import { unauthorized } from '@/lib/server/http'
 import {
   emailOf,
@@ -87,6 +88,22 @@ export async function findUserByPrivyId(privyId: string): Promise<UserRow | null
     .maybeSingle()
   if (error) throw error
   return data as UserRow | null
+}
+
+/**
+ * The Morrow row for someone's Telegram name. Only people who have actually signed in exist
+ * there, so this never creates or pregenerates anything — it just finds who is already here.
+ */
+export async function telegramRowByUsername(username: string): Promise<UserRow | null> {
+  let privyId: string
+  try {
+    privyId = (await privy.users().getByTelegramUsername({ username })).id
+  } catch (error) {
+    if (error instanceof NotFoundError) return null
+    throw error
+  }
+  const row = await findUserByPrivyId(privyId)
+  return row?.wallet_address ? row : null
 }
 
 export async function requireUser(request: Request): Promise<UserRow> {
