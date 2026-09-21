@@ -20,13 +20,15 @@ export type UserRow = {
   avatar_path: string | null
   country: string | null
   terms_accepted_at: string | null
+  /** The Telegram person behind this account, so notifications can reach them as a bot message */
+  telegram_user_id: string | null
   /** Cash balance at the last look, in USDC base units; deposits are what came in above it */
   cash_seen_raw: string | null
   cash_seen_signature: string | null
 }
 
 export const USER_COLUMNS =
-  'id, privy_id, email, wallet_address, handle, name, avatar_path, country, terms_accepted_at, cash_seen_raw, cash_seen_signature'
+  'id, privy_id, email, wallet_address, handle, name, avatar_path, country, terms_accepted_at, telegram_user_id, cash_seen_raw, cash_seen_signature'
 
 export { HANDLE_PATTERN } from '@/lib/handles'
 // Every top-level page route, plus the names we keep for ourselves: a handle that matches one
@@ -66,6 +68,14 @@ export async function syncUser(privyId: string): Promise<UserRow> {
   const wallet = solanaWalletOf(user)
   if (email) patch.email = email
   if (wallet) patch.wallet_address = wallet
+  // A Telegram login carries who the bot can message; it's there from the first sync, which
+  // is when a Telegram person's row is born
+  for (const account of user.linked_accounts) {
+    if (account.type === 'telegram') {
+      patch.telegram_user_id = account.telegram_user_id
+      break
+    }
+  }
 
   const upsert = (values: Record<string, string>) =>
     db.from('users').upsert(values, { onConflict: 'privy_id' }).select(USER_COLUMNS).single()

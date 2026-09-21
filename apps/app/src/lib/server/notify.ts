@@ -1,7 +1,7 @@
 import type { EmailContent } from '@/lib/email-template'
 import { sendEmails } from '@/lib/server/email'
-import { sendPush } from '@/lib/server/push'
 import { db } from '@/lib/server/supabase'
+import { sendPhoneNotifications } from '@/lib/server/telegram'
 import type { NotificationKind } from '@/lib/types'
 
 /**
@@ -89,7 +89,7 @@ export async function notify(inputs: NotificationInput[]): Promise<void> {
 
   // Only what happened while they were away is worth reaching for: their own actions are already
   // on screen. Those are exactly the kinds with a toggle. One of each per person, too, so a run
-  // of deposits in a single call doesn't arrive as a run of emails.
+  // of deposits in a single call doesn't arrive as a run of messages.
   const messages = new Map<string, { title: string; body: string; url: string }>()
   const mail = new Map<string, EmailContent>()
   for (const input of wanted) {
@@ -106,6 +106,7 @@ export async function notify(inputs: NotificationInput[]): Promise<void> {
       mail.set(input.userId, input.email)
     }
   }
-  // Neither can fail the other, or a dead subscription would cost someone their email
-  await Promise.allSettled([sendPush(messages), sendEmails(mail)])
+  // The phone half decides Telegram versus web push per person; neither can fail the other,
+  // or a dead subscription would cost someone their email
+  await Promise.allSettled([sendPhoneNotifications(messages), sendEmails(mail)])
 }

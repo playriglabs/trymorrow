@@ -133,6 +133,16 @@ const structuredData = JSON.stringify({
             app.setHeaderColor('#fff7e9')
             app.setBackgroundColor('#fff7e9')
           } catch (e) {}
+          // Ask once, ever, for the right to message them when a gift arrives; the popup only
+          // shows if they haven't already allowed it or blocked the bot
+          try {
+            var asked = localStorage.getItem('morrow.telegram.write') === 'asked'
+            var person = app.initDataUnsafe && app.initDataUnsafe.user
+            if (!asked && person && !person.allows_write_to_pm && app.requestWriteAccess) {
+              localStorage.setItem('morrow.telegram.write', 'asked')
+              app.requestWriteAccess()
+            }
+          } catch (e) {}
         }
         document.head.appendChild(script)
       })()

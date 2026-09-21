@@ -24,23 +24,27 @@ What's left, in the order it matters. Hackathon deadline: **Thu 2026-09-25** (ex
       `cash_deposited` and `stock_deposited` now have toggle columns, so both reach a phone as
       well as the feed. `deposits.ts` was inserting into `notifications` directly, which is why
       neither could — both now go through `notify()`, as everything is supposed to.
-- [ ] **Apply `20260919140000_email_notifications.sql`.** Adds `email_enabled`, `cash_deposited`
+- [x] **Apply `20260919140000_email_notifications.sql`.** Adds `email_enabled`, `cash_deposited`
       and `stock_deposited` to `notification_settings`. Email and the two new phone notifications
       stay silent until it has run.
-- [ ] **Set `RESEND_API_KEY` in Vercel**, after verifying `send.trymorrow.money` in Resend (SPF,
+- [x] **Set `RESEND_API_KEY` in Vercel**, after verifying `send.trymorrow.money` in Resend (SPF,
       DKIM and the return-path record). Unset means no email is sent at all. Send one of each to a
       real inbox before the demo — Gmail, Apple Mail and Outlook all render differently.
 - [x] **Run one share send on mainnet**: to an address that already holds the stock (free), then to
       one that doesn't (fee opens their account). Only the cash-out twin has been proven on chain.
-- [ ] **Telegram Mini App** — the app runs inside Telegram and gifts resolve by Telegram name. Code is
+- [x] **Telegram Mini App** — the app runs inside Telegram and gifts resolve by Telegram name. Code is
       done (`telegram-web-app.js` loads only when Telegram launch params are in the URL, web push is
       off in there, Privy logs people in seamlessly). Still to do, all outside the repo:
-  - [ ] Create the bot via `@BotFather`, `/setdomain app.trymorrow.money`, note the bot token
-  - [ ] Privy Dashboard → Login Methods → Socials → Telegram: paste the bot token and username,
+  - [x] Create the bot via `@BotFather`, `/setdomain app.trymorrow.money`, note the bot token
+  - [x] Privy Dashboard → Login Methods → Socials → Telegram: paste the bot token and username,
         enable **seamless authentication**
-  - [ ] Add `web.telegram.org` to Privy's allowed domains (Telegram's web client)
-  - [ ] Open the app from the bot (`t.me/<bot>` → add the Mini App via `/newapp`), sign a real
+  - [x] Add `web.telegram.org` to Privy's allowed domains (Telegram's web client)
+  - [x] Open the app from the bot (`t.me/<bot>` → add the Mini App via `/newapp`), sign a real
         gift on mainnet from inside Telegram and confirm the embedded wallet signs in the webview
+  - [x] Apply `20260921090000_telegram_notifications.sql`, then set `TELEGRAM_BOT_TOKEN` in
+        Vercel — bot messages replace web push for anyone signed in from Telegram. The Mini App
+        asks the person once (`requestWriteAccess`); test by sending a gift to a Telegram account
+        from a second one.
 - [ ] **Submission**: the video is scripted shot by shot in [DEMO-VIDEO.md](./DEMO-VIDEO.md) —
       4:30, product first, deck only between demo beats. Still to do: record it, mint the judge
       redeem codes, and put the program address and a Solscan link in the README.
