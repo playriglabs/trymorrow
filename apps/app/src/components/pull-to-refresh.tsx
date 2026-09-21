@@ -9,6 +9,8 @@ const THRESHOLD = 72
 const MAX_PULL = 110
 // A refresh that answers instantly still shows the spinner long enough to read as "checked"
 const MIN_SPIN_MS = 600
+/** Movement before the gesture commits to an axis; below this a swipe has no direction yet */
+const AXIS_LOCK_PX = 8
 
 /**
  * Pull down from the top of the page to refresh. An installed PWA has no browser pull to
@@ -18,7 +20,9 @@ export function usePullToRefresh(onRefresh: () => Promise<unknown>) {
   const [pull, setPull] = useState(0)
   const [refreshing, setRefreshing] = useState(false)
   const [dragging, setDragging] = useState(false)
-  const start = useRef<number | null>(null)
+  const start = useRef<{ x: number; y: number } | null>(null)
+  /** Null until the finger has moved enough to say which way it's going */
+  const axis = useRef<'vertical' | 'horizontal' | null>(null)
   const distance = useRef(0)
   const busy = useRef(false)
   const refresh = useRef(onRefresh)
@@ -31,6 +35,7 @@ export function usePullToRefresh(onRefresh: () => Promise<unknown>) {
 
     const reset = () => {
       start.current = null
+      axis.current = null
       distance.current = 0
       setDragging(false)
       setPull(0)
@@ -40,12 +45,27 @@ export function usePullToRefresh(onRefresh: () => Promise<unknown>) {
       // Not while a sheet has locked the page, mid-scroll, or with a second finger down
       const locked = document.body.style.overflow === 'hidden'
       if (busy.current || locked || window.scrollY > 0 || event.touches.length !== 1) return
-      start.current = event.touches[0]?.clientY ?? null
+      const touch = event.touches[0]
+      start.current = touch ? { x: touch.clientX, y: touch.clientY } : null
+      axis.current = null
     }
 
     const onMove = (event: TouchEvent) => {
-      if (start.current == null) return
-      const delta = (event.touches[0]?.clientY ?? start.current) - start.current
+      const from = start.current
+      if (from == null || axis.current === 'horizontal') return
+      const touch = event.touches[0]
+      const delta = (touch?.clientY ?? from.y) - from.y
+      const sideways = (touch?.clientX ?? from.x) - from.x
+
+      // Which way this swipe is going is decided once, at the first few pixels. Without that, a
+      // sideways drag that drifts down a little counts as a pull and the carousel under the
+      // finger never moves, because the pull is what cancels the browser's own scrolling.
+      if (axis.current === null) {
+        if (Math.max(Math.abs(delta), Math.abs(sideways)) < AXIS_LOCK_PX) return
+        axis.current = Math.abs(sideways) > Math.abs(delta) ? 'horizontal' : 'vertical'
+        if (axis.current === 'horizontal') return
+      }
+
       if (delta <= 0 || window.scrollY > 0) {
         if (distance.current > 0) reset()
         return
