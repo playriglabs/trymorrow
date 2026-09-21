@@ -1,5 +1,6 @@
 import { ShareIcon, XIcon } from '@phosphor-icons/react'
 import { useEffect, useRef, useState } from 'react'
+import { inTelegram } from '@/lib/client/telegram'
 
 type InstallEvent = Event & {
   prompt: () => Promise<void>
@@ -28,7 +29,8 @@ export function InstallPrompt() {
   const dialog = useRef<HTMLDialogElement>(null)
 
   useEffect(() => {
-    if (isStandalone() || window.__morrowInstalled) return
+    // Telegram already is the installed app for someone in its Mini App
+    if (isStandalone() || window.__morrowInstalled || inTelegram()) return
     try {
       if (Number(localStorage.getItem(DISMISSED)) > Date.now()) return
     } catch {
