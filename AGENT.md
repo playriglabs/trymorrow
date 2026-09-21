@@ -55,28 +55,29 @@ Program changes: `pnpm build:program`, then confirm the discriminators in `progr
 
 Server modules in `src/lib/server`:
 
-| Module          | Owns                                                                                                                                               |
-| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `http.ts`       | `route()` wrapper, `HttpError`, `badRequest`/`forbidden`/`notFound`, `readBody` (zod)                                                              |
-| `privy.ts`      | Access-token auth, wallet lookup, `walletForEmail` (creates) vs `findWalletForEmail` (read-only)                                                   |
-| `users.ts`      | Profile rows, `requireUser`, onboarding state                                                                                                      |
-| `recipients.ts` | `@handle`/email/Telegram-name resolution, `resolveGiftRecipients`                                                                                  |
-| `rate-limit.ts` | Per-user fixed windows on the recipient lookup and the gift routes; in-memory, so a soft cap across instances                                      |
-| `solana.ts`     | Relayer, `signRelayed` (simulate, size compute, sign), `sendRelayedTransaction` (resend loop), transaction parsing and verification                |
-| `gifts.ts`      | Gift rows (`gift_items` embedded) to `GiftView`                                                                                                    |
-| `fees.ts`       | Gift fee math, fee payment plan (cash, else shares), treasury accounts, fee transfer checks                                                        |
-| `catalog.ts`    | xStocks, PreStocks and Backpack Securities from Jupiter's verified tokens (PreStocks cross-checked with their API), 5-minute cache, name overrides |
-| `funds.ts`      | Fund rows, vault balances on-chain, `toFundView` (value, all-time change, contributors)                                                            |
-| `prices.ts`     | Jupiter Price v3: `usdPrice` per share, `tokenPriceUsd` per raw token                                                                              |
-| `jupiter.ts`    | Ultra `/order` and `/execute` (keyless `lite-api`), optional referral fee                                                                          |
-| `trades.ts`     | Quotes, fair-price check (3%, fee excluded), fee-with-gasless-fallback, trade transaction checks                                                   |
-| `charts.ts`     | Jupiter chart candles (per share, split-adjusted) with sanity checks, cached in `price_candles`                                                    |
-| `notify.ts`     | The only way into the feed: settings filter, insert, then push and email for what happened while away                                              |
-| `push.ts`       | Web push through VAPID; inert with no keys set, prunes subscriptions the browser dropped                                                           |
-| `telegram.ts`   | Phone-notification routing: a bot message for whoever `users.telegram_user_id` names, web push for everyone else                                   |
-| `email.ts`      | Resend; inert with no key set, addresses read from the profile, never from the caller                                                              |
-| `pnl.ts`        | Average-cost basis per stock from claimed gifts and `trade_fills`; no basis rather than a wrong one                                                |
-| `posthog.ts`    | Analytics events from the routes that moved money; no keys means a no-op, amounts only as bands, people only by Privy id                           |
+| Module            | Owns                                                                                                                                                                           |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `http.ts`         | `route()` wrapper, `HttpError`, `badRequest`/`forbidden`/`notFound`, `readBody` (zod)                                                                                          |
+| `privy.ts`        | Access-token auth, wallet lookup, `walletForEmail` (creates) vs `findWalletForEmail` (read-only)                                                                               |
+| `users.ts`        | Profile rows, `requireUser`, onboarding state                                                                                                                                  |
+| `recipients.ts`   | `@handle`/email/Telegram-name resolution, `resolveGiftRecipients`                                                                                                              |
+| `rate-limit.ts`   | Per-user fixed windows on the recipient lookup and the gift routes; in-memory, so a soft cap across instances                                                                  |
+| `solana.ts`       | Relayer, `signRelayed` (simulate, size compute, sign), `sendRelayedTransaction` (resend loop), transaction parsing and verification                                            |
+| `gifts.ts`        | Gift rows (`gift_items` embedded) to `GiftView`                                                                                                                                |
+| `fees.ts`         | Gift fee math, fee payment plan (cash, else shares), treasury accounts, fee transfer checks                                                                                    |
+| `catalog.ts`      | xStocks, PreStocks and Backpack Securities from Jupiter's verified tokens (PreStocks cross-checked with their API), 5-minute cache, name overrides                             |
+| `funds.ts`        | Fund rows, vault balances on-chain, `toFundView` (value, all-time change, contributors)                                                                                        |
+| `prices.ts`       | Jupiter Price v3: `usdPrice` per share, `tokenPriceUsd` per raw token                                                                                                          |
+| `jupiter.ts`      | Ultra `/order` and `/execute` (keyless `lite-api`), optional referral fee                                                                                                      |
+| `trades.ts`       | Quotes, fair-price check (3%, fee excluded, plus 10% over the listed stock for buys), fee-with-gasless-fallback, weekend no-route as "market closed", trade transaction checks |
+| `listed-price.ts` | The real stock's exchange price from FMP, trusted only when the company name matches; 10-minute cache, null when unknown                                                       |
+| `charts.ts`       | Jupiter chart candles (per share, split-adjusted) with sanity checks, cached in `price_candles`                                                                                |
+| `notify.ts`       | The only way into the feed: settings filter, insert, then push and email for what happened while away                                                                          |
+| `push.ts`         | Web push through VAPID; inert with no keys set, prunes subscriptions the browser dropped                                                                                       |
+| `telegram.ts`     | Phone-notification routing: a bot message for whoever `users.telegram_user_id` names, web push for everyone else                                                               |
+| `email.ts`        | Resend; inert with no key set, addresses read from the profile, never from the caller                                                                                          |
+| `pnl.ts`          | Average-cost basis per stock from claimed gifts and `trade_fills`; no basis rather than a wrong one                                                                            |
+| `posthog.ts`      | Analytics events from the routes that moved money; no keys means a no-op, amounts only as bands, people only by Privy id                                                       |
 
 ### Fund flow
 
@@ -252,7 +253,7 @@ Email rides the same switch plus `email_enabled`, and only when the call site wr
 - Solana transactions cap at 1,232 bytes and we use no lookup tables. Measured: 3 stocks + cash fee = 1,159 bytes, 3 stocks + share fee = 1,097, claim of 3 = 859, contribute of 3 = 732, withdraw of 2 = 690, withdraw of 4 = 924. That's why `MAX_GIFT_STOCKS` and `MAX_FUND_STOCKS` (the mix) are 3, a fund keeps at most `MAX_FUND_HOLDINGS` (6) stocks, and withdrawals go out `MAX_WITHDRAWALS_PER_TRANSACTION` (4) at a time. `pnpm test:program` fails if a full batch ever goes over the limit. Measure again (build the transaction and serialize it) before adding accounts to a gift transaction.
 - xStocks are Token-2022 with 8 decimals, a scaled UI amount multiplier, permanent delegate, pausable and an (unset) transfer hook. Use `TransferChecked` for Token-2022.
 - Jupiter's `usdPrice` is per share, with the scaled UI multiplier applied (Netflix is ×10, OpenAI's PreStock ×1.49). Anything that works in raw amounts (fair-price check, fund vault values, share-paid fees) must use `tokenPriceUsd` from `getPriceData`/`getTokenPrices`. Convert raw balances to shares with `toUi`/`uiMultiplier`.
-- Charts come from `datapi.jup.ag/v2/charts` (keyless, undocumented), so they cache per range and serve stale copies on 429s or outages. Intraday candles from a thin pool are real trades at prices nobody could trade out of — Alibaba's pool ran $117 to $263 and back in an hour — so `dropOutliers` (`charts.ts`) leaves out candles beyond `maxDeviation` from the window's median, and keeps everything when more than a fifth would go, because then the outliers are the market. Bands: 25% on 1D, 35% on 3D, 45% on 1W, 70% on 1M, none on daily candles. Measured across the catalog, a stock with a working market never reaches 5% over a day.
+- Charts come from `datapi.jup.ag/v2/charts` (keyless, undocumented), so they cache per range and serve stale copies on 429s or outages. Intraday candles from a thin pool are real trades at prices nobody could trade out of — Alibaba's pool ran $117 to $263 and back in an hour — so `dropOutliers` (`charts.ts`) leaves out candles beyond `maxDeviation` from the window's median, and keeps everything when more than a fifth would go, because then the outliers are the market. Bands (a ratio either way from the median): 25% on 1D, 35% on 3D, 45% on 1W, 70% on 1M, 4x on daily candles. A thin pool (under `LOW_LIQUIDITY_USD`) whose window still doesn't hold together gets no pool chart at all — Applied Materials' xStock had $2 of liquidity and five trades between $731 and $15,395 — so it falls back to the listed stock's closes or says there's no reliable history. Measured across the catalog, a stock with a working market never reaches 5% over a day.
 - Jupiter Ultra is deprecated in favour of Swap V2 (API key). It still works keyless.
 - Gifts to an email must be opened by signing in with that email code. Google login creates a separate Privy user, so it won't see the gift.
 

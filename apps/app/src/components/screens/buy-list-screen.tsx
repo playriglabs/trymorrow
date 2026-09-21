@@ -10,7 +10,7 @@ import { STOCK_CATEGORIES, type StockCategory } from '@/lib/categories'
 import { errorMessage } from '@/lib/client/api'
 import { useStocksQuery } from '@/lib/client/queries'
 import { useSession } from '@/lib/client/session'
-import { formatShares, formatUsd } from '@/lib/format'
+import { formatPrice, formatShares, formatUsd } from '@/lib/format'
 
 const PAGE_SIZE = 20
 
@@ -190,7 +190,7 @@ function BuyList() {
                       <span className="truncate font-sans text-[16px] font-medium tracking-[-0.01em]">
                         {stock.name}
                       </span>
-                      <span className="text-[14px] text-stone">{formatUsd(stock.priceUsd)}</span>
+                      <span className="text-[14px] text-stone">{formatPrice(stock.priceUsd)}</span>
                     </div>
                     <div className="self-start">
                       <ChangePill value={stock.change24hPct ?? 0} />
@@ -245,7 +245,7 @@ function BuyList() {
                 </span>
               </div>
               <div className="flex flex-col items-end gap-0.5">
-                <span className="text-[15px]">{formatUsd(stock.priceUsd)}</span>
+                <span className="text-[15px]">{formatPrice(stock.priceUsd)}</span>
                 {/* A % move from one small trade in a thin market is noise, so don't show it */}
                 {stock.change24hPct != null && !stock.lowLiquidity && (
                   <ChangePill value={stock.change24hPct} />

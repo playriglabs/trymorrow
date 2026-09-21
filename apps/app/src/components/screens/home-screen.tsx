@@ -34,7 +34,7 @@ import {
 } from '@/lib/client/queries'
 import { useSession } from '@/lib/client/session'
 import { useWatchlists, watchedMints } from '@/lib/client/watchlists'
-import { formatUsd } from '@/lib/format'
+import { formatPrice, formatUsd } from '@/lib/format'
 import { giftAssetsLabel } from '@/lib/gifts'
 import type { FundCardView } from '@/lib/types'
 
@@ -168,8 +168,19 @@ function House() {
   const session = useSession()
   const enabled = session.ready
   const portfolio = usePortfolioQuery({ enabled })
-  // The day's change prints with one decimal, so under 5 cents reads as $0.0: flat, not a gain
-  const dayFlat = Math.abs(portfolio.data?.stocksPnl24hUsd ?? 0) < 0.05
+  // Gain since buying, summed over the same rows listed below, so the header and the rows agree.
+  // Stocks with no cost basis (moved in from outside) are left out rather than counted as free.
+  const tracked = (portfolio.data?.holdings ?? []).flatMap((holding) =>
+    !holding.isCash && holding.costUsd != null && holding.valueUsd != null
+      ? [{ cost: holding.costUsd, value: holding.valueUsd }]
+      : [],
+  )
+  const gainUsd =
+    tracked.length > 0 ? tracked.reduce((sum, item) => sum + item.value - item.cost, 0) : null
+  const trackedCost = tracked.reduce((sum, item) => sum + item.cost, 0)
+  const gainPct = gainUsd != null && trackedCost > 0 ? (gainUsd / trackedCost) * 100 : null
+  // Under half a cent prints as $0.00: flat, not a gain
+  const gainFlat = Math.abs(gainUsd ?? 0) < 0.005
   const received = useGiftsQuery('received', { enabled })
   const sent = useGiftsQuery('sent', { enabled })
   const feed = useNotificationsQuery({ enabled })
@@ -364,23 +375,18 @@ function House() {
               >
                 {balanceLabel}
               </h2>
-              {portfolio.data?.stocksPnl24hUsd != null && !balanceHidden && (
+              {gainUsd != null && !balanceHidden && (
                 <p
                   className={clsx('text-[14px] whitespace-nowrap', {
-                    'text-gain': !dayFlat && portfolio.data.stocksPnl24hUsd > 0,
-                    'text-loss': !dayFlat && portfolio.data.stocksPnl24hUsd < 0,
-                    'text-stone': dayFlat,
+                    'text-gain': !gainFlat && gainUsd > 0,
+                    'text-loss': !gainFlat && gainUsd < 0,
+                    'text-stone': gainFlat,
                   })}
                 >
-                  {!dayFlat && portfolio.data.stocksPnl24hUsd > 0 ? '+' : ''}
-                  {(dayFlat ? 0 : portfolio.data.stocksPnl24hUsd).toLocaleString('en-US', {
-                    style: 'currency',
-                    currency: 'USD',
-                    minimumFractionDigits: 1,
-                    maximumFractionDigits: 1,
-                  })}
-                  {portfolio.data.stocksPnl24hPct != null &&
-                    ` (${!dayFlat && Math.round(portfolio.data.stocksPnl24hPct) > 0 ? '+' : ''}${dayFlat ? Math.abs(Math.round(portfolio.data.stocksPnl24hPct)) : Math.round(portfolio.data.stocksPnl24hPct)}%)`}
+                  {!gainFlat && gainUsd > 0 ? '+' : ''}
+                  {formatUsd(gainFlat ? 0 : gainUsd)}
+                  {gainPct != null &&
+                    ` (${!gainFlat && Math.round(gainPct) > 0 ? '+' : ''}${gainFlat ? 0 : Math.round(gainPct)}%)`}
                 </p>
               )}
             </div>
@@ -560,7 +566,7 @@ function House() {
                         <span className="text-[13px] text-stone">{stock.ticker}</span>
                       </div>
                       <div className="flex flex-col items-end gap-0.5">
-                        <span className="text-[15px]">{formatUsd(stock.priceUsd)}</span>
+                        <span className="text-[15px]">{formatPrice(stock.priceUsd)}</span>
                         {stock.change24hPct != null && !stock.lowLiquidity && (
                           <ChangePill value={stock.change24hPct} />
                         )}

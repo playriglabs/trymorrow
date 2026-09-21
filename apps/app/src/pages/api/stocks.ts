@@ -29,8 +29,10 @@ export const GET = route(async ({ request }) => {
         ticker: stock.ticker,
         iconUrl: stock.iconUrl,
         category: stock.preIpo ? 'pre-ipo' : categoryFor(stock.ticker),
-        priceUsd: holding?.priceUsd ?? stock.priceUsd,
-        change24hPct: stock.change24hPct,
+        // A pool nobody trades has a last print, not a price; Review quotes the real one
+        priceUsd: stock.noMarket ? null : (holding?.priceUsd ?? stock.priceUsd),
+        change24hPct: stock.noMarket ? null : stock.change24hPct,
+        noMarket: stock.noMarket,
         lowLiquidity: stock.liquidityUsd < LOW_LIQUIDITY_USD,
         ownedShares: holding?.amount ?? 0,
         ownedRaw: holding?.raw ?? '0',
@@ -42,6 +44,12 @@ export const GET = route(async ({ request }) => {
         transferFeePct: stock.transferFeeBps / 100,
       }
     })
+
+  // Stocks with a price and a day's move first, then a price alone, then no price at all. The
+  // sort is stable, so each group keeps the catalog's most-liquid-first order
+  const rank = (stock: StockListing) =>
+    stock.priceUsd == null ? 2 : stock.change24hPct == null ? 1 : 0
+  stocks.sort((a, b) => rank(a) - rank(b))
 
   const response: StocksResponse = {
     stocks,

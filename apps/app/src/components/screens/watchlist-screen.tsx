@@ -10,7 +10,7 @@ import { errorMessage } from '@/lib/client/api'
 import { useStocksQuery } from '@/lib/client/queries'
 import { useSession } from '@/lib/client/session'
 import { useWatchlists, type Watchlist } from '@/lib/client/watchlists'
-import { formatShares, formatUsd } from '@/lib/format'
+import { formatPrice, formatShares } from '@/lib/format'
 import type { StockListing } from '@/lib/types'
 
 export const tradeHref = (ticker: string) => `/trade/${encodeURIComponent(ticker.toLowerCase())}`
@@ -34,7 +34,7 @@ function WatchedRow({
         </span>
       </div>
       <div className="flex flex-col items-end gap-0.5">
-        <span className="text-[15px]">{formatUsd(stock.priceUsd)}</span>
+        <span className="text-[15px]">{formatPrice(stock.priceUsd)}</span>
         {stock.change24hPct != null && !stock.lowLiquidity && (
           <ChangePill value={stock.change24hPct} />
         )}

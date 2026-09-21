@@ -100,7 +100,11 @@ function Ask() {
               <StockLogo iconUrl={stock.iconUrl} ticker={stock.ticker} size={36} />
               <div className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate">{stock.name}</span>
-                <span className="text-[13px] text-stone">{formatUsd(stock.priceUsd)} a share</span>
+                <span className="text-[13px] text-stone">
+                  {stock.priceUsd == null
+                    ? 'No price right now'
+                    : `${formatUsd(stock.priceUsd)} a share`}
+                </span>
               </div>
               <button
                 type="button"

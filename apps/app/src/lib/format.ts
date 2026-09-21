@@ -4,6 +4,11 @@ export function formatUsd(value: number | null | undefined): string {
   return value == null ? '$0.00' : usd.format(value)
 }
 
+/** A share price, where none is an honest answer: a stock nobody trades has no price, not $0 */
+export function formatPrice(value: number | null | undefined): string {
+  return value == null ? 'No price' : usd.format(value)
+}
+
 const wholeUsd = new Intl.NumberFormat('en-US', {
   style: 'currency',
   currency: 'USD',

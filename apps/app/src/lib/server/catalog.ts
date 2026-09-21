@@ -2,6 +2,7 @@ import { type Asset, STOCKS, TOKEN_2022_PROGRAM, USDC } from '@morrow/sdk'
 import { PublicKey } from '@solana/web3.js'
 import { CASH_MINT } from '@/lib/gifts'
 import { primeMints, transferFeeBps } from '@/lib/server/tokens'
+import { LOW_LIQUIDITY_USD, NO_MARKET_TRADERS } from '@/lib/stocks'
 
 const VERIFIED_TOKENS_API = 'https://lite-api.jup.ag/tokens/v2/tag?query=verified'
 const PRESTOCKS_API = 'https://prestocks.com/api/prestocks'
@@ -41,6 +42,8 @@ export type StockAsset = Asset & {
   transferFeeBps: number
   /** Another issuer mints the same company with more liquidity, so this one isn't worth offering */
   superseded: boolean
+  /** Almost nobody trades it, so its last price means nothing (see `NO_MARKET_TRADERS`) */
+  noMarket: boolean
 }
 
 type JupiterToken = {
@@ -52,7 +55,7 @@ type JupiterToken = {
   icon?: string | null
   usdPrice?: number | null
   liquidity?: number | null
-  stats24h?: { priceChange?: number | null } | null
+  stats24h?: { priceChange?: number | null; numTraders?: number | null } | null
   tags?: string[] | null
 }
 
@@ -100,6 +103,10 @@ const preStockLogo = (symbol: string): string | null => {
   return PRESTOCK_LOGOS.has(key) ? `/logos/prestocks/${key}.png` : null
 }
 
+const noMarket = (token: JupiterToken) =>
+  (token.liquidity ?? 0) < LOW_LIQUIDITY_USD &&
+  (token.stats24h?.numTraders ?? 0) < NO_MARKET_TRADERS
+
 const toStock = (token: JupiterToken): StockAsset => ({
   symbol: token.symbol,
   name: NAME_OVERRIDES[token.symbol] ?? token.name.replace(/\s*xStock$/i, '').trim(),
@@ -114,6 +121,7 @@ const toStock = (token: JupiterToken): StockAsset => ({
   preIpo: null,
   transferFeeBps: 0,
   superseded: false,
+  noMarket: noMarket(token),
 })
 
 const builtIn = (): StockAsset[] =>
@@ -126,6 +134,7 @@ const builtIn = (): StockAsset[] =>
     preIpo: null,
     transferFeeBps: 0,
     superseded: false,
+    noMarket: false,
   }))
 
 /** The issuer's list, or null when it's down; Jupiter's verified list still names the stocks */
@@ -171,6 +180,7 @@ async function toPreStock(token: JupiterToken, issuer: PreStock | undefined): Pr
     },
     transferFeeBps: feeBps,
     superseded: false,
+    noMarket: noMarket(token),
   }
 }
 
@@ -200,6 +210,7 @@ async function toBackpackStock(token: JupiterToken): Promise<StockAsset> {
     preIpo: null,
     transferFeeBps: feeBps,
     superseded: false,
+    noMarket: noMarket(token),
   }
 }
 
@@ -324,6 +335,7 @@ export function cashAsset(): GiftAsset {
     preIpo: null,
     transferFeeBps: 0,
     superseded: false,
+    noMarket: false,
     isCash: true,
   }
 }

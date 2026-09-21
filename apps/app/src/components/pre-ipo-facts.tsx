@@ -1,5 +1,5 @@
 import { Card } from '@/components/ui'
-import { formatUsd, formatUsdCompact } from '@/lib/format'
+import { formatPrice, formatUsd, formatUsdCompact } from '@/lib/format'
 import type { StockListing } from '@/lib/types'
 
 function Row({ label, value }: { label: string; value: string }) {
@@ -29,7 +29,7 @@ export function PreIpoFacts({ stock }: { stock: StockListing }) {
         {preIpo.markPriceUsd != null && (
           <Row label="PreStocks’ price a share" value={formatUsd(preIpo.markPriceUsd)} />
         )}
-        <Row label="Price a share here" value={formatUsd(stock.priceUsd)} />
+        <Row label="Price a share here" value={formatPrice(stock.priceUsd)} />
       </Card>
 
       <Card className="flex flex-col gap-2 px-4 py-4">

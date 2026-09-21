@@ -27,6 +27,8 @@ const MIN_USD = 1
 const FEE_FRIENDLY_USD = 10
 /** Same limit the server enforces; shown so people know why a trade was stopped */
 const FAIR_PRICE_LIMIT_PCT = 3
+/** Mirrors `MAX_LISTED_PREMIUM_PCT` on the server, which is what actually stops the buy */
+const LISTED_PREMIUM_LIMIT_PCT = 10
 /** Up to 7 whole digits and 2 decimals: dollars and cents */
 const AMOUNT_PATTERN = /^\d{0,7}(\.\d{0,2})?$/
 
@@ -240,12 +242,36 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
   const current = quote.data
   const buying = side === 'buy'
   const deviation = current?.fairPriceDeviationPct ?? null
+  const premium = current?.listedPremiumPct ?? null
+  const overListed = buying && premium != null && premium > LISTED_PREMIUM_LIMIT_PCT
+  // Selling under the real stock is allowed, it's their money, but they should know
+  const underListed = !buying && premium != null && premium < -LISTED_PREMIUM_LIMIT_PCT
   const fair =
-    deviation == null ||
-    (buying ? deviation <= FAIR_PRICE_LIMIT_PCT : deviation >= -FAIR_PRICE_LIMIT_PCT)
+    !overListed &&
+    (deviation == null ||
+      (buying ? deviation <= FAIR_PRICE_LIMIT_PCT : deviation >= -FAIR_PRICE_LIMIT_PCT))
 
   if (stage === 'review' && current) {
+    const listedNotice = match({ overListed, underListed })
+      .with({ overListed: true }, () => (
+        <Notice tone="warning" icon={<WarningIcon className="size-4.5 text-loss" />}>
+          This costs {Math.round(premium ?? 0)}% more here than the real {stock.ticker} stock (
+          {formatUsd(current.listedPriceUsd)} a share), so we won’t place it. Prices like that tend
+          to fall back.
+        </Notice>
+      ))
+      .with({ underListed: true }, () => (
+        <Notice tone="warning" icon={<WarningIcon className="size-4.5 text-loss" />}>
+          You’d get {Math.round(Math.abs(premium ?? 0))}% less here than the real {stock.ticker}{' '}
+          stock ({formatUsd(current.listedPriceUsd)} a share). Waiting may get you more.
+        </Notice>
+      ))
+      .otherwise(() => null)
     const priceNotice = match(deviation)
+      .when(
+        () => listedNotice != null,
+        () => listedNotice,
+      )
       .with(null, () => null)
       .when(
         () => fair,
@@ -425,6 +451,7 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
             iconUrl={stock.iconUrl}
             fallbackPrice={stock.priceUsd}
             lowLiquidity={stock.lowLiquidity}
+            noMarket={stock.noMarket}
           />
 
           <Card className="flex flex-col divide-y divide-line px-4 text-[15px]">

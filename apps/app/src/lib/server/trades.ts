@@ -4,6 +4,7 @@ import { type PublicKey, VersionedTransaction } from '@solana/web3.js'
 import { findStock } from '@/lib/server/catalog'
 import { badRequest, HttpError } from '@/lib/server/http'
 import { getOrder, type UltraOrder } from '@/lib/server/jupiter'
+import { listedPrice } from '@/lib/server/listed-price'
 import { getTokenPrices } from '@/lib/server/prices'
 import { toUi, uiMultiplier } from '@/lib/server/tokens'
 import { LOW_LIQUIDITY_USD } from '@/lib/stocks'
@@ -11,6 +12,13 @@ import type { TradeQuote, TradeSide } from '@/lib/types'
 
 /** Trades priced further than this from the market reference are stopped (thin pools, bad fills) */
 const MAX_PRICE_DEVIATION_PCT = 3
+
+/**
+ * Buys priced further than this above the real stock on its exchange are stopped. Looser than
+ * the pool check: the token trades while the exchange is shut and can fairly drift a little,
+ * but a pool pushed well past the stock has always come back down.
+ */
+export const MAX_LISTED_PREMIUM_PCT = 10
 
 const unsafeTrade = () =>
   new HttpError(422, 'unsafe_trade', 'We couldn’t prepare that trade safely. Try again.')
@@ -61,6 +69,35 @@ async function orderForQuote(
   }
 }
 
+/**
+ * The weekend as the stock market has it: Friday 8pm to Sunday 8pm in New York. Market makers
+ * fill most stocks here and stop quoting while the exchange is shut, so in that window "no
+ * price" means "closed", not "broken". Holidays aren't counted: they get the plain message.
+ */
+export function stockMarketWeekend(at = new Date()): boolean {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    weekday: 'short',
+    hour: 'numeric',
+    hourCycle: 'h23',
+  }).formatToParts(at)
+  const weekday = parts.find((part) => part.type === 'weekday')?.value
+  const hour = Number(parts.find((part) => part.type === 'hour')?.value ?? 0)
+  return weekday === 'Sat' || (weekday === 'Fri' && hour >= 20) || (weekday === 'Sun' && hour < 20)
+}
+
+/** A stock nobody will price on a weekend says so, instead of reading as something we broke */
+function explainNoRoute(error: unknown, name: string): unknown {
+  if (!(error instanceof HttpError) || error.code !== 'no_route' || !stockMarketWeekend()) {
+    return error
+  }
+  return new HttpError(
+    422,
+    'market_closed',
+    `The stock market is closed for the weekend, so nobody is trading ${name} right now. Try again when it opens Sunday evening, New York time.`,
+  )
+}
+
 export async function tradeAssets(side: TradeSide, mint: string) {
   const stock = await findStock(mint)
   if (!stock) throw badRequest('Pick a stock.')
@@ -85,7 +122,7 @@ export async function quoteTrade(
   const { input, output, stock } = await tradeAssets(side, mint)
   const stockMint = stock.mint.toBase58()
 
-  const [{ order, preview }, multiplier, prices] = await Promise.all([
+  const [{ order, preview }, multiplier, prices, listed] = await Promise.all([
     orderForQuote(
       {
         inputMint: input.mint.toBase58(),
@@ -95,9 +132,13 @@ export async function quoteTrade(
       },
       side,
       allowPreview,
-    ),
+    ).catch((error: unknown) => {
+      throw explainNoRoute(error, stock.name)
+    }),
     uiMultiplier(stockMint),
     getTokenPrices([stockMint]),
+    // A private company has no exchange price to hold the pool to
+    stock.preIpo ? null : listedPrice(stock.ticker, stock.name),
   ])
 
   const stockRaw = side === 'buy' ? order.outAmount : order.inAmount
@@ -118,6 +159,8 @@ export async function quoteTrade(
   const swapCash = side === 'buy' ? cashUsd * (1 - feeShare) : cashUsd / (1 - feeShare)
   const deviation =
     reference && tokens > 0 ? ((swapCash / tokens - reference) / reference) * 100 : null
+  // Per share as people count them, against one share of the real stock
+  const listedPremium = listed && shares > 0 ? ((swapCash / shares - listed) / listed) * 100 : null
 
   return {
     order,
@@ -132,6 +175,8 @@ export async function quoteTrade(
       minReceived,
       pricePerShareUsd: shares > 0 ? cashUsd / shares : 0,
       fairPriceDeviationPct: deviation,
+      listedPriceUsd: listed,
+      listedPremiumPct: listedPremium,
       feePct: order.feeBps / 100,
       gasless: order.gasless,
       slippagePct: order.slippageBps / 100,
@@ -143,6 +188,16 @@ export async function quoteTrade(
 
 /** Buying above the market or selling below it by more than the limit is blocked */
 export function assertFairPrice(view: TradeQuote) {
+  // Selling below the real stock only warns: blocking it would keep people from their own money
+  const premium = view.listedPremiumPct
+  if (view.side === 'buy' && premium != null && premium > MAX_LISTED_PREMIUM_PCT) {
+    throw new HttpError(
+      422,
+      'above_listed_price',
+      `${view.name} is selling here for ${premium.toFixed(0)}% more than the real stock, so we stopped this. Prices like that tend to fall back.`,
+    )
+  }
+
   const deviation = view.fairPriceDeviationPct
   if (deviation == null) return
   const tooExpensive = view.side === 'buy' && deviation > MAX_PRICE_DEVIATION_PCT

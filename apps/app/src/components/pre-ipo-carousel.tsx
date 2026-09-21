@@ -3,7 +3,7 @@ import clsx from 'clsx'
 import { useRef, useState } from 'react'
 import { ChangePill } from '@/components/change-pill'
 import { StockLogo } from '@/components/stock-logo'
-import { formatUsd, formatUsdCompact } from '@/lib/format'
+import { formatPrice, formatUsd, formatUsdCompact } from '@/lib/format'
 import type { StockListing } from '@/lib/types'
 
 const GAP_PX = 12
@@ -35,7 +35,7 @@ function PreIpoCard({ stock, href }: { stock: StockListing; href: string }) {
         <div className="flex items-center justify-between gap-3 pb-2.5">
           <span className="text-stone">Price a share</span>
           <span className="flex items-center gap-2 tabular-nums">
-            {formatUsd(stock.priceUsd)}
+            {formatPrice(stock.priceUsd)}
             {/* A move from one small trade in a thin market is noise, so don't show it */}
             {stock.change24hPct != null && !stock.lowLiquidity && (
               <ChangePill value={stock.change24hPct} />

@@ -26,6 +26,7 @@ export function PricePlot({
   up,
   reference,
   ariaLabel,
+  ranges = CHART_RANGES,
 }: {
   points: PricePoint[]
   range: ChartRange
@@ -38,6 +39,8 @@ export function PricePlot({
   /** A dashed line of its own, labelled: what a gift was worth, or what a buy cost */
   reference?: { value: number; label: string } | null
   ariaLabel: string
+  /** The tabs to offer; a stock with no trading has nothing to show inside a day */
+  ranges?: readonly ChartRange[]
 }) {
   const [width, setWidth] = useState(350)
   const frame = useRef<HTMLDivElement>(null)
@@ -219,8 +222,11 @@ export function PricePlot({
           .otherwise(() => null)}
       </div>
 
-      <div className="grid grid-cols-6 gap-1 rounded-link border border-line bg-surface p-1">
-        {CHART_RANGES.map((option) => (
+      <div
+        className="grid gap-1 rounded-link border border-line bg-surface p-1"
+        style={{ gridTemplateColumns: `repeat(${ranges.length}, minmax(0, 1fr))` }}
+      >
+        {ranges.map((option) => (
           <button
             key={option}
             type="button"

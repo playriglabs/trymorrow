@@ -1,7 +1,8 @@
 import { findStock } from '@/lib/server/catalog'
-import { getPriceChart } from '@/lib/server/charts'
+import { getListedChart, getPriceChart } from '@/lib/server/charts'
 import { badRequest, json, notFound, route } from '@/lib/server/http'
 import { requireUser } from '@/lib/server/users'
+import { LOW_LIQUIDITY_USD } from '@/lib/stocks'
 import { CHART_RANGES, type ChartRange } from '@/lib/types'
 
 export const GET = route(async ({ params, request, url }) => {
@@ -12,6 +13,17 @@ export const GET = route(async ({ params, request, url }) => {
   const stock = await findStock(params.mint ?? '')
   if (!stock) throw notFound('We couldn’t find that stock.')
 
+  const mint = stock.mint.toBase58()
+  if (stock.noMarket) return json(await getListedChart(mint, stock.ticker, range))
+
   // The catalog's market price lets the chart reject histories from broken pools
-  return json(await getPriceChart(stock.mint.toBase58(), stock.ticker, range, stock.priceUsd))
+  return json(
+    await getPriceChart(
+      mint,
+      stock.ticker,
+      range,
+      stock.priceUsd,
+      stock.liquidityUsd < LOW_LIQUIDITY_USD,
+    ),
+  )
 })

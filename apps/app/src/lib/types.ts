@@ -97,8 +97,11 @@ export type StockListing = {
   category: StockCategory
   /** Thin market: quotes can fail or cost more */
   lowLiquidity: boolean
+  /** Null when nobody is trading it (`noMarket`), rather than a last print that means nothing */
   priceUsd: number | null
   change24hPct: number | null
+  /** Almost nobody trades it: no price or pool chart, only the real quote on Review */
+  noMarket: boolean
   ownedShares: number
   /** Raw base units as a string (bigint-safe) */
   ownedRaw: string
@@ -129,6 +132,10 @@ export type TradeQuote = {
   pricePerShareUsd: number
   /** How far this price is from the market reference; null when no reference is available */
   fairPriceDeviationPct: number | null
+  /** One share of the real stock on its exchange; null for a private company or no data */
+  listedPriceUsd: number | null
+  /** How far this price (before fees) sits from `listedPriceUsd`; positive is paying more */
+  listedPremiumPct: number | null
   /** Total fee taken from the swap, including covering network costs */
   feePct: number
   /** Jupiter or a market maker pays network fees and rent, so no SOL is needed */

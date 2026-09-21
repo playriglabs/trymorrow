@@ -15,6 +15,9 @@ export const RANGE_LABEL: Record<ChartRange, string> = {
   ALL: 'all time',
 }
 
+/** Nobody trades these inside a day, so only ranges daily closes can fill are offered */
+const NO_MARKET_RANGES: readonly ChartRange[] = ['1W', '1M', '1Y', 'ALL']
+
 export function formatPointTime(seconds: number, range: ChartRange) {
   const date = new Date(seconds * 1000)
   return range === '1D' || range === '3D'
@@ -35,6 +38,7 @@ export function PriceChart({
   iconUrl,
   fallbackPrice,
   lowLiquidity = false,
+  noMarket = false,
 }: {
   mint: string
   name: string
@@ -43,8 +47,11 @@ export function PriceChart({
   fallbackPrice: number | null
   /** Thin market: a single small trade can move the price a lot */
   lowLiquidity?: boolean
+  /** Nobody is trading it: there's no price to show until Review quotes one */
+  noMarket?: boolean
 }) {
-  const [range, setRange] = useState<ChartRange>('1D')
+  // No trading means no day to show, so it opens on the whole history instead
+  const [range, setRange] = useState<ChartRange>(noMarket ? 'ALL' : '1D')
   const [hover, setHover] = useState<number | null>(null)
   const chart = usePriceChartQuery(mint, range)
 
@@ -67,9 +74,15 @@ export function PriceChart({
       </div>
 
       <div className="flex flex-col gap-1">
-        <span className="font-sans text-[34px] leading-[1.1] font-medium tracking-[-0.02em]">
-          {formatUsd(active?.price ?? fallbackPrice)}
-        </span>
+        {(active?.price ?? fallbackPrice) != null ? (
+          <span className="font-sans text-[34px] leading-[1.1] font-medium tracking-[-0.02em]">
+            {formatUsd(active?.price ?? fallbackPrice)}
+          </span>
+        ) : (
+          <span className="font-sans text-[26px] leading-[1.2] font-medium tracking-[-0.02em]">
+            No price right now
+          </span>
+        )}
         <div className="flex min-h-5 flex-wrap items-center gap-2 text-[13px] text-stone">
           {shownChange != null && <ChangePill value={shownChange} />}
           <span>
@@ -78,10 +91,17 @@ export function PriceChart({
           {chart.data?.stale && <span>· may be a few minutes old</span>}
           {chart.data?.source === 'market' && <span>· daily closes on the stock market</span>}
         </div>
-        {lowLiquidity && (
+        {noMarket ? (
           <p className="text-[13px] text-stone">
-            Few trades, so prices can jump. Check the price on Review before you buy.
+            Almost nobody is trading this, so there’s no price to go by. Review shows a real one
+            before you buy or sell.
           </p>
+        ) : (
+          lowLiquidity && (
+            <p className="text-[13px] text-stone">
+              Few trades, so prices can jump. Check the price on Review before you buy.
+            </p>
+          )
         )}
       </div>
 
@@ -94,6 +114,7 @@ export function PriceChart({
         pending={chart.isPending}
         error={chart.isError ? (chart.error?.message ?? 'Couldn’t load this chart.') : null}
         up={(chart.data?.changePct ?? 0) >= 0}
+        ranges={noMarket ? NO_MARKET_RANGES : undefined}
         ariaLabel={`${name} ${RANGE_LABEL[range]}: from ${formatUsd(first)} to ${formatUsd(points.at(-1)?.price)}`}
       />
     </section>

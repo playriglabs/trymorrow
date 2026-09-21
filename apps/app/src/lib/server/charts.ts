@@ -27,12 +27,13 @@ type RangeSpec = {
    */
   windowSeconds: number | null
   /**
-   * How far a candle may sit from the middle of the window before it's treated as the pool talking
-   * to itself rather than a price anyone could have traded at. Widens with the range, because a
-   * month of real movement is not a bad print; null on daily candles, where a year of real movement
-   * dwarfs any band worth setting and a whole session's close is robust anyway.
+   * How far a candle may sit from the middle of the window, as a ratio either way (0.25 is within
+   * 1.25x above or below), before it's treated as the pool talking to itself rather than a price
+   * anyone could have traded at. Widens with the range, because a month of real movement is not a
+   * bad print. Daily candles get 4x: a year of real movement stays inside it, while a dead pool's
+   * prints (Applied Materials ran $731 to $15,395 across five trades) don't.
    */
-  maxDeviation: number | null
+  maxDeviation: number
 }
 
 const HOUR = 3600
@@ -77,7 +78,7 @@ const RANGES: Record<ChartRange, RangeSpec> = {
     cacheMs: 60 * 60_000,
     timeframeKey: '1d',
     windowSeconds: 365 * DAY,
-    maxDeviation: null,
+    maxDeviation: 3,
   },
   ALL: {
     interval: '1_DAY',
@@ -85,7 +86,7 @@ const RANGES: Record<ChartRange, RangeSpec> = {
     cacheMs: 60 * 60_000,
     timeframeKey: '1d',
     windowSeconds: null,
-    maxDeviation: null,
+    maxDeviation: 3,
   },
 }
 
@@ -98,7 +99,7 @@ class RateLimited extends Error {}
 
 type ChartsResponse = { candles?: { time?: number; close?: number }[] }
 
-async function candles(mint: string, spec: RangeSpec): Promise<PricePoint[]> {
+async function candles(mint: string, spec: RangeSpec, thin: boolean): Promise<PricePoint[]> {
   const params = new URLSearchParams({
     interval: spec.interval,
     to: String(Date.now()),
@@ -121,7 +122,7 @@ async function candles(mint: string, spec: RangeSpec): Promise<PricePoint[]> {
         : [],
     )
     .sort((a, b) => a.t - b.t)
-  return dropOutliers(points, spec.maxDeviation)
+  return dropOutliers(points, spec.maxDeviation, thin)
 }
 
 /**
@@ -134,15 +135,31 @@ async function candles(mint: string, spec: RangeSpec): Promise<PricePoint[]> {
  */
 const MAX_OUTLIER_SHARE = 0.2
 
-function dropOutliers(points: PricePoint[], maxDeviation: number | null): PricePoint[] {
-  if (maxDeviation === null || points.length < 5) return points
+/** How far apart two prices are, as a ratio either way: $100 against $80 or $125 is 0.25 */
+const gap = (a: number, b: number) => Math.max(a / b, b / a) - 1
+
+/**
+ * Drops candles outside the band around the window's median. In a deep pool a window full of them
+ * is the market moving (Lockheed's weekend pump was thousands of real trades), so it's drawn as is.
+ * In a thin pool it means nobody is trading at all: a handful of prints wherever someone happened
+ * to fill, and there's no line to draw from that. Those windows come back empty, so the chart
+ * falls back to the listed stock or says it has no reliable history instead of inventing one.
+ */
+function dropOutliers(points: PricePoint[], maxDeviation: number, thin: boolean): PricePoint[] {
+  const spread = (list: PricePoint[]) => {
+    const prices = list.map((point) => point.price)
+    return prices.length ? gap(Math.max(...prices), Math.min(...prices)) : 0
+  }
+  // Too few candles to find a middle: a thin pool has to agree with itself or say nothing
+  if (points.length < 5) return thin && spread(points) > maxDeviation ? [] : points
+
   const sorted = points.map((point) => point.price).sort((a, b) => a - b)
   const median = sorted[Math.floor(sorted.length / 2)]
   if (!median) return points
 
-  const kept = points.filter((point) => Math.abs(point.price - median) / median <= maxDeviation)
-  // Past a point the outliers are the market and the anchor is the lie, so nothing is dropped
-  return kept.length >= points.length * (1 - MAX_OUTLIER_SHARE) ? kept : points
+  const kept = points.filter((point) => gap(point.price, median) <= maxDeviation)
+  if (kept.length < points.length * (1 - MAX_OUTLIER_SHARE)) return thin ? [] : points
+  return thin && spread(kept) > maxDeviation ? [] : kept
 }
 
 /** True when the latest price is close enough to the market price to trust the history */
@@ -156,7 +173,11 @@ function matchesReference(points: PricePoint[], referencePrice: number | null): 
 type StoredCandles = { points: PricePoint[]; fetchedAt: number }
 
 /** Candles already kept for this size, inside the range's window, with our last fetch time */
-async function readStored(mint: string, spec: RangeSpec): Promise<StoredCandles | null> {
+async function readStored(
+  mint: string,
+  spec: RangeSpec,
+  thin: boolean,
+): Promise<StoredCandles | null> {
   const cutoff = spec.windowSeconds ? Math.floor(Date.now() / 1000 - spec.windowSeconds) : 0
   const { data, error } = await db
     .from('price_candles')
@@ -177,7 +198,7 @@ async function readStored(mint: string, spec: RangeSpec): Promise<StoredCandles 
   })
   points.reverse()
   // Rows kept before the band existed are filtered on the way out too, not only on the way in
-  const kept = dropOutliers(points, spec.maxDeviation)
+  const kept = dropOutliers(points, spec.maxDeviation, thin)
   return kept.length < 2 ? null : { points: kept, fetchedAt }
 }
 
@@ -246,6 +267,8 @@ export async function getPriceChart(
   ticker: string,
   range: ChartRange,
   referencePrice: number | null,
+  /** The pool is too shallow for its prints to be a price on their own (see `dropOutliers`) */
+  thin: boolean,
 ): Promise<PriceChart> {
   const key = `${mint}:${range}`
   const spec = RANGES[range]
@@ -265,7 +288,7 @@ export async function getPriceChart(
   const cachedIsSane = cached ? matchesReference(cached.chart.points, referencePrice) : false
   if (cached && cachedIsSane && Date.now() - cached.at < spec.cacheMs) return cached.chart
 
-  const stored = await readStored(mint, spec).catch((error) => {
+  const stored = await readStored(mint, spec, thin).catch((error) => {
     console.error('Reading cached candles failed', error)
     return null
   })
@@ -281,7 +304,7 @@ export async function getPriceChart(
   }
 
   try {
-    const history = await candles(mint, spec)
+    const history = await candles(mint, spec, thin)
     const points = history.length >= 2 && matchesReference(history, referencePrice) ? history : null
     if (!points) {
       // Don't remember a stale answer: the next request should try the pools again
@@ -307,4 +330,32 @@ export async function getPriceChart(
     console.error('Price chart failed', error)
     throw new HttpError(502, 'chart_failed', 'We couldn’t load the chart right now.')
   }
+}
+
+/**
+ * The chart for a stock nobody trades (`noMarket`). The listed stock's daily closes come first.
+ * Without them the pool's own history is used, but only as a thin pool — so a handful of prints
+ * that don't agree with each other still draw nothing — and never inside a day, where the last
+ * two fills would be the whole line.
+ */
+export async function getListedChart(
+  mint: string,
+  ticker: string,
+  range: ChartRange,
+): Promise<PriceChart> {
+  const noHistory = () =>
+    new HttpError(
+      404,
+      'no_chart',
+      'Nobody is trading this right now, so there’s no price history to show.',
+    )
+  if (!MARKET_FALLBACK_RANGES.has(range)) throw noHistory()
+
+  const points = await getMarketCandles(mint, ticker, RANGES[range].windowSeconds)
+  if (points && points.length >= 2) return toChart(range, points, 'market')
+  // The catalog price is one of those fills, so it can't vouch for the history
+  return getPriceChart(mint, ticker, range, null, true).catch((error: unknown) => {
+    if (error instanceof HttpError && error.code === 'no_chart') throw noHistory()
+    throw error
+  })
 }
