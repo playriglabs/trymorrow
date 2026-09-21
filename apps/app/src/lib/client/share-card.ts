@@ -45,7 +45,7 @@ export type ShareCardInput = {
   eyebrow: string
   /** Biggest words on the card; shrinks until it fits */
   hero: string
-  /** One line under the hero, e.g. the ticker */
+  /** Sits beside the logo, level with its middle, e.g. the ticker */
   subhero: string
   /** Same-origin logo URL; cross-origin images would block exporting the canvas */
   logoUrl: string | null
@@ -56,6 +56,8 @@ export type ShareCardInput = {
 }
 
 const PANEL = { x: 72, y: 72, w: WIDTH - 144, h: 1010, r: 64 }
+/** The logo disc: the white ring around it adds 12 on every side */
+const LOGO = { x: 72 + 88, y: 72 + 72, size: 180, ring: 12 }
 const SHEET_PAD = 36
 const ROW_HEIGHT = 104
 
@@ -104,9 +106,7 @@ function drawPanel(ctx: CanvasRenderingContext2D) {
 
 /** Company logo in a white disc, falling back to the ticker when the image won't load */
 async function drawLogo(ctx: CanvasRenderingContext2D, url: string | null, fallback: string) {
-  const size = 180
-  const x = PANEL.x + 88
-  const y = PANEL.y + 72
+  const { size, x, y } = LOGO
   ctx.beginPath()
   ctx.arc(x + size / 2, y + size / 2, size / 2 + 12, 0, Math.PI * 2)
   ctx.fillStyle = COLORS.white
@@ -304,7 +304,19 @@ export async function renderShareCard(
   const textX = PANEL.x + 88
   const textWidth = PANEL.w - 176
   const sheetTop = drawSheet(ctx, input.rows)
-  const logoBottom = PANEL.y + 72 + 180
+  const logoBottom = LOGO.y + LOGO.size
+
+  // The ticker sits beside the mark, level with its middle: it names the company the logo shows,
+  // so it belongs to the logo rather than to the number underneath
+  if (input.subhero) {
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'middle'
+    ctx.fillStyle = COLORS.white
+    ctx.globalAlpha = 0.9
+    ctx.font = `500 68px ${SANS}`
+    ctx.fillText(`$${input.subhero}`, LOGO.x + LOGO.size + LOGO.ring + 28, LOGO.y + LOGO.size / 2)
+    ctx.globalAlpha = 1
+  }
 
   ctx.textAlign = 'left'
   ctx.textBaseline = 'alphabetic'
@@ -314,15 +326,13 @@ export async function renderShareCard(
   // sunrise below it instead of pulling the ticker away from the name
   const eyebrowBaseline = logoBottom + 84
   ctx.fillText(input.eyebrow, textX, eyebrowBaseline)
-  const heroRoom = sheetTop - 84 - eyebrowBaseline
+
+  // With the ticker gone from this line, the hero has the whole width and the room the old
+  // second line used to take
+  const heroRoom = sheetTop - 56 - eyebrowBaseline
   const heroSize = Math.min(fitText(ctx, input.hero, textWidth, 104), Math.floor(heroRoom))
   ctx.font = `500 ${heroSize}px ${SANS}`
   ctx.fillText(input.hero, textX, eyebrowBaseline + heroSize + 12)
-
-  ctx.globalAlpha = 0.85
-  ctx.font = `400 44px ${BODY}`
-  ctx.fillText(`$${input.subhero}`, textX, eyebrowBaseline + heroSize + 72)
-  ctx.globalAlpha = 1
 
   await drawFooter(ctx, input.qrUrl, renderVersion)
 
