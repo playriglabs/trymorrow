@@ -25,13 +25,13 @@ export const GET = route(async ({ request }) => {
       console.error(label, user.id, cause)
       return 0
     })
-  const newNotifications =
-    (cash
-      ? await safeNote(() => noteDeposits(user, BigInt(cash.raw)), 'Noting a cash deposit failed')
-      : 0) +
-    (stocks.length > 0
-      ? await safeNote(() => noteStockTransfers(user, stocks), 'Noting a stock transfer failed')
-      : 0)
+  const [cashNoted, stocksNoted] = await Promise.all([
+    cash ? safeNote(() => noteDeposits(user, BigInt(cash.raw)), 'Noting a cash deposit failed') : 0,
+    stocks.length > 0
+      ? safeNote(() => noteStockTransfers(user, stocks), 'Noting a stock transfer failed')
+      : 0,
+  ])
+  const newNotifications = cashNoted + stocksNoted
 
   return json({ ...portfolio, newNotifications })
 })

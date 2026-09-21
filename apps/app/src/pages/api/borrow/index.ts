@@ -18,7 +18,7 @@ export const GET = route(async ({ request }) => {
 
   const [market, portfolio, loan, cash, opened] = await Promise.all([
     borrowMarket(),
-    getPortfolio(walletAddress),
+    getPortfolio(walletAddress, { withHistory: false }),
     loanFor(wallet),
     cashBalance(wallet),
     hasLoanAccounts(wallet),

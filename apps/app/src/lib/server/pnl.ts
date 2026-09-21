@@ -1,6 +1,6 @@
 import { match } from 'ts-pattern'
 import { db } from '@/lib/server/supabase'
-import { toUi, uiMultiplier } from '@/lib/server/tokens'
+import { primeMints, toUi, uiMultiplier } from '@/lib/server/tokens'
 import type { HoldingOrigin } from '@/lib/types'
 
 type StockInput = {
@@ -18,140 +18,143 @@ type Lot = {
   from: string | null
 }
 
+/** How to turn one stock's raw amounts into shares */
+type LotUnits = { decimals: number; multiplier: number }
+
 /**
- * Every lot of one stock for one wallet, oldest first: what came in, and what went out.
+ * Every lot of these stocks for one wallet, oldest first per stock: what came in, and what went out.
  *
  * Shares leave by more routes than a sale — a gift, a gift card, a fund, a transfer, a fee paid
  * in shares — and each one has to take its share of the cost with it when it goes. Without that
  * the pool keeps cost that no longer has shares behind it, and every later buy averages against
  * it. A sell lot's `usd` is never read: cost leaves at the running average, not at a price.
+ *
+ * One query per source for the whole portfolio, all at once: the database is a round trip away
+ * from the function, and a query per stock per source added up to seconds.
  */
-async function readLots(
-  wallet: string,
-  mint: string,
-  decimals: number,
-  multiplier: number,
-): Promise<Lot[]> {
-  const lots: Lot[] = []
-  const { data: items, error: giftError } = await db
-    .from('gift_items')
-    .select(
-      'amount_raw, usd_value, gifts!inner(recipient_wallet, status, claimed_at, created_at, users:sender_id (name))',
-    )
-    .eq('mint', mint)
-    .eq('gifts.recipient_wallet', wallet)
-    .eq('gifts.status', 'claimed')
-  if (giftError) throw giftError
-  for (const item of items ?? []) {
+async function readLots(wallet: string, units: Map<string, LotUnits>): Promise<Map<string, Lot[]>> {
+  const mints = [...units.keys()]
+  const lotsByMint = new Map<string, Lot[]>(mints.map((mint) => [mint, []]))
+  if (mints.length === 0) return lotsByMint
+  const add = (mint: string, raw: string, lot: Omit<Lot, 'shares'>) => {
+    const unit = units.get(mint)
+    const lots = lotsByMint.get(mint)
+    if (!unit || !lots) return
+    lots.push({ ...lot, shares: toUi(raw, unit.decimals, unit.multiplier) })
+  }
+
+  const [received, fills, sent, fees, added, transfers] = await Promise.all([
+    db
+      .from('gift_items')
+      .select(
+        'mint, amount_raw, usd_value, gifts!inner(recipient_wallet, status, claimed_at, created_at, users:sender_id (name))',
+      )
+      .in('mint', mints)
+      .eq('gifts.recipient_wallet', wallet)
+      .eq('gifts.status', 'claimed'),
+    db
+      .from('trade_fills')
+      .select('mint, side, shares_raw, usd, created_at')
+      .eq('wallet', wallet)
+      .in('mint', mints),
+    // Gifts and gift cards this wallet sent. A draft never landed and a refund came back, so
+    // neither took anything with it
+    db
+      .from('gift_items')
+      .select('mint, amount_raw, gifts!inner(sender_wallet, status, created_at)')
+      .in('mint', mints)
+      .eq('gifts.sender_wallet', wallet)
+      .in('gifts.status', ['pending', 'claimed']),
+    // A fee paid in shares leaves for the treasury and doesn't come back, even on a refund
+    db
+      .from('gifts')
+      .select('fee_mint, fee_raw, created_at')
+      .eq('sender_wallet', wallet)
+      .in('fee_mint', mints)
+      .neq('status', 'draft'),
+    // Shares locked into a fund: out of the balance until the beneficiary takes them out
+    db
+      .from('fund_contributions')
+      .select('mint, amount_raw, created_at')
+      .eq('contributor_wallet', wallet)
+      .in('mint', mints)
+      .eq('status', 'confirmed'),
+    // Sent out of Morrow entirely. `amount_raw` is everything that left, fee included
+    db
+      .from('stock_sends')
+      .select('mint, amount_raw, created_at')
+      .eq('wallet', wallet)
+      .in('mint', mints)
+      .eq('status', 'sent'),
+  ])
+  for (const result of [received, fills, sent, fees, added, transfers]) {
+    if (result.error) throw result.error
+  }
+
+  for (const item of received.data ?? []) {
     if (item.usd_value == null) continue
     // The join resolves to one row, but the generated types can only see an array
     const gift = Array.isArray(item.gifts) ? item.gifts[0] : item.gifts
     if (!gift) continue
     const sender = Array.isArray(gift.users) ? gift.users[0] : gift.users
-    lots.push({
+    add(item.mint, item.amount_raw, {
       side: 'buy',
       at: new Date(gift.claimed_at ?? gift.created_at).getTime(),
       usd: Number(item.usd_value),
-      shares: toUi(item.amount_raw, decimals, multiplier),
       from: sender?.name ?? 'Someone',
     })
   }
-
-  const { data: fills, error } = await db
-    .from('trade_fills')
-    .select('side, shares_raw, usd, created_at')
-    .eq('wallet', wallet)
-    .eq('mint', mint)
-    .order('created_at', { ascending: true })
-  if (error) throw error
-  for (const fill of fills ?? []) {
-    lots.push({
+  for (const fill of fills.data ?? []) {
+    add(fill.mint, fill.shares_raw, {
       side: fill.side,
       at: new Date(fill.created_at).getTime(),
       usd: Number(fill.usd),
-      shares: toUi(fill.shares_raw, decimals, multiplier),
       from: null,
     })
   }
-
-  // Gifts and gift cards this wallet sent. A draft never landed and a refund came back, so
-  // neither took anything with it
-  const { data: sent, error: sentError } = await db
-    .from('gift_items')
-    .select('amount_raw, gifts!inner(sender_wallet, status, created_at)')
-    .eq('mint', mint)
-    .eq('gifts.sender_wallet', wallet)
-    .in('gifts.status', ['pending', 'claimed'])
-  if (sentError) throw sentError
-  for (const item of sent ?? []) {
+  for (const item of sent.data ?? []) {
     const gift = Array.isArray(item.gifts) ? item.gifts[0] : item.gifts
     if (!gift) continue
-    lots.push({
+    add(item.mint, item.amount_raw, {
       side: 'sell',
       at: new Date(gift.created_at).getTime(),
       usd: 0,
-      shares: toUi(item.amount_raw, decimals, multiplier),
       from: null,
     })
   }
-
-  // A fee paid in shares leaves for the treasury and doesn't come back, even on a refund
-  const { data: fees, error: feeError } = await db
-    .from('gifts')
-    .select('fee_raw, created_at')
-    .eq('sender_wallet', wallet)
-    .eq('fee_mint', mint)
-    .neq('status', 'draft')
-  if (feeError) throw feeError
-  for (const gift of fees ?? []) {
-    const shares = toUi(gift.fee_raw, decimals, multiplier)
-    if (shares <= 0) continue
-    lots.push({
+  for (const gift of fees.data ?? []) {
+    if (!gift.fee_mint || BigInt(gift.fee_raw ?? 0) <= 0n) continue
+    add(gift.fee_mint, gift.fee_raw, {
       side: 'sell',
       at: new Date(gift.created_at).getTime(),
       usd: 0,
-      shares,
       from: null,
     })
   }
-
-  // Shares locked into a fund: out of the balance until the beneficiary takes them out
-  const { data: added, error: addedError } = await db
-    .from('fund_contributions')
-    .select('amount_raw, created_at')
-    .eq('contributor_wallet', wallet)
-    .eq('mint', mint)
-    .eq('status', 'confirmed')
-  if (addedError) throw addedError
-  for (const row of added ?? []) {
-    lots.push({
+  for (const row of [...(added.data ?? []), ...(transfers.data ?? [])]) {
+    add(row.mint, row.amount_raw, {
       side: 'sell',
       at: new Date(row.created_at).getTime(),
       usd: 0,
-      shares: toUi(row.amount_raw, decimals, multiplier),
       from: null,
     })
   }
 
-  // Sent out of Morrow entirely. `amount_raw` is everything that left, fee included
-  const { data: transfers, error: transferError } = await db
-    .from('stock_sends')
-    .select('amount_raw, created_at')
-    .eq('wallet', wallet)
-    .eq('mint', mint)
-    .eq('status', 'sent')
-  if (transferError) throw transferError
-  for (const row of transfers ?? []) {
-    lots.push({
-      side: 'sell',
-      at: new Date(row.created_at).getTime(),
-      usd: 0,
-      shares: toUi(row.amount_raw, decimals, multiplier),
-      from: null,
-    })
-  }
+  for (const lots of lotsByMint.values()) lots.sort((a, b) => a.at - b.at)
+  return lotsByMint
+}
 
-  return lots.sort((a, b) => a.at - b.at)
+/** Raw-to-shares units for each stock; xStocks scale share counts, so today's multiplier applies */
+async function lotUnits(stocks: Map<string, { decimals: number }>): Promise<Map<string, LotUnits>> {
+  await primeMints([...stocks.keys()])
+  return new Map(
+    await Promise.all(
+      [...stocks].map(
+        async ([mint, stock]) =>
+          [mint, { decimals: stock.decimals, multiplier: await uiMultiplier(mint) }] as const,
+      ),
+    ),
+  )
 }
 
 /** Shares the lots account for: buys add, sells take away */
@@ -174,8 +177,7 @@ export async function getHoldingOrigin(
   stock: StockInput,
 ): Promise<HoldingOrigin | null> {
   try {
-    const multiplier = await uiMultiplier(mint)
-    const lots = await readLots(wallet, mint, stock.decimals, multiplier)
+    const lots = (await readLots(wallet, await lotUnits(new Map([[mint, stock]])))).get(mint) ?? []
     if (lots.length === 0 || netShares(lots) < stock.amount - EPSILON) return null
 
     const buys = lots.filter((lot) => lot.side === 'buy')
@@ -207,32 +209,32 @@ export async function getCostBasis(
   stocks: Map<string, StockInput>,
 ): Promise<Map<string, number>> {
   const basis = new Map<string, number>()
+  let lotsByMint: Map<string, Lot[]>
+  try {
+    lotsByMint = await readLots(wallet, await lotUnits(stocks))
+  } catch {
+    // Tracking is best effort: no basis rather than a broken portfolio
+    return basis
+  }
+
   for (const [mint, stock] of stocks) {
-    try {
-      // xStocks scale share counts over time, so historical raw amounts use today's multiplier
-      const multiplier = await uiMultiplier(mint)
-      const lots = await readLots(wallet, mint, stock.decimals, multiplier)
-
-      let cost = 0
-      let shares = 0
-      for (const lot of lots) {
-        if (lot.side === 'buy') {
-          cost += lot.usd
-          shares += lot.shares
-        } else {
-          const sold = Math.min(lot.shares, shares)
-          cost -= shares > 0 ? (cost / shares) * sold : 0
-          shares -= sold
-        }
+    let cost = 0
+    let shares = 0
+    for (const lot of lotsByMint.get(mint) ?? []) {
+      if (lot.side === 'buy') {
+        cost += lot.usd
+        shares += lot.shares
+      } else {
+        const sold = Math.min(lot.shares, shares)
+        cost -= shares > 0 ? (cost / shares) * sold : 0
+        shares -= sold
       }
+    }
 
-      if (shares >= stock.amount - EPSILON && shares > 0) {
-        // Shares can survive outside our records (moved in without a lot); never show more
-        // basis than the balance could have cost
-        basis.set(mint, shares > stock.amount ? (cost / shares) * stock.amount : cost)
-      }
-    } catch {
-      // Tracking is best effort: no basis rather than a broken portfolio
+    if (shares >= stock.amount - EPSILON && shares > 0) {
+      // Shares can survive outside our records (moved in without a lot); never show more
+      // basis than the balance could have cost
+      basis.set(mint, shares > stock.amount ? (cost / shares) * stock.amount : cost)
     }
   }
   return basis

@@ -8,7 +8,10 @@ import type { StockListing, StocksResponse } from '@/lib/types'
 
 export const GET = route(async ({ request }) => {
   const user = await requireUser(request)
-  const [catalog, portfolio] = await Promise.all([getStocks(), getPortfolio(requireWallet(user))])
+  const [catalog, portfolio] = await Promise.all([
+    getStocks(),
+    getPortfolio(requireWallet(user), { withHistory: false }),
+  ])
   const owned = new Map(portfolio.holdings.map((holding) => [holding.mint, holding]))
 
   // Everything with a market price from the issuer that actually trades it, plus anything held

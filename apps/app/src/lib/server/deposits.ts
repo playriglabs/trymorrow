@@ -69,114 +69,119 @@ export async function noteStockTransfers(user: UserRow, holdings: StockHolding[]
     ((seenRows as StockSeenRow[] | null) ?? []).map((row) => [row.mint, row]),
   )
 
-  let inserted = 0
-  for (const holding of holdings) {
-    const raw = BigInt(holding.raw)
-    if (raw <= 0n) continue
-    const account = getAssociatedTokenAddressSync(
-      new PublicKey(holding.mint),
-      owner,
-      true,
-      TOKEN_2022_PROGRAM,
-    ).toBase58()
-    const seen = seenByMint.get(holding.mint)
+  // Each stock has its own account, cursor and row, so they're looked at side by side
+  const noted = await Promise.all(
+    holdings.map(async (holding): Promise<number> => {
+      const raw = BigInt(holding.raw)
+      if (raw <= 0n) return 0
+      const account = getAssociatedTokenAddressSync(
+        new PublicKey(holding.mint),
+        owner,
+        true,
+        TOKEN_2022_PROGRAM,
+      ).toBase58()
+      const seen = seenByMint.get(holding.mint)
 
-    const upsertSeen = (signature: string | null) =>
-      db
-        .from('stock_seen')
-        .upsert(
-          { user_id: user.id, mint: holding.mint, raw: raw.toString(), last_signature: signature },
+      const upsertSeen = (signature: string | null) =>
+        db.from('stock_seen').upsert(
+          {
+            user_id: user.id,
+            mint: holding.mint,
+            raw: raw.toString(),
+            last_signature: signature,
+          },
           { onConflict: 'user_id,mint' },
         )
 
-    // First look at this stock: record the balance and a cursor, say nothing
-    if (!seen) {
-      const newest = (
-        await connection.getSignaturesForAddress(new PublicKey(account), { limit: 1 })
-      )[0]?.signature
-      const { error } = await upsertSeen(newest ?? null)
-      if (error) throw error
-      continue
-    }
-
-    const signatures = await connection.getSignaturesForAddress(new PublicKey(account), {
-      limit: MAX_SIGNATURES,
-    })
-    const fresh: typeof signatures = []
-    for (const entry of signatures) {
-      if (entry.signature === seen.last_signature) break
-      fresh.push(entry)
-    }
-
-    const newestSignature = signatures[0]?.signature ?? seen.last_signature
-    const balanceUnchangedOrDown = raw <= BigInt(seen.raw)
-    if (balanceUnchangedOrDown || fresh.length === 0) {
-      // Move the cursor forward so a later transfer isn't missed, but there's nothing to report
-      if (newestSignature && newestSignature !== seen.last_signature) {
-        const { error } = await upsertSeen(newestSignature)
+      // First look at this stock: record the balance and a cursor, say nothing
+      if (!seen) {
+        const newest = (
+          await connection.getSignaturesForAddress(new PublicKey(account), { limit: 1 })
+        )[0]?.signature
+        const { error } = await upsertSeen(newest ?? null)
         if (error) throw error
+        return 0
       }
-      continue
-    }
 
-    const signaturesIn = fresh.map((entry) => entry.signature)
-    // A buy lands as a plain transfer from a market maker; rule it out by its fill signature.
-    // A send from another Morrow user is announced the moment it lands, naming them, so it's
-    // ruled out the same way rather than turning up later as an anonymous deposit.
-    const [{ data: fills, error: fillsError }, { data: sends, error: sendsError }] =
-      await Promise.all([
-        db.from('trade_fills').select('signature').in('signature', signaturesIn),
-        db.from('stock_sends').select('signature').in('signature', signaturesIn),
+      const signatures = await connection.getSignaturesForAddress(new PublicKey(account), {
+        limit: MAX_SIGNATURES,
+      })
+      const fresh: typeof signatures = []
+      for (const entry of signatures) {
+        if (entry.signature === seen.last_signature) break
+        fresh.push(entry)
+      }
+
+      const newestSignature = signatures[0]?.signature ?? seen.last_signature
+      const balanceUnchangedOrDown = raw <= BigInt(seen.raw)
+      if (balanceUnchangedOrDown || fresh.length === 0) {
+        // Move the cursor forward so a later transfer isn't missed, but there's nothing to report
+        if (newestSignature && newestSignature !== seen.last_signature) {
+          const { error } = await upsertSeen(newestSignature)
+          if (error) throw error
+        }
+        return 0
+      }
+
+      const signaturesIn = fresh.map((entry) => entry.signature)
+      // A buy lands as a plain transfer from a market maker; rule it out by its fill signature.
+      // A send from another Morrow user is announced the moment it lands, naming them, so it's
+      // ruled out the same way rather than turning up later as an anonymous deposit.
+      const [{ data: fills, error: fillsError }, { data: sends, error: sendsError }] =
+        await Promise.all([
+          db.from('trade_fills').select('signature').in('signature', signaturesIn),
+          db.from('stock_sends').select('signature').in('signature', signaturesIn),
+        ])
+      if (fillsError) throw fillsError
+      if (sendsError) throw sendsError
+      const known = new Set([
+        ...(fills ?? []).map((fill) => fill.signature as string),
+        ...(sends ?? []).map((send) => send.signature as string),
       ])
-    if (fillsError) throw fillsError
-    if (sendsError) throw sendsError
-    const known = new Set([
-      ...(fills ?? []).map((fill) => fill.signature as string),
-      ...(sends ?? []).map((send) => send.signature as string),
-    ])
 
-    let gainedRaw = 0n
-    for (const entry of fresh.reverse()) {
-      if (known.has(entry.signature)) continue
-      gainedRaw += await depositIn(entry.signature, account)
-    }
+      const gains = await Promise.all(
+        fresh
+          .filter((entry) => !known.has(entry.signature))
+          .map((entry) => depositIn(entry.signature, account)),
+      )
+      const gainedRaw = gains.reduce((sum, gained) => sum + gained, 0n)
 
-    const { error: cursorError } = await upsertSeen(newestSignature)
-    if (cursorError) throw cursorError
-    if (gainedRaw <= 0n) continue
+      const { error: cursorError } = await upsertSeen(newestSignature)
+      if (cursorError) throw cursorError
+      if (gainedRaw <= 0n) return 0
 
-    const multiplier = await uiMultiplier(holding.mint)
-    const shares = toUi(gainedRaw, holding.decimals, multiplier)
-    // The ticker, not the company: a hero line has one row and some company names are very long
-    const arrived = `${formatShares(shares)} ${tickerLabel(holding.ticker)} shares`
-    await notify([
-      {
-        userId: user.id,
-        kind: 'stock_deposited',
-        title: `${formatShares(shares)} ${holding.ticker} arrived`,
-        body: 'From an outside account.',
-        url: `/holding/${holding.ticker}`,
-        email: {
-          subject: `${arrived} arrived`,
-          preview: 'They landed in your account from an outside account.',
-          eyebrow: 'Shares arrived',
-          hero: arrived,
-          subhero: 'From an outside account.',
-          rows: [
-            { label: 'Shares added', value: formatShares(shares) },
-            {
-              label: 'Shares you hold now',
-              value: formatShares(toUi(raw, holding.decimals, multiplier)),
-            },
-          ],
-          cta: { label: 'See your shares', path: `/holding/${holding.ticker}` },
+      const multiplier = await uiMultiplier(holding.mint)
+      const shares = toUi(gainedRaw, holding.decimals, multiplier)
+      // The ticker, not the company: a hero line has one row and some company names are very long
+      const arrived = `${formatShares(shares)} ${tickerLabel(holding.ticker)} shares`
+      await notify([
+        {
+          userId: user.id,
+          kind: 'stock_deposited',
+          title: `${formatShares(shares)} ${holding.ticker} arrived`,
+          body: 'From an outside account.',
+          url: `/holding/${holding.ticker}`,
+          email: {
+            subject: `${arrived} arrived`,
+            preview: 'They landed in your account from an outside account.',
+            eyebrow: 'Shares arrived',
+            hero: arrived,
+            subhero: 'From an outside account.',
+            rows: [
+              { label: 'Shares added', value: formatShares(shares) },
+              {
+                label: 'Shares you hold now',
+                value: formatShares(toUi(raw, holding.decimals, multiplier)),
+              },
+            ],
+            cta: { label: 'See your shares', path: `/holding/${holding.ticker}` },
+          },
         },
-      },
-    ])
-    inserted += 1
-  }
-
-  return inserted
+      ])
+      return 1
+    }),
+  )
+  return noted.reduce((sum, count) => sum + count, 0)
 }
 
 /**
@@ -239,13 +244,18 @@ export async function noteDeposits(user: UserRow, cashRaw: bigint): Promise<numb
   if (fillsError) throw fillsError
   const traded = new Set((fills ?? []).map((fill) => fill.signature as string))
 
-  const deposits: Deposit[] = []
   // Oldest first, so the feed reads in the order the money arrived
-  for (const entry of fresh.reverse()) {
-    if (traded.has(entry.signature)) continue
-    const raw = await depositIn(entry.signature, account)
-    if (raw > 0n) deposits.push({ signature: entry.signature, raw })
-  }
+  const deposits: Deposit[] = (
+    await Promise.all(
+      fresh
+        .reverse()
+        .filter((entry) => !traded.has(entry.signature))
+        .map(async (entry) => ({
+          signature: entry.signature,
+          raw: await depositIn(entry.signature, account),
+        })),
+    )
+  ).filter((deposit) => deposit.raw > 0n)
 
   // The balance is recorded before anything is written, so a second look can't repeat these
   await snapshot(signatures[0]?.signature)

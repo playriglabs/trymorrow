@@ -6,7 +6,14 @@ import { getPriceData } from '@/lib/server/prices'
 import { connection } from '@/lib/server/solana'
 import type { Holding, Portfolio } from '@/lib/types'
 
-export async function getPortfolio(walletAddress: string): Promise<Portfolio> {
+/**
+ * Balances and live prices, and with `withHistory` (the default) what each stock cost and when it
+ * arrived. Screens that only need what's held today skip the history: it's the slow half.
+ */
+export async function getPortfolio(
+  walletAddress: string,
+  { withHistory = true }: { withHistory?: boolean } = {},
+): Promise<Portfolio> {
   const owner = new PublicKey(walletAddress)
   const [classic, extended, stocks] = await Promise.all([
     connection.getParsedTokenAccountsByOwner(owner, { programId: TOKEN_PROGRAM }),
@@ -81,20 +88,26 @@ export async function getPortfolio(walletAddress: string): Promise<Portfolio> {
 
   const sum = (items: Holding[]) => items.reduce((total, item) => total + (item.valueUsd ?? 0), 0)
   const stockHoldings = holdings.filter((item) => !item.isCash && item.amount > 0)
-  if (stockHoldings.length > 0) {
-    const basis = await getCostBasis(
-      walletAddress,
-      new Map(
-        stockHoldings.map((item) => [item.mint, { decimals: item.decimals, amount: item.amount }]),
+  if (withHistory && stockHoldings.length > 0) {
+    const [basis, acquired] = await Promise.all([
+      getCostBasis(
+        walletAddress,
+        new Map(
+          stockHoldings.map((item) => [
+            item.mint,
+            { decimals: item.decimals, amount: item.amount },
+          ]),
+        ),
       ),
-    )
-    for (const item of stockHoldings) item.costUsd = basis.get(item.mint) ?? null
-
-    const acquired = await getAcquiredAt(
-      walletAddress,
-      stockHoldings.map((item) => item.mint),
-    ).catch(() => new Map<string, string>())
-    for (const item of stockHoldings) item.acquiredAt = acquired.get(item.mint) ?? null
+      getAcquiredAt(
+        walletAddress,
+        stockHoldings.map((item) => item.mint),
+      ).catch(() => new Map<string, string>()),
+    ])
+    for (const item of stockHoldings) {
+      item.costUsd = basis.get(item.mint) ?? null
+      item.acquiredAt = acquired.get(item.mint) ?? null
+    }
   }
 
   // Convert each percentage move back to yesterday's value, then sum the dollar moves.

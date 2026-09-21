@@ -66,7 +66,13 @@ type PreStock = {
   markValuation?: number | null
 }
 
-type Catalog = { at: number; stocks: StockAsset[]; byMint: Map<string, StockAsset> }
+type Catalog = {
+  at: number
+  stocks: StockAsset[]
+  byMint: Map<string, StockAsset>
+  /** The built-in list, because the live one couldn't be read */
+  fallback: boolean
+}
 
 let catalog: Catalog | null = null
 let loading: Promise<Catalog> | null = null
@@ -216,6 +222,7 @@ function markSuperseded(stocks: StockAsset[]): void {
 
 async function load(): Promise<Catalog> {
   let stocks: StockAsset[]
+  let fallback = false
   try {
     const [response, preStocks] = await Promise.all([fetch(VERIFIED_TOKENS_API), loadPreStocks()])
     if (!response.ok) throw new Error(`Jupiter tokens responded ${response.status}`)
@@ -256,6 +263,7 @@ async function load(): Promise<Catalog> {
   } catch (error) {
     console.error('xStocks catalog unavailable, using the built-in list', error)
     stocks = builtIn()
+    fallback = true
   }
 
   markSuperseded(stocks)
@@ -264,20 +272,28 @@ async function load(): Promise<Catalog> {
     at: Date.now(),
     stocks,
     byMint: new Map(stocks.map((stock) => [stock.mint.toBase58(), stock])),
+    fallback,
   }
 }
 
+/**
+ * A reload is a 5 MB list plus a read of every listed mint, a couple of seconds, so only the first
+ * one is waited for. After that a stale catalog is served while the next one loads: names, logos
+ * and fees barely move, and live prices come from the price API wherever money is at stake.
+ */
 async function getCatalog(): Promise<Catalog> {
   if (catalog && Date.now() - catalog.at < CACHE_MS) return catalog
   loading ??= load()
     .then((loaded) => {
-      catalog = loaded
-      return loaded
+      // A failed reload keeps the live list we already have rather than shrinking to the built-in
+      // one; the next request tries again
+      if (!(loaded.fallback && catalog)) catalog = loaded
+      return catalog ?? loaded
     })
     .finally(() => {
       loading = null
     })
-  return loading
+  return catalog ?? loading
 }
 
 /** Every verified xStock, most liquid first */
