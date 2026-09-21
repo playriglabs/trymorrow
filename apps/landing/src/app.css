@@ -250,7 +250,7 @@
    has started (.features-live), so reduced motion keeps the ordinary two-column grid. */
 @media (min-width: 1024px) {
   #made-for-you.features-live {
-    height: 320svh;
+    height: 370svh;
     padding-block: 0;
   }
   /* Full bleed, so cards run off the right edge of the screen rather than the page column.

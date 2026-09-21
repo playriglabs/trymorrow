@@ -640,14 +640,13 @@ onMount(() => {
               </p>
             </div>
           </article>
-          <!-- Wide on desktop so the last row doesn't sit half empty -->
-          <article class="reveal w-[82%] shrink-0 snap-start md:w-[46%] lg:col-span-2 lg:w-auto">
+          <article class="reveal w-[82%] shrink-0 snap-start md:w-[46%] lg:w-auto">
             <div
-              class="feature-art relative flex aspect-[0.92] items-center justify-center overflow-hidden rounded-3xl bg-[#dde9e0] lg:aspect-[2.75]"
+              class="feature-art relative flex aspect-[0.92] items-center justify-center overflow-hidden rounded-3xl bg-[#dde9e0] lg:aspect-[1.35]"
             >
               <CardOrnament variant="growth" />
               <div
-                class="feature-mock relative w-[75%] max-w-78.75 rotate-2 rounded-[22px] bg-surface p-5 lg:w-[42%]"
+                class="feature-mock relative w-[75%] max-w-78.75 rotate-2 rounded-[22px] bg-surface p-5"
               >
                 <div class="mb-4 flex items-center justify-between text-xs">
                   <span>Your cash</span><span class="text-stone">Today</span>
@@ -686,6 +685,54 @@ onMount(() => {
               <p class="mt-2 max-w-116.5 text-sm leading-relaxed text-stone">
                 Cash waiting for its next stock earns at the best rate we can find. Nothing is
                 locked, it stays in your own account, and the rate moves with the market.
+              </p>
+            </div>
+          </article>
+          <!-- The other side of Earn. The fall that gets the shares sold is on the card, because
+               the app never shows a loan without it. -->
+          <article class="reveal w-[82%] shrink-0 snap-start md:w-[46%] lg:w-auto">
+            <div
+              class="feature-art relative flex aspect-[0.92] items-center justify-center overflow-hidden rounded-3xl bg-[#dbe4f0] lg:aspect-[1.35]"
+            >
+              <CardOrnament variant="orbit" />
+              <div
+                class="feature-mock relative w-[75%] max-w-78.75 -rotate-3 rounded-[22px] bg-surface p-5"
+              >
+                <div class="mb-4 flex items-center justify-between text-xs">
+                  <span>Cash against your shares</span><span class="text-stone">Tesla</span>
+                </div>
+                <div class="flex items-center gap-3 border-t border-line py-3">
+                  <StockMark stock="tesla" color="#eef0f4" size={36} scale={0.6} />
+                  <div>
+                    <p class="font-sans text-sm">Your shares</p>
+                    <p class="text-[10px] text-stone">Still yours, still growing</p>
+                  </div>
+                  <span class="ml-auto font-sans text-sm">$1,000.00</span>
+                </div>
+                <div class="flex items-center gap-3 border-t border-line py-3">
+                  <span
+                    class="flex size-9 items-center justify-center rounded-full bg-[#e6ecf5] text-base"
+                    aria-hidden="true">💵</span
+                  >
+                  <div>
+                    <p class="font-sans text-sm">Borrowed</p>
+                    <p class="text-[10px] text-stone">Pay it back any time</p>
+                  </div>
+                  <span class="ml-auto font-sans text-sm">$300.00</span>
+                </div>
+                <div
+                  class="mt-3 rounded-full bg-[#e6ecf5] px-3 py-2 text-center text-[11px] text-stone"
+                >
+                  Sold only if Tesla falls 62%
+                </div>
+              </div>
+            </div>
+            <div class="px-2 pt-5">
+              <h3 class="text-xl">Cash, without selling.</h3>
+              <p class="mt-2 max-w-116.5 text-sm leading-relaxed text-stone">
+                Borrow cash against the shares you hold and pay it back when you like. If the stock
+                falls far enough, shares are sold to cover the loan, so you always see how far that
+                is.
               </p>
             </div>
           </article>
