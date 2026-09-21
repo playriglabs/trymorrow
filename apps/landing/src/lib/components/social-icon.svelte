@@ -1,5 +1,6 @@
 <script lang="ts">
-let { name, small = false }: { name: 'x' | 'reddit' | 'linkedin'; small?: boolean } = $props()
+let { name, small = false }: { name: 'x' | 'reddit' | 'linkedin' | 'telegram'; small?: boolean } =
+  $props()
 
 // Reddit's mark reads smaller than the others at the same box, so it gets a step up.
 const sizes = {
@@ -9,6 +10,8 @@ const sizes = {
   linkedin: small ? 'size-4' : 'size-5',
   // svelte-ignore state_referenced_locally
   reddit: small ? 'size-5' : 'size-6',
+  // svelte-ignore state_referenced_locally
+  telegram: small ? 'size-4.5' : 'size-5.5',
 }
 </script>
 

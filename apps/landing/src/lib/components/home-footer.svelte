@@ -1,7 +1,9 @@
 <script lang="ts">
+import { telegramUrl } from '$lib/site'
 import SocialIcon from './social-icon.svelte'
 
 const socials = [
+  { name: 'telegram', label: 'Telegram', href: telegramUrl },
   { name: 'x', label: 'X', href: 'https://x.com/trymorrow' },
   { name: 'reddit', label: 'Reddit', href: 'https://www.reddit.com/r/TRYMORROW/' },
   { name: 'linkedin', label: 'LinkedIn', href: 'https://www.linkedin.com/company/trymorrow' },

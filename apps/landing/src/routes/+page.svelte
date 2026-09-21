@@ -5,7 +5,7 @@ import { siteUrl } from '$lib/site'
 
 const title = 'Morrow — Send cash, buy stocks, gift them, grow together'
 const description =
-  'Buy and sell shares of real companies from a few dollars, gift stocks or cash to someone you care about, start a fund for their future, and earn on the cash you have not spent yet. All in Morrow.'
+  'Buy and sell shares of real companies from a few dollars, gift stocks or cash to someone you care about, start a fund for their future, and earn on the cash you have not spent yet. On your home screen or inside Telegram, with nothing to download.'
 const url = new URL('/', siteUrl).href
 const imageUrl = new URL('/og-image.jpg', siteUrl).href
 const structuredData = JSON.stringify({

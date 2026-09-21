@@ -6,13 +6,38 @@ import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon'
 import PaperPlaneTiltIcon from 'phosphor-svelte/lib/PaperPlaneTiltIcon'
 import PiggyBankIcon from 'phosphor-svelte/lib/PiggyBankIcon'
 import { onMount } from 'svelte'
+import { appUrl, telegramUrl } from '$lib/site'
 import CardOrnament from './card-ornament.svelte'
 import GiftPreview from './gift-preview.svelte'
 import HomeFooter from './home-footer.svelte'
 import HomeNav from './home-nav.svelte'
 import Icon from './landing-icon.svelte'
 import LockMark from './lock-mark.svelte'
+import SocialIcon from './social-icon.svelte'
 import StockMark from './stock-mark.svelte'
+
+// The marks beside the two ways in: where Morrow is, in one narrow column
+const appSocials = [
+  { name: 'telegram', label: 'Telegram', href: telegramUrl },
+  { name: 'x', label: 'X', href: 'https://x.com/trymorrow' },
+  { name: 'reddit', label: 'Reddit', href: 'https://www.reddit.com/r/TRYMORROW/' },
+  { name: 'linkedin', label: 'LinkedIn', href: 'https://www.linkedin.com/company/trymorrow' },
+] as const
+
+const giftSteps = [
+  {
+    title: 'Pick what goes inside',
+    text: 'A share of a company they love, some cash, or a little of both.',
+  },
+  {
+    title: 'Say it in your own words',
+    text: 'A short note travels with it, so the gift sounds like you.',
+  },
+  {
+    title: 'They open it',
+    text: 'Send it to an email, a Morrow handle or a Telegram name. Only they can open it.',
+  },
+]
 
 const tourScreens = [
   {
@@ -316,6 +341,84 @@ onMount(() => {
             </p>
           </div>
         </article>
+      </div>
+    </section>
+
+    <!-- The gift itself, start to finish: the one flow everything else on this page leads to. -->
+    <section
+      id="gifting"
+      aria-labelledby="gifting-title"
+      class="mx-auto max-w-page scroll-mt-10 px-5 pb-20 md:px-10 md:pb-28"
+    >
+      <div class="reveal grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
+        <div>
+          <span class="text-[10px] tracking-widest text-stone">SENDING ONE</span>
+          <h2 id="gifting-title" class="section-title mt-4">
+            Three taps, and<br />it’s on its way.
+          </h2>
+          <p class="mt-5 max-w-97.5 text-sm leading-relaxed text-stone">
+            No wrapping paper, no gift shop, nothing for them to sign up for first. Most gifts cost
+            under 50¢ to send.
+          </p>
+          <ol class="mt-8 flex flex-col">
+            {#each giftSteps as step, i}
+              <li class="flex items-start gap-5 border-t border-line py-5">
+                <span
+                  class="flex size-11 shrink-0 items-center justify-center rounded-[15px] bg-orange-wash font-sans text-lg text-orange"
+                  >{i + 1}</span
+                >
+                <div>
+                  <h3 class="text-xl">{step.title}</h3>
+                  <p class="mt-1 max-w-95 text-sm leading-relaxed text-stone">{step.text}</p>
+                </div>
+              </li>
+            {/each}
+          </ol>
+          <a
+            href="{appUrl}/login"
+            class="cta group mt-8 inline-flex min-h-13 items-center justify-center gap-4 rounded-full bg-ink px-7 text-sm text-cream"
+            >Send your first gift <span class="transition-transform group-hover:translate-x-1"
+              ><Icon size={19} /></span
+            ></a
+          >
+        </div>
+        <!-- The other way to send one, for someone who isn’t here yet: a card with a code. -->
+        <div
+          class="group relative flex aspect-[0.92] items-center justify-center overflow-hidden rounded-3xl bg-[#f1dfc7] px-8 md:aspect-[1.15]"
+        >
+          <CardOrnament variant="sparkles" />
+          <div
+            class="relative w-64 -rotate-6 overflow-hidden rounded-[22px] bg-surface text-left shadow-[0_18px_40px_-22px_rgb(76_40_6/0.45)] transition-transform duration-500 group-hover:rotate-0"
+          >
+            <div class="bg-orange px-5 pt-5 pb-6 text-white">
+              <div class="flex items-center justify-between text-[11px]">
+                <span>Morrow gift card</span><Icon name="gift" size={16} />
+              </div>
+              <p class="mt-4 font-sans text-[34px] leading-none tracking-[-0.05em]">$50.00</p>
+              <p class="mt-1 text-[11px] text-white/85">Two stocks and a little cash</p>
+            </div>
+            <div class="border-t border-dashed border-line px-5 py-4">
+              <div class="flex items-end justify-between gap-2">
+                <div>
+                  <p class="text-[10px] text-stone">Redeem code</p>
+                  <p class="mt-0.5 font-sans text-sm tracking-tight">7QF4-2M9K-8RD3</p>
+                </div>
+                <div class="flex shrink-0 items-center -space-x-1.5">
+                  <span class="inline-flex rounded-full ring-2 ring-surface"
+                    ><StockMark stock="openai" size={24} /></span
+                  >
+                  <span class="inline-flex rounded-full ring-2 ring-surface"
+                    ><StockMark stock="nvidia" size={24} scale={0.6} /></span
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+          <span
+            class="absolute right-5 bottom-6 rotate-[-8deg] rounded-full bg-[#d3e7bb] px-4 py-2 font-sans text-sm"
+            >Anyone can open it.</span
+          >
+        </div>
       </div>
     </section>
 
@@ -660,6 +763,127 @@ onMount(() => {
               ></span>
             {/each}
           </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Two doors into the same app, laid out as one panel: the statement, the two ways in,
+         and the marks that open them. Neither is a store download. -->
+    <section
+      id="get-morrow"
+      aria-labelledby="get-title"
+      class="mx-auto max-w-page scroll-mt-10 px-5 pt-8 pb-24 md:px-10 md:pt-16 md:pb-32"
+    >
+      <div
+        class="reveal rounded-[36px] bg-[#f1dfc7] p-3 md:rounded-[48px] md:p-4 lg:grid lg:grid-cols-[1.35fr_1fr_auto] lg:gap-4"
+      >
+        <div class="grid gap-3 md:gap-4 lg:contents">
+          <article
+            class="flex flex-col justify-between gap-10 rounded-[28px] bg-surface p-7 md:rounded-[36px] md:p-10 lg:col-start-1 lg:row-span-2 lg:row-start-1"
+          >
+            <div>
+              <span class="text-[10px] tracking-widest text-stone">TWO WAYS IN</span>
+              <h2
+                id="get-title"
+                class="mt-4 font-sans text-[clamp(40px,5vw,72px)] leading-[0.97] tracking-[-0.06em]"
+              >
+                Home screen,<br />or Telegram.
+              </h2>
+            </div>
+            <div>
+              <p class="max-w-90 text-sm leading-relaxed text-stone">
+                Nothing to download from a store, nothing to update. The same Morrow either way,
+                with the same account behind it.
+              </p>
+              <div class="mt-7 flex items-center gap-3">
+                <img
+                  src="/trymorrow-logo-rounded.png"
+                  alt=""
+                  width="29"
+                  height="29"
+                  class="size-11 rounded-[14px]"
+                />
+                <span class="font-sans text-2xl leading-none tracking-tighter"
+                  >morrow<span class="text-orange">*</span></span
+                >
+              </div>
+            </div>
+          </article>
+
+          <article
+            class="rounded-[28px] bg-surface p-7 md:rounded-[36px] md:p-8 lg:col-start-2 lg:row-start-1"
+          >
+            <h3 class="font-sans text-2xl tracking-[-0.04em]">Keep it on your home screen</h3>
+            <div class="mt-5 rounded-[20px] bg-cream p-4">
+              <div class="flex items-center gap-3">
+                <img
+                  src="/trymorrow-logo-rounded.png"
+                  alt=""
+                  width="29"
+                  height="29"
+                  class="size-10 rounded-[12px]"
+                />
+                <div>
+                  <p class="font-sans text-sm leading-none">Morrow</p>
+                  <p class="mt-1 text-[10px] text-stone">app.trymorrow.money</p>
+                </div>
+                <span class="ml-auto flex items-center gap-1.5 text-[11px] text-stone"
+                  ><Icon name="plus" size={14} /> Add</span
+                >
+              </div>
+            </div>
+            <p class="mt-4 text-sm leading-relaxed text-stone">
+              Open it once in your browser and add it to your home screen. Full screen, works
+              offline, updates itself.
+            </p>
+            <a
+              href="{appUrl}/login"
+              class="cta group mt-6 inline-flex min-h-12 items-center justify-center gap-4 rounded-full bg-ink px-6 text-sm text-cream"
+              >Open the web app <span class="transition-transform group-hover:translate-x-1"
+                ><Icon size={18} /></span
+              ></a
+            >
+          </article>
+
+          <article
+            class="rounded-[28px] bg-surface p-7 md:rounded-[36px] md:p-8 lg:col-start-2 lg:row-start-2"
+          >
+            <h3 class="font-sans text-2xl tracking-[-0.04em]">Or keep it inside Telegram</h3>
+            <div class="mt-5 rounded-[20px] bg-white p-4">
+              <div class="rounded-[20px] rounded-bl-md bg-[#e3eef8] px-4 py-3 text-xs">
+                You have a gift from @alex ✨
+              </div>
+            </div>
+            <p class="mt-4 text-sm leading-relaxed text-stone">
+              The Mini App knows you the moment it opens, gifts can go to a Telegram name, and news
+              of one arrives as a message.
+            </p>
+            <a
+              href={telegramUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="cta group mt-6 inline-flex min-h-12 items-center justify-center gap-4 rounded-full bg-ink px-6 text-sm text-cream"
+              >Open in Telegram <span class="transition-transform group-hover:translate-x-1"
+                ><Icon size={18} /></span
+              ></a
+            >
+          </article>
+
+          <!-- The marks on their own, centred: every place Morrow answers, the Mini App first -->
+          <aside
+            class="flex items-center justify-center gap-3 rounded-[28px] bg-surface p-4 md:rounded-[36px] lg:col-start-3 lg:row-span-2 lg:row-start-1 lg:flex-col lg:gap-4 lg:px-4"
+          >
+            {#each appSocials as social}
+              <a
+                href={social.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`Morrow on ${social.label}`}
+                class="flex size-14 items-center justify-center rounded-[20px] bg-cream text-ink transition-colors hover:bg-orange-wash hover:text-orange md:size-16"
+                ><SocialIcon name={social.name} /></a
+              >
+            {/each}
+          </aside>
         </div>
       </div>
     </section>
