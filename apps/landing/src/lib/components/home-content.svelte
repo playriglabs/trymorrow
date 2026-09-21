@@ -39,6 +39,41 @@ const giftSteps = [
   },
 ]
 
+// The gift card stack: the front one stays the $50 mix, the two behind show a single share and a
+// pre-IPO company, so the panel reads as "any of these" rather than one fixed product.
+const giftCards = [
+  {
+    amount: '$25.00',
+    note: 'One share of Apple',
+    code: '3HX8-KT2P-9WQ4',
+    marks: [{ stock: 'apple', scale: 0.55 }],
+    head: 'bg-ink text-cream',
+    rest: 'translate(-44px, -30px) rotate(-16deg)',
+    spread: 'translate(-92px, -44px) rotate(-20deg)',
+  },
+  {
+    amount: '$100.00',
+    note: 'Anthropic, before it lists',
+    code: 'M2D7-6RVA-J5TN',
+    marks: [{ stock: 'anthropic', scale: 0.55 }],
+    head: 'bg-[#d3e7bb] text-ink',
+    rest: 'translate(46px, -14px) rotate(9deg)',
+    spread: 'translate(96px, -26px) rotate(14deg)',
+  },
+  {
+    amount: '$50.00',
+    note: 'Two stocks and a little cash',
+    code: '7QF4-2M9K-8RD3',
+    marks: [
+      { stock: 'openai', scale: 0.55 },
+      { stock: 'nvidia', scale: 0.6 },
+    ],
+    head: 'bg-orange text-white',
+    rest: 'rotate(-6deg)',
+    spread: 'translate(0, 10px) rotate(0deg)',
+  },
+]
+
 const tourScreens = [
   {
     src: '/images/buy-screen.png',
@@ -344,84 +379,6 @@ onMount(() => {
       </div>
     </section>
 
-    <!-- The gift itself, start to finish: the one flow everything else on this page leads to. -->
-    <section
-      id="gifting"
-      aria-labelledby="gifting-title"
-      class="mx-auto max-w-page scroll-mt-10 px-5 pb-20 md:px-10 md:pb-28"
-    >
-      <div class="reveal grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
-        <div>
-          <span class="text-[10px] tracking-widest text-stone">SENDING ONE</span>
-          <h2 id="gifting-title" class="section-title mt-4">
-            Three taps, and<br />it’s on its way.
-          </h2>
-          <p class="mt-5 max-w-97.5 text-sm leading-relaxed text-stone">
-            No wrapping paper, no gift shop, nothing for them to sign up for first. Most gifts cost
-            under 50¢ to send.
-          </p>
-          <ol class="mt-8 flex flex-col">
-            {#each giftSteps as step, i}
-              <li class="flex items-start gap-5 border-t border-line py-5">
-                <span
-                  class="flex size-11 shrink-0 items-center justify-center rounded-[15px] bg-orange-wash font-sans text-lg text-orange"
-                  >{i + 1}</span
-                >
-                <div>
-                  <h3 class="text-xl">{step.title}</h3>
-                  <p class="mt-1 max-w-95 text-sm leading-relaxed text-stone">{step.text}</p>
-                </div>
-              </li>
-            {/each}
-          </ol>
-          <a
-            href="{appUrl}/login"
-            class="cta group mt-8 inline-flex min-h-13 items-center justify-center gap-4 rounded-full bg-ink px-7 text-sm text-cream"
-            >Send your first gift <span class="transition-transform group-hover:translate-x-1"
-              ><Icon size={19} /></span
-            ></a
-          >
-        </div>
-        <!-- The other way to send one, for someone who isn’t here yet: a card with a code. -->
-        <div
-          class="group relative flex aspect-[0.92] items-center justify-center overflow-hidden rounded-3xl bg-[#f1dfc7] px-8 md:aspect-[1.15]"
-        >
-          <CardOrnament variant="sparkles" />
-          <div
-            class="relative w-64 -rotate-6 overflow-hidden rounded-[22px] bg-surface text-left shadow-[0_18px_40px_-22px_rgb(76_40_6/0.45)] transition-transform duration-500 group-hover:rotate-0"
-          >
-            <div class="bg-orange px-5 pt-5 pb-6 text-white">
-              <div class="flex items-center justify-between text-[11px]">
-                <span>Morrow gift card</span><Icon name="gift" size={16} />
-              </div>
-              <p class="mt-4 font-sans text-[34px] leading-none tracking-[-0.05em]">$50.00</p>
-              <p class="mt-1 text-[11px] text-white/85">Two stocks and a little cash</p>
-            </div>
-            <div class="border-t border-dashed border-line px-5 py-4">
-              <div class="flex items-end justify-between gap-2">
-                <div>
-                  <p class="text-[10px] text-stone">Redeem code</p>
-                  <p class="mt-0.5 font-sans text-sm tracking-tight">7QF4-2M9K-8RD3</p>
-                </div>
-                <div class="flex shrink-0 items-center -space-x-1.5">
-                  <span class="inline-flex rounded-full ring-2 ring-surface"
-                    ><StockMark stock="openai" size={24} /></span
-                  >
-                  <span class="inline-flex rounded-full ring-2 ring-surface"
-                    ><StockMark stock="nvidia" size={24} scale={0.6} /></span
-                  >
-                </div>
-              </div>
-            </div>
-          </div>
-          <span
-            class="absolute right-5 bottom-6 rotate-[-8deg] rounded-full bg-[#d3e7bb] px-4 py-2 font-sans text-sm"
-            >Anyone can open it.</span
-          >
-        </div>
-      </div>
-    </section>
-
     <section aria-labelledby="together-title" class="together-section relative bg-surface">
       <div class="together-stage relative h-svh w-full overflow-hidden">
         <div class="together-canvas relative mx-auto h-full max-w-360">
@@ -499,6 +456,93 @@ onMount(() => {
             {/each}
             <p class="mt-7 text-sm text-stone">A little of each. All in Morrow.</p>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- The gift itself, start to finish: the one flow everything else on this page leads to. -->
+    <section
+      id="gifting"
+      aria-labelledby="gifting-title"
+      class="mx-auto max-w-page scroll-mt-10 px-5 pt-24 pb-20 md:px-10 md:pt-32 md:pb-28"
+    >
+      <div class="reveal grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
+        <div>
+          <span class="text-[10px] tracking-widest text-stone">SENDING ONE</span>
+          <h2 id="gifting-title" class="section-title mt-4">
+            Three taps, and<br />it’s on its way.
+          </h2>
+          <p class="mt-5 max-w-97.5 text-sm leading-relaxed text-stone">
+            No wrapping paper, no gift shop, nothing for them to sign up for first. Most gifts cost
+            under 50¢ to send.
+          </p>
+          <ol class="mt-8 flex flex-col">
+            {#each giftSteps as step, i}
+              <li class="flex items-start gap-5 border-t border-line py-5">
+                <span
+                  class="flex size-11 shrink-0 items-center justify-center rounded-[15px] bg-orange-wash font-sans text-lg text-orange"
+                  >{i + 1}</span
+                >
+                <div>
+                  <h3 class="text-xl">{step.title}</h3>
+                  <p class="mt-1 max-w-95 text-sm leading-relaxed text-stone">{step.text}</p>
+                </div>
+              </li>
+            {/each}
+          </ol>
+          <a
+            href="{appUrl}/login"
+            class="cta group mt-8 inline-flex min-h-13 items-center justify-center gap-4 rounded-full bg-ink px-7 text-sm text-cream"
+            >Send your first gift <span class="transition-transform group-hover:translate-x-1"
+              ><Icon size={19} /></span
+            ></a
+          >
+        </div>
+        <!-- The other way to send one, for someone who isn’t here yet: a card with a code. -->
+        <div
+          class="group relative flex aspect-[0.92] items-center justify-center overflow-hidden rounded-3xl bg-[#f1dfc7] px-8 md:aspect-[1.15]"
+        >
+          <CardOrnament variant="sparkles" />
+          <!-- Stacked in paint order, back to front; hovering the panel fans them out -->
+          <div class="relative h-56 w-64">
+            {#each giftCards as card, i}
+              <div
+                aria-hidden={i < giftCards.length - 1}
+                class="gift-card absolute inset-x-0 top-0 overflow-hidden rounded-[22px] bg-surface text-left shadow-[0_18px_40px_-22px_rgb(76_40_6/0.45)]"
+                style:--rest={card.rest}
+                style:--spread={card.spread}
+              >
+                <div class="px-5 pt-5 pb-6 {card.head}">
+                  <div class="flex items-center justify-between text-[11px]">
+                    <span>Morrow gift card</span><Icon name="gift" size={16} />
+                  </div>
+                  <p class="mt-4 font-sans text-[34px] leading-none tracking-[-0.05em]">
+                    {card.amount}
+                  </p>
+                  <p class="mt-1 text-[11px] opacity-85">{card.note}</p>
+                </div>
+                <div class="border-t border-dashed border-line px-5 py-4">
+                  <div class="flex items-end justify-between gap-2">
+                    <div>
+                      <p class="text-[10px] text-stone">Redeem code</p>
+                      <p class="mt-0.5 font-sans text-sm tracking-tight">{card.code}</p>
+                    </div>
+                    <div class="flex shrink-0 items-center -space-x-1.5">
+                      {#each card.marks as mark}
+                        <span class="inline-flex rounded-full ring-2 ring-surface"
+                          ><StockMark stock={mark.stock} size={24} scale={mark.scale} /></span
+                        >
+                      {/each}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            {/each}
+          </div>
+          <span
+            class="absolute right-5 bottom-6 rotate-[-8deg] rounded-full bg-[#d3e7bb] px-4 py-2 font-sans text-sm"
+            >Anyone can open it.</span
+          >
         </div>
       </div>
     </section>
@@ -965,3 +1009,19 @@ onMount(() => {
   </main>
   <HomeFooter />
 </div>
+
+<style>
+/* Each card carries its resting and fanned-out pose, so one rule animates all three */
+.gift-card {
+  transform: var(--rest);
+  transition: transform 500ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+:global(.group:hover) .gift-card {
+  transform: var(--spread);
+}
+@media (prefers-reduced-motion: reduce) {
+  .gift-card {
+    transition: none;
+  }
+}
+</style>
