@@ -141,6 +141,76 @@ on not holding customer assets. It also makes leaving Privy easy, since we could
 money out. Worth re-testing the modal on HTTPS — `navigator.clipboard` doesn't exist on the LAN dev
 origin, so "the button does nothing" may just have been the clipboard failing silently.
 
+## P1 — cash without selling (Kamino xStocks market)
+
+Kamino runs an isolated market where tokenized shares are collateral and cash is the only thing
+borrowed: **xStocks Market `5wJeMrUYECGq41fxRESKALVcHnNX26TAWy4W98yULsua`**. It answers the one
+thing a holder asks that we had no answer for — "I need money, do I have to sell?" — and it needs
+no program change of ours, because the shares stay in the person's own account and the market
+holds them, exactly like Earn.
+
+Measured 2026-09-20 against mainnet with `klend-sdk` v12 and noop signers:
+
+- **Collateral, loan-to-value / liquidation threshold:** SPYx 73/75, QQQx 70/72, GOOGLx 60/70,
+  TSLAx 55/65, NVDAx 55/65, AAPLx 40/50, METAx 35/45 (paused, deposit cap 0), MSTRx, CRCLx and
+  HOODx 30/40, plus cbBTC 75/80. Ten of our stocks, not 188. Deposit caps are per stock and real:
+  AAPLx takes 2,000 shares, NVDAx 18,000, SPYx 20,000.
+- **Liquidation costs the borrower 5–10%** of what is sold (`minLiquidationBonusBps` 500,
+  `maxLiquidationBonusBps` 1000), half of it to Kamino. That is the number a screen has to say out
+  loud, because it is the price of being wrong.
+- **Cash:** $5.64M supplied, $4.92M borrowed, so 87% is already lent and about $720k is free to
+  borrow. 5.11% a year to borrow, variable. A borrow bigger than what's free simply fails.
+- **Our catalog already points at the right mint.** For 9 of the 10, the xStocks mint is the most
+  liquid one, so `findStockByTicker` and a holding bought in the app both land on the mint Kamino
+  takes. A Backpack mint of the same company is not collateral; `markSuperseded` keeps both, so
+  eligibility is decided per mint, never per ticker.
+- **Transaction sizes, no lookup tables:** a first-time deposit-and-borrow in one transaction is
+  **1,367 bytes** — over the 1,232 limit — so the accounts are opened in their own transaction and
+  the money moves in the next. As the app builds them: setup **730** (**868** when it also opens a
+  cash account), the money **1,137** bare, **1,184** with the fee and **1,211** with an account
+  opening, repay **794**, unlock shares **830**. That is why the account opening rides with the
+  setup and never beside the fee, and why a second collateral stock is refused for now: each one
+  adds its own refresh instruction to every transaction after it. No lookup tables anywhere.
+- **Rent:** the obligation is 3,344 bytes (0.01764 SOL) and the user metadata 1,032 (0.00589), and
+  `klend-sdk` v12 exposes no instruction that closes either, so **0.02353 SOL per person never
+  comes back**. Charged at cost out of the cash they borrow, like every other unrecoverable
+  account. The debt farm state (920 bytes, 0.00532) does come back — `getCloseEmptyUserStateIx`
+  closes it once the loan is gone.
+- **The relayer can pay it.** `initUserMetadata` and `initObligation` take a `feePayer` separate
+  from the owner, so the person never needs SOL, which is what made this fit our shape at all.
+- **The SDK bundles.** `@kamino-finance/klend-sdk` v12 builds inside the Astro/Vercel function, and
+  its `@solana/kit` v2 accepts the app's kit v5 RPC client.
+
+This is the same Kamino we measured and turned down for Earn: a bad place to _put_ cash, the only
+place to borrow it against these shares.
+
+- [x] `lib/server/borrow.ts`: market terms, the position read back from the obligation, and the
+      instruction builders (open, repay, unlock), all converted from the SDK's kit instructions
+- [x] `GET /api/borrow`, `POST /api/borrow/quote`, `/open`, `/repay`, `/submit`, mirroring Earn:
+      the relayer builds and signs, the browser adds the person's signature, `submit` accepts only
+      the lending program, the farms program, the token programs and the recorded fee
+- [x] `/borrow` screens: what a stock can raise, what a loan costs, and how far the stock can fall
+      before shares are sold, plus `/borrow/open` and `/borrow/repay` (which also hands the shares
+      back once nothing is owed)
+- [x] Ways in: a home banner (the loan and its room to fall once there is one, the offer before
+      that) and a line on the holding screen. Home only asks the lending market anything when the
+      person actually holds shares
+- [x] A floor on the loan: `minimumLoanUsd` is ten times the one-off cost, never under $5, because
+      charging $2.99 to hand someone $1.70 is a fee and not a service. The list marks holdings too
+      small to reach it, `/borrow/open` offers the ones that can instead of a screen of dead
+      buttons, and the route refuses anything under it
+- [ ] **Run it once on mainnet with about $5** — open, top up, repay part, repay the rest and
+      unlock the shares. Nothing here has touched mainnet yet
+- [ ] **Watch the loan.** A daily cron that notifies at 80% of the liquidation threshold and again
+      at 90%, plus a "shares were sold" notification when a liquidation happens, so nobody finds
+      out by noticing their shares are gone
+- [ ] Close the debt farm state on full repayment so its 0.00532 SOL comes home
+- [ ] Decide whether borrowed cash counts as cash for gift fees and "send the whole balance". It
+      does today, because it is plain cash in their account — but the fee planner has no idea it is
+      owed to someone
+- [x] A second collateral stock is refused in `POST /api/borrow/open` (`one_stock_only`) until the
+      bytes and the liquidation maths for two have been measured; the obligation itself holds many
+
 ## P2 — product
 
 - [x] **Trade history** stored in the DB (`trade_fills`, `pending_trades`), which gives a cost basis
@@ -345,7 +415,8 @@ Two shapes of Earn, very different in effort:
         it coming back unless those accounts are closed. Jupiter Lend costs one 0.00149 SOL account
         that closes itself on a full take-back. So Kamino's main market is a lower rate at 17× the
         setup cost. Only its isolated USDC market (6.41%, $7M) beats Jupiter, and that's a thin
-        pool with riskier collateral — revisit with a minimum deposit and a plain warning.
+        pool with riskier collateral — revisit with a minimum deposit and a plain warning. Its
+        xStocks market is a different question and is being built: see "cash without selling".
   - [x] The screen lists Jupiter Lend, Kamino and Save with live rates and marks the one the cash
         goes to, so the claim "best rate" can be checked rather than believed. Kamino answers for
         itself; Save comes through DefiLlama.

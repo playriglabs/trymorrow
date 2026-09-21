@@ -204,6 +204,38 @@ export async function fundCreateFee(): Promise<{ raw: bigint; usd: number }> {
   return cashAtCost(rent + lamportsPerTransaction, solUsd)
 }
 
+/**
+ * Kamino's obligation (3,344 bytes) and the user metadata beside it (1,032). Opened once for
+ * someone who borrows against their shares, and `klend-sdk` has no instruction that closes
+ * either, so unlike a gift's vault this rent never comes back.
+ */
+const LOAN_ACCOUNT_SIZES = [3_344, 1_032]
+
+/** Below this a loan isn't worth anyone's time, fee or no fee */
+const FLOOR_LOAN_USD = 5
+
+/**
+ * The smallest loan we'll build. The rent a first loan opens never comes back, so a loan has to be
+ * worth many times that cost — charging $2.99 to hand someone $1.70 is a fee, not a service.
+ */
+export const minimumLoanUsd = (feeUsd: number) => Math.max(FLOOR_LOAN_USD, Math.ceil(feeUsd * 10))
+
+/**
+ * What opening someone's first loan costs us for good: the two accounts the lending market keeps
+ * for them, plus the transaction that opens them and the one that moves the money. Charged at
+ * cost, out of the cash they borrow, and only the first time — every later loan of theirs reuses
+ * the same accounts and is free.
+ */
+export async function loanSetupFee(): Promise<{ raw: bigint; usd: number }> {
+  const [rents, solUsd, lamportsPerTransaction] = await Promise.all([
+    Promise.all(LOAN_ACCOUNT_SIZES.map(accountRent)),
+    solPrice(),
+    transactionLamports(),
+  ])
+  const rent = rents.reduce((sum, lamports) => sum + lamports, 0)
+  return cashAtCost(rent + 2 * lamportsPerTransaction, solUsd)
+}
+
 export type CashoutFee = {
   /** True when the destination has no cash account yet, which is the only thing that costs us */
   opensAccount: boolean

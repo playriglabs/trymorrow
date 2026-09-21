@@ -5,6 +5,7 @@ import { useSignRelayed } from '@/lib/client/sign'
 import { HANDLE_PATTERN } from '@/lib/handles'
 import { normalizeCode } from '@/lib/redeem-code'
 import type {
+  BorrowView,
   CashoutQuote,
   CashoutView,
   ChartRange,
@@ -18,6 +19,7 @@ import type {
   GiftFeeQuote,
   GiftView,
   HoldingDetail,
+  LoanQuote,
   NotificationSettings,
   NotificationView,
   Portfolio,
@@ -59,6 +61,9 @@ export const queryKeys = {
   fundContributionFee: (fundId: string, mints: string[]) =>
     ['fund-contribution-fee', fundId, [...mints].sort().join(',')] as const,
   earn: () => ['earn'] as const,
+  borrow: () => ['borrow'] as const,
+  loanQuote: (mint: string, sharesRaw: string, cashRaw: string) =>
+    ['loan-quote', mint, sharesRaw, cashRaw] as const,
   notifications: () => ['notifications'] as const,
   notificationFeed: () => ['notification-feed'] as const,
   tradeQuote: ({ side, mint, amountRaw }: TradeQuoteParams) =>
@@ -416,6 +421,36 @@ export function useWithdrawFundMutation(fundId: string) {
       queryClient.invalidateQueries({ queryKey: queryKeys.funds() })
       queryClient.invalidateQueries({ queryKey: queryKeys.portfolio() })
     },
+  })
+}
+
+/** What shares can raise today, and what is owed on them; read from the market, not our books */
+export function useBorrowQuery({ enabled = true }: Options = {}) {
+  const api = useApi()
+  return useQuery({
+    queryKey: queryKeys.borrow(),
+    enabled,
+    staleTime: 30_000,
+    queryFn: () => api<BorrowView>('/api/borrow'),
+  })
+}
+
+/** What one loan would look like before anything is built, the market's numbers not ours */
+export function useLoanQuoteQuery(
+  { mint, sharesRaw, cashRaw }: { mint: string; sharesRaw: string; cashRaw: string },
+  { enabled = true }: Options = {},
+) {
+  const api = useApi()
+  return useQuery({
+    queryKey: queryKeys.loanQuote(mint, sharesRaw, cashRaw),
+    enabled: enabled && Boolean(mint) && sharesRaw !== '0',
+    placeholderData: keepPreviousData,
+    staleTime: 15_000,
+    queryFn: () =>
+      api<LoanQuote>('/api/borrow/quote', {
+        method: 'POST',
+        body: { mint, sharesRaw, cashRaw: cashRaw === '0' ? undefined : cashRaw },
+      }),
   })
 }
 
@@ -958,6 +993,106 @@ export function useThankGiftMutation(giftId: string) {
     onSuccess: (gift) => {
       queryClient.setQueriesData({ queryKey: queryKeys.gift(giftId) }, gift)
       queryClient.invalidateQueries({ queryKey: queryKeys.gifts() })
+    },
+  })
+}
+
+/**
+ * Opens a loan: locks the shares, takes the cash. The market opens two accounts for a first-time
+ * borrower and they don't fit in the same transaction as the money, so when the server sends one
+ * back it is signed and broadcast first, in order.
+ */
+export function useOpenLoanMutation() {
+  const api = useApi()
+  const sign = useSignRelayed()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      mint,
+      sharesRaw,
+      cashRaw,
+    }: {
+      mint: string
+      sharesRaw: string
+      cashRaw: string
+    }) => {
+      const built = await api<{
+        setup: string | null
+        transaction: string
+        cashUsd: number
+        feeUsd: number
+      }>('/api/borrow/open', { method: 'POST', body: { mint, sharesRaw, cashRaw } })
+      if (built.setup) {
+        await api<{ signature: string }>('/api/borrow/submit', {
+          method: 'POST',
+          body: { transaction: await sign(built.setup), action: 'setup' },
+        })
+      }
+      await api<{ signature: string }>('/api/borrow/submit', {
+        method: 'POST',
+        body: { transaction: await sign(built.transaction), action: 'open' },
+      })
+      return built
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.borrow() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.portfolio() })
+    },
+  })
+}
+
+/** Pays a loan back, in part or in full */
+export function useRepayLoanMutation() {
+  const api = useApi()
+  const sign = useSignRelayed()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ amountRaw, all }: { amountRaw?: string; all?: boolean }) => {
+      const { transaction, amountUsd } = await api<{ transaction: string; amountUsd: number }>(
+        '/api/borrow/repay',
+        { method: 'POST', body: { amountRaw, all } },
+      )
+      await api<{ signature: string }>('/api/borrow/submit', {
+        method: 'POST',
+        body: { transaction: await sign(transaction), action: 'repay' },
+      })
+      return amountUsd
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.borrow() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.portfolio() })
+    },
+  })
+}
+
+/** Takes locked shares back out, which the market allows only while the loan stays covered */
+export function useUnlockSharesMutation() {
+  const api = useApi()
+  const sign = useSignRelayed()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      mint,
+      sharesRaw,
+      all,
+    }: {
+      mint: string
+      sharesRaw?: string
+      all?: boolean
+    }) => {
+      const { transaction, shares } = await api<{ transaction: string; shares: number }>(
+        '/api/borrow/unlock',
+        { method: 'POST', body: { mint, sharesRaw, all } },
+      )
+      await api<{ signature: string }>('/api/borrow/submit', {
+        method: 'POST',
+        body: { transaction: await sign(transaction), action: 'unlock' },
+      })
+      return shares
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.borrow() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.portfolio() })
     },
   })
 }

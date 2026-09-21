@@ -1,0 +1,16 @@
+---
+import AppScreen from '@/components/app-screen'
+import AppLayout from '@/layouts/app-layout.astro'
+
+const ticker = (Astro.url.searchParams.get('stock') ?? '').toUpperCase()
+---
+
+<AppLayout title="Get cash — Morrow">
+  <AppScreen
+    client:only="react"
+    transition:persist="morrow-app"
+    screen="borrow-open-screen"
+    screenProps={{ ticker }}
+    routeKey={Astro.url.pathname + Astro.url.search}
+  />
+</AppLayout>

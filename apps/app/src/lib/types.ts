@@ -282,6 +282,83 @@ export type EarnView = {
   readyUsd: number
 }
 
+/** A stock this lending market takes, and what it could raise for the person holding it */
+export type BorrowStockView = {
+  mint: string
+  ticker: string
+  name: string
+  iconUrl: string | null
+  /** Shares they hold today */
+  shares: number
+  /** The same holding in base units, so a part of it can be locked exactly */
+  sharesRaw: string
+  sharePriceUsd: number | null
+  /** Cash the market lends against a dollar of these shares */
+  ltvPct: number
+  /** Where the market starts selling them to cover the loan */
+  liquidationPct: number
+  /** The most this whole holding could raise */
+  maxCashUsd: number
+  /** Shares the market will still take; a bigger deposit is refused */
+  roomShares: number
+}
+
+/** What is owed and what is backing it, read from the market */
+export type BorrowLoanView = {
+  owedUsd: number
+  collateralUsd: number
+  collateral: {
+    mint: string
+    ticker: string
+    name: string
+    iconUrl: string | null
+    shares: number
+    valueUsd: number
+  }[]
+  /** Cash that could still be taken out today */
+  availableUsd: number
+  /** What the loan would have to reach for the shares to be sold */
+  sellsAtUsd: number
+  /** How far the shares can fall before that; null when nothing is owed */
+  dropPct: number | null
+}
+
+/** What one loan would look like, priced before anything is built */
+export type LoanQuote = {
+  ratePct: number
+  ltvPct: number
+  liquidationPct: number
+  sharePriceUsd: number
+  /** What the shares going in are worth today */
+  lockedUsd: number
+  /** The most they could raise */
+  maxCashUsd: number
+  cashUsd: number
+  /** Charged once, out of the cash borrowed; 0 for anyone who has borrowed before */
+  feeUsd: number
+  /** What a share would have to be worth for the market to start selling */
+  sellsAtPriceUsd: number
+  /** How far the stock can fall before that, as a percent of today's price */
+  dropPct: number | null
+}
+
+/** Cash borrowed against shares, without selling them */
+export type BorrowView = {
+  /** Percent a year, variable: what the loan costs right now */
+  ratePct: number
+  /** Cash nobody has borrowed yet; a loan bigger than this fails */
+  availableUsd: number
+  /** Cash sitting in the account, which is what repays a loan */
+  readyUsd: number
+  checkedAt: string
+  stocks: BorrowStockView[]
+  loan: BorrowLoanView | null
+  /** What opening a first loan costs, taken out of the cash borrowed; 0 after that */
+  setupFeeUsd: number
+  /** The smallest loan worth building, which rises with the one-off cost */
+  minimumUsd: number
+}
+
 /** One send of shares to an account outside Morrow */
 export type StockSendView = {
   id: string

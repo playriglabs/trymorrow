@@ -138,6 +138,40 @@ earnings back from it rather than from our database.
   first deposit opens an obligation plus user metadata, 0.0250 SOL against Jupiter's 0.00149, for a
   lower rate. Before adding any venue, build one deposit and price the accounts it opens.
 
+### Cash against shares
+
+`/borrow` is the other side of Earn: shares stay, cash comes out. It runs on **Kamino's isolated
+xStocks market** (`5wJeMrUYECGq41fxRESKALVcHnNX26TAWy4W98yULsua`, program
+`KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD`), so no program change of ours: the shares back the
+loan inside the market, the cash lands in the person's own account, and `lib/server/borrow.ts`
+only builds what they sign. The market is the book — `GET /api/borrow` reads the terms, the
+position and the debt back from it, and we record nothing.
+
+- **Ten stocks, not 188**, and each has its own numbers: loan-to-value 30–73%, liquidation
+  threshold 40–90%, per-stock deposit caps. `borrowMarket()` reads them live and hides a reserve
+  that is paused, full or takes no collateral. For 9 of the 10 our catalog already prefers the same
+  mint Kamino takes; a Backpack mint of the same company is not collateral.
+- **The relayer pays the rent, as everywhere else.** `initUserMetadata`, `initObligation` and the
+  debt farm state each take a fee payer apart from the owner, and `split()` swaps the relayer into
+  that slot by instruction label. The obligation (0.01764 SOL) and the metadata (0.00589) have no
+  close instruction in `klend-sdk` v12, so `loanSetupFee` charges those at cost, once, out of the
+  cash borrowed. Every later loan is free.
+- **Two transactions the first time.** The account openings and the money don't fit together
+  (1,367 bytes). `POST /api/borrow/open` returns `setup` and `transaction`; the browser signs and
+  submits them in that order. The money transaction can't be simulated before the accounts exist,
+  so it is built with `buildRelayedTransaction(..., { simulate: false })`.
+- **Sizes are tight**: money 1,137 bytes bare, 1,184 with the fee, 1,211 with a cash-account
+  opening, against 1,232. That's why the opening rides with the setup, and why a second collateral
+  stock is refused (`one_stock_only`) — each adds a refresh instruction to everything after it.
+- `POST /api/borrow/submit` allows only the lending program, the farms program, the token and
+  associated-token programs and the compute budget, no lookup tables, relayer first and the person
+  signing — and the only token transfer it accepts is our own fee into the treasury.
+- **Say what liquidation is, in plain words**: if the shares fall far enough they are sold to cover
+  the loan, and that sale costs up to 10%. The screens show the price the stock would have to reach
+  and the percent fall that gets there; never show a loan without it.
+- Not yet: nothing has run on mainnet, nobody is warned as a loan gets close, and the debt farm
+  state's 0.00532 SOL isn't reclaimed on full repayment. See TODO.
+
 ### Cash out flow
 
 1. `POST /api/cashouts/quote` prices it: `planCashout` validates the address, checks the balance and returns the fee. Nothing is recorded.
@@ -172,6 +206,9 @@ Stocks someone follows without buying, grouped into named lists with an emoji. `
 ### Share cards
 
 `renderShareCard` (`lib/client/share-card.ts`) draws every shareable image on a canvas: eyebrow, hero, subhero, a cream receipt of labelled rows, and a footer with a code to the sharer's handle page. It shares its module grid with `qr-code.tsx` through `qr-layout.ts`, so both codes look the same.
+
+The ticker sits on the hero's own baseline, to its right and smaller — "+6.7% $HOOD" — so the
+line under the hero is the hero's to use. `subhero` is that ticker; an empty string drops it.
 
 **Every number on a card needs a label that says whose it is.** A bare percentage on a "Just bought" card reads as the sharer's return, and a fresh buy has none, so today's move goes in a row called "Today's move" rather than a pill. Gain and loss only work on the cream receipt; they don't pass AA on the orange panel.
 

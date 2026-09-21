@@ -40,10 +40,18 @@ export function relayer(): Keypair {
  */
 export async function buildRelayedTransaction(
   instructions: TransactionInstruction[],
+  options: RelayOptions = {},
 ): Promise<string> {
-  const transaction = await signRelayed(instructions)
+  const transaction = await signRelayed(instructions, options)
   return Buffer.from(transaction.serialize()).toString('base64')
 }
+
+/**
+ * `simulate: false` is for a transaction whose accounts don't exist yet, because the one that
+ * opens them hasn't been signed. It costs the compute sizing and the early failure, so only use
+ * it when simulating would fail for that reason alone.
+ */
+export type RelayOptions = { simulate?: boolean }
 
 /** Ceiling for simulation, and the limit used if simulation can't report usage */
 const MAX_COMPUTE_UNITS = 400_000
@@ -124,6 +132,7 @@ export async function priorityFeeMicroLamports(): Promise<number> {
  */
 export async function signRelayed(
   instructions: TransactionInstruction[],
+  { simulate = true }: RelayOptions = {},
 ): Promise<VersionedTransaction> {
   const [{ blockhash }, microLamports] = await Promise.all([
     connection.getLatestBlockhash('confirmed'),
@@ -141,6 +150,12 @@ export async function signRelayed(
         ],
       }).compileToV0Message(),
     )
+
+  if (!simulate) {
+    const unsimulated = compile(MAX_COMPUTE_UNITS)
+    unsimulated.sign([relayer()])
+    return unsimulated
+  }
 
   const simulation = await connection.simulateTransaction(compile(MAX_COMPUTE_UNITS), {
     sigVerify: false,

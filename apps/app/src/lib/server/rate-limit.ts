@@ -9,6 +9,7 @@ export const RATE_LIMITS = {
   createGifts: { limit: 5, windowMs: 60_000 },
   createGiftCards: { limit: 5, windowMs: 60_000 },
   earnMove: { limit: 10, windowMs: 60_000 },
+  loanMove: { limit: 10, windowMs: 60_000 },
   redeemLookup: { limit: 10, windowMs: 60_000 },
   // Keyed by address rather than account, since it answers before anyone has signed in
   redeemPreview: { limit: 10, windowMs: 60_000 },

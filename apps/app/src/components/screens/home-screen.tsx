@@ -24,6 +24,7 @@ import { Avatar, Card, LinkButton, Loading } from '@/components/ui'
 import { WatchlistTabs } from '@/components/watchlist-tabs'
 import { useAnimatedNumber } from '@/lib/client/animated-number'
 import {
+  useBorrowQuery,
   useEarnQuery,
   useFundsQuery,
   useGiftsQuery,
@@ -174,10 +175,18 @@ function House() {
   const feed = useNotificationsQuery({ enabled })
   const funds = useFundsQuery({ enabled })
   const earn = useEarnQuery({ enabled })
+  // Reading the lending market is the priciest call on this screen, so it only goes out for
+  // someone who actually holds shares: with nothing to lock there is nothing to say
+  const holdsStocks = (portfolio.data?.holdings ?? []).some(
+    (holding) => !holding.isCash && holding.amount > 0,
+  )
+  const borrow = useBorrowQuery({ enabled: enabled && holdsStocks })
   // Everything we want to put in front of someone lives in this list: a rate today, a new
   // feature tomorrow, a paid placement later. Anything with `sponsored` is labelled as an ad.
   // The Earn banner only appears once there's cash to talk about — either sitting idle or already
   // earning. Someone with an empty account sees nothing, because there's nothing to offer them.
+  const loan = borrow.data?.loan
+  const bestToBorrowOn = borrow.data?.stocks[0]
   const banners: Banner[] = [
     ...(earn.data && (earn.data.earningUsd > 0 || earn.data.readyUsd > 0)
       ? [
@@ -197,6 +206,34 @@ function House() {
           } satisfies Banner,
         ]
       : []),
+    // A loan in progress outranks the offer: the thing worth knowing is how much room is left
+    // before the shares get sold, not that borrowing exists
+    ...(loan
+      ? [
+          {
+            id: 'loan',
+            emoji: '💵',
+            eyebrow: 'Your loan',
+            title: `${formatUsd(loan.owedUsd)} owed on your shares`,
+            body:
+              loan.dropPct !== null
+                ? `They'd be sold if the stock fell ${loan.dropPct.toFixed(0)}%`
+                : 'Pay it back whenever you like',
+            href: '/borrow',
+          } satisfies Banner,
+        ]
+      : bestToBorrowOn && bestToBorrowOn.maxCashUsd >= (borrow.data?.minimumUsd ?? 5)
+        ? [
+            {
+              id: 'borrow',
+              emoji: '💵',
+              eyebrow: 'Need cash?',
+              title: `Get up to ${formatUsd(bestToBorrowOn.maxCashUsd)} on your ${bestToBorrowOn.ticker}`,
+              body: 'Keep the shares, borrow against them',
+              href: `/borrow/open?stock=${bestToBorrowOn.ticker}`,
+            } satisfies Banner,
+          ]
+        : []),
   ]
   // Everything home shows, so a pull brings the balance, stocks, gifts, funds and badge up to
   // date. Not before sign-in settles: refetch ignores `enabled` and would go out without a session

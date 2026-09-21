@@ -6,6 +6,9 @@ import { Loading } from '@/components/ui'
 const loaders = {
   'add-cash-screen': () => import('@/components/screens/add-cash-screen'),
   'ask-screen': () => import('@/components/screens/ask-screen'),
+  'borrow-open-screen': () => import('@/components/screens/borrow-open-screen'),
+  'borrow-repay-screen': () => import('@/components/screens/borrow-repay-screen'),
+  'borrow-screen': () => import('@/components/screens/borrow-screen'),
   'buy-list-screen': () => import('@/components/screens/buy-list-screen'),
   'cash-out-screen': () => import('@/components/screens/cash-out-screen'),
   'create-fund-screen': () => import('@/components/screens/create-fund-screen'),

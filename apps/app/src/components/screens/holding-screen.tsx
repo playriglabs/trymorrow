@@ -256,6 +256,19 @@ function Holding({ mint, ticker, name }: { mint: string; ticker: string; name: s
         </p>
       )}
 
+      {/* Only a link, not a promise: the ten stocks this market takes are decided over there,
+          and the screen says plainly when this one isn't among them */}
+      <a
+        href={`/borrow/open?stock=${encodeURIComponent(ticker)}`}
+        className="flex items-center justify-between gap-3 rounded-button border border-line bg-surface px-4 py-3.5 hover:bg-orange-wash"
+      >
+        <span className="flex flex-col">
+          <span>Need cash? Keep the shares</span>
+          <span className="text-[13px] text-stone">Borrow against them instead of selling</span>
+        </span>
+        <span className="shrink-0 text-stone">→</span>
+      </a>
+
       <StockAbout mint={mint} name={name} />
 
       <p className="flex items-center gap-2 text-[13px] text-stone">
