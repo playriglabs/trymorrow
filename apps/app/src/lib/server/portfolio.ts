@@ -1,7 +1,7 @@
 import { TOKEN_2022_PROGRAM, TOKEN_PROGRAM, USDC } from '@morrow/sdk'
 import { PublicKey } from '@solana/web3.js'
 import { getStocks } from '@/lib/server/catalog'
-import { getCostBasis } from '@/lib/server/pnl'
+import { getAcquiredAt, getCostBasis } from '@/lib/server/pnl'
 import { getPriceData } from '@/lib/server/prices'
 import { connection } from '@/lib/server/solana'
 import type { Holding, Portfolio } from '@/lib/types'
@@ -51,6 +51,7 @@ export async function getPortfolio(walletAddress: string): Promise<Portfolio> {
       valueUsd: cash?.amount ?? 0,
       transferFeePct: 0,
       costUsd: null,
+      acquiredAt: null,
     },
     ...ownedStockMints.flatMap((mint) => {
       const stock = stockByMint.get(mint)
@@ -72,6 +73,7 @@ export async function getPortfolio(walletAddress: string): Promise<Portfolio> {
           valueUsd: priceUsd == null ? null : balance.amount * priceUsd,
           transferFeePct: stock.transferFeeBps / 100,
           costUsd: null,
+          acquiredAt: null,
         },
       ]
     }),
@@ -87,6 +89,12 @@ export async function getPortfolio(walletAddress: string): Promise<Portfolio> {
       ),
     )
     for (const item of stockHoldings) item.costUsd = basis.get(item.mint) ?? null
+
+    const acquired = await getAcquiredAt(
+      walletAddress,
+      stockHoldings.map((item) => item.mint),
+    ).catch(() => new Map<string, string>())
+    for (const item of stockHoldings) item.acquiredAt = acquired.get(item.mint) ?? null
   }
 
   // Convert each percentage move back to yesterday's value, then sum the dollar moves.

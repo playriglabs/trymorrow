@@ -15,7 +15,7 @@ import { type Banner, BannerCarousel } from '@/components/banner-carousel'
 import { ChangePill } from '@/components/change-pill'
 import { FundCard } from '@/components/fund-card'
 import { GiftRow } from '@/components/gift-row'
-import { byValue, HoldingRow } from '@/components/holding-row'
+import { byNewest, HoldingRow } from '@/components/holding-row'
 import { withProviders } from '@/components/providers'
 import { PullIndicator, usePullToRefresh } from '@/components/pull-to-refresh'
 import { CashLogo, StockLogo } from '@/components/stock-logo'
@@ -38,7 +38,7 @@ import { giftAssetsLabel } from '@/lib/gifts'
 import type { FundCardView } from '@/lib/types'
 
 /** Home shows the biggest handful; the rest live on their own page */
-const HOME_STOCKS = 7
+const HOME_STOCKS = 5
 /** A glance at what's being watched, not the whole list */
 const HOME_WATCHED = 4
 /** Baskets past this are a swipe too far on a phone; "See all" holds the rest */
@@ -261,7 +261,11 @@ function House() {
   const balanceFontSize = Math.max(24, 44 - Math.max(0, balanceLabel.length - 7) * 3)
 
   const toClaim = received.data?.filter((gift) => gift.status === 'pending') ?? []
-  const stocks = (portfolio.data?.holdings.filter((holding) => !holding.isCash) ?? []).sort(byValue)
+  // Home shows the five that arrived most recently — what someone just bought is what they came
+  // back to look at. `/stocks` holds the whole portfolio, biggest first.
+  const stocks = (portfolio.data?.holdings.filter((holding) => !holding.isCash) ?? []).sort(
+    byNewest,
+  )
   const pricedStocks = new Map((stockPrices.data?.stocks ?? []).map((stock) => [stock.mint, stock]))
   const watched = (watchlist?.mints ?? []).flatMap((mint) => {
     const stock = pricedStocks.get(mint)
@@ -458,7 +462,7 @@ function House() {
         <section className="flex flex-col gap-3">
           <div className="flex items-baseline justify-between">
             <h2 className="font-sans text-lg font-medium tracking-[-0.02em]">Your stocks</h2>
-            {stocks.length > HOME_STOCKS && (
+            {stocks.length > 0 && (
               <a href="/stocks" className="text-[14px] text-stone">
                 See all
               </a>

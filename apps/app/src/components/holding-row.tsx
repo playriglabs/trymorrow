@@ -8,6 +8,17 @@ export function byValue(a: Holding, b: Holding): number {
   return (b.valueUsd ?? 0) - (a.valueUsd ?? 0)
 }
 
+/**
+ * Newest first, by when it last arrived. Stocks that predate our records have no date and sit
+ * after the ones that do, biggest first, so the order is never arbitrary.
+ */
+export function byNewest(a: Holding, b: Holding): number {
+  if (a.acquiredAt && b.acquiredAt) return b.acquiredAt.localeCompare(a.acquiredAt)
+  if (a.acquiredAt) return -1
+  if (b.acquiredAt) return 1
+  return byValue(a, b)
+}
+
 /** One stock someone owns: what it is, how much of it, what it's worth and how it's done */
 export function HoldingRow({
   holding,

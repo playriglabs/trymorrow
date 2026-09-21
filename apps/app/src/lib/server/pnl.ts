@@ -237,3 +237,41 @@ export async function getCostBasis(
   }
   return basis
 }
+
+/**
+ * When each of these stocks last arrived — a buy that filled, or a gift that was opened. Two
+ * queries for the whole portfolio rather than one per stock, because Home only needs an order.
+ * A stock that arrived before we kept records, or from outside, simply isn't in the map.
+ */
+export async function getAcquiredAt(wallet: string, mints: string[]): Promise<Map<string, string>> {
+  if (mints.length === 0) return new Map()
+  const latest = new Map<string, string>()
+  const note = (mint: string | null, at: string | null) => {
+    if (!mint || !at) return
+    const current = latest.get(mint)
+    if (!current || at > current) latest.set(mint, at)
+  }
+
+  const [fills, items] = await Promise.all([
+    db
+      .from('trade_fills')
+      .select('mint, created_at')
+      .eq('wallet', wallet)
+      .eq('side', 'buy')
+      .in('mint', mints),
+    db
+      .from('gift_items')
+      .select('mint, gifts!inner(recipient_wallet, status, claimed_at, created_at)')
+      .eq('gifts.recipient_wallet', wallet)
+      .eq('gifts.status', 'claimed')
+      .in('mint', mints),
+  ])
+
+  for (const fill of fills.data ?? []) note(fill.mint, fill.created_at)
+  for (const item of items.data ?? []) {
+    // The join resolves to one row, but the generated types can only see an array
+    const gift = Array.isArray(item.gifts) ? item.gifts[0] : item.gifts
+    note(item.mint, gift?.claimed_at ?? gift?.created_at ?? null)
+  }
+  return latest
+}

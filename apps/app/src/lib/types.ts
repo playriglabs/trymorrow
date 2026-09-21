@@ -39,6 +39,8 @@ export type Holding = {
   transferFeePct: number
   /** All-time cost basis (gift value + buys, minus what sells took out); null when unknown */
   costUsd: number | null
+  /** When it last arrived: a buy that filled or a gift opened; null when it predates our records */
+  acquiredAt: string | null
 }
 
 /** Where a holding came from, when our records account for every share of it */
