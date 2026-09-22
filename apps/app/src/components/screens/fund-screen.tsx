@@ -1,4 +1,5 @@
 import {
+  ArrowSquareOutIcon,
   CheckIcon,
   LockIcon,
   LockOpenIcon,
@@ -14,7 +15,7 @@ import { EmailLogin } from '@/components/email-login'
 import { withProviders } from '@/components/providers'
 import { StockLogo } from '@/components/stock-logo'
 import { SuccessMark } from '@/components/success-mark'
-import { Avatar, Button, Card, Label, Loading, Notice, Screen } from '@/components/ui'
+import { Avatar, Button, Card, Label, LinkButton, Loading, Notice, Screen } from '@/components/ui'
 import { ApiError, errorMessage } from '@/lib/client/api'
 import { copyText } from '@/lib/client/copy'
 import {
@@ -788,6 +789,18 @@ function Fund({ fundId }: { fundId: string }) {
               : `Then it goes to ${view.beneficiaryName}.`}
           </Notice>
         )}
+
+        {/* The fund is its own account, so anyone can check what went in and out without us */}
+        <LinkButton
+          variant="outline"
+          size="sm"
+          href={`https://solscan.io/account/${view.address}`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          <ArrowSquareOutIcon className="size-4.5 shrink-0" />
+          See on-chain data
+        </LinkButton>
       </Screen>
       {adding && <AddSheet fund={view} onClose={() => setAdding(false)} />}
     </>

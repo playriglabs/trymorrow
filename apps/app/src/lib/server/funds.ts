@@ -229,6 +229,7 @@ export async function toFundView(fund: FundRow, viewer: UserRow | null): Promise
   const creatorRow = creator.data as Pick<UserRow, 'handle' | 'name' | 'avatar_path'> | null
   return {
     id: fund.id,
+    address: fundAddress(fund).toBase58(),
     name: fund.name ?? `${fund.beneficiary_name}’s fund`,
     status: fund.status,
     purpose: fund.purpose,

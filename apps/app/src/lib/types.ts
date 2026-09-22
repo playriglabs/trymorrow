@@ -482,6 +482,8 @@ export type FundContributionView = {
 
 export type FundView = {
   id: string
+  /** The fund account on-chain, where every contribution and withdrawal can be checked */
+  address: string
   name: string
   status: FundStatus
   purpose: FundPurpose
