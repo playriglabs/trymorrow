@@ -4,7 +4,8 @@
  *
  * Mail clients only reliably render inline styles on tables, so this is built by hand. No `<style>`
  * block (Gmail drops most of one), and no image the words depend on: the mark in the header sits
- * beside a "Morrow" written in text, so a client that blocks images still reads right.
+ * beside a "Morrow" written in text, and every stock logo beside its ticker, so a client that
+ * blocks images still reads right.
  *
  * The panel's gradient is a `background-image` over a `bgcolor`, so Outlook's Word engine — which
  * has no gradients without VML, and VML needs a fixed height this content can't promise — falls
@@ -55,6 +56,9 @@ const PANEL = [
 /** One labelled fact on the cream receipt. `tone` colours the value; leave it off for plain facts */
 export type EmailRow = { label: string; value: string; tone?: 'gain' | 'loss' }
 
+/** A stock (or cash, with no mint) shown with its logo, the way the app lists a holding */
+export type EmailAsset = { mint: string | null; title: string; detail?: string; value?: string }
+
 export type EmailContent = {
   subject: string
   /** The grey line an inbox shows after the subject; without it clients scrape the markup */
@@ -65,6 +69,8 @@ export type EmailContent = {
   hero: string
   /** One line under the hero */
   subhero?: string
+  /** What moved, each with its logo, above the facts */
+  assets?: EmailAsset[]
   /** Labelled facts, top to bottom */
   rows?: EmailRow[]
   /** What someone wrote, in their words */
@@ -87,9 +93,40 @@ function receiptRow(row: EmailRow, last: boolean): string {
 </tr>`
 }
 
+// Cash has no logo to load, so its mark is drawn in the cell itself
+function assetMark(asset: EmailAsset, appUrl: string): string {
+  if (!asset.mint) {
+    return `<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" width="36" height="36" style="width:36px;height:36px;border:1.5px solid ${COLORS.orange};border-radius:18px;font-family:${SANS};font-size:18px;line-height:18px;font-weight:500;color:${COLORS.orange};">$</td></tr></table>`
+  }
+  const src = escapeFn(new URL(`/api/stocks/${asset.mint}/logo.png`, appUrl).href)
+  return `<img src="${src}" width="36" height="36" alt="" style="display:block;width:36px;height:36px;border:0;border-radius:18px;">`
+}
+
+function assetRow(asset: EmailAsset, appUrl: string, last: boolean): string {
+  const border = last ? '' : `border-bottom:1px solid ${COLORS.line};`
+  const detail = asset.detail
+    ? `<div style="padding:2px 0 0 0;font-family:${BODY};font-size:13px;line-height:18px;color:${COLORS.stone};">${escapeFn(asset.detail)}</div>`
+    : ''
+  const value = asset.value
+    ? `<td align="right" style="${border}padding:12px 0;font-family:${SANS};font-size:15px;line-height:20px;font-weight:500;color:${COLORS.ink};white-space:nowrap;">${escapeFn(asset.value)}</td>`
+    : `<td style="${border}"></td>`
+  return `<tr>
+<td width="48" style="${border}padding:12px 12px 12px 0;width:36px;line-height:0;">${assetMark(asset, appUrl)}</td>
+<td style="${border}padding:12px 0;"><div style="font-family:${SANS};font-size:15px;line-height:20px;font-weight:500;color:${COLORS.ink};">${escapeFn(asset.title)}</div>${detail}</td>
+${value}
+</tr>`
+}
+
 export function renderEmail(content: EmailContent, appUrl: string): string {
   const link = (path: string) => escapeFn(new URL(path, appUrl).href)
   const rows = content.rows ?? []
+  const assets = content.assets ?? []
+  const assetList =
+    assets.length === 0
+      ? ''
+      : `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-bottom:${rows.length > 0 || content.note ? `1px solid ${COLORS.line}` : '0'};">
+${assets.map((asset, index) => assetRow(asset, appUrl, index === assets.length - 1)).join('\n')}
+</table>`
   const receipt =
     rows.length === 0
       ? ''
@@ -107,7 +144,9 @@ ${rows.map((row, index) => receiptRow(row, index === rows.length - 1 && !content
   // The receipt reads as part of the card, ruled rather than boxed: a panel inside a sheet inside
   // a card is three rounded boxes deep and stops looking like anything
   const sheet =
-    receipt || note ? `<tr><td style="padding:4px 28px 6px 28px;">${receipt}${note}</td></tr>` : ''
+    assetList || receipt || note
+      ? `<tr><td style="padding:4px 28px 6px 28px;">${assetList}${receipt}${note}</td></tr>`
+      : ''
 
   const subhero = content.subhero
     ? `<tr><td style="padding:10px 0 0 0;font-family:${BODY};font-size:16px;line-height:22px;color:rgba(255,255,255,0.9);">${escapeFn(content.subhero)}</td></tr>`
@@ -187,6 +226,12 @@ ${footnote}
 export function renderEmailText(content: EmailContent, appUrl: string): string {
   const lines = [content.eyebrow, '', content.hero]
   if (content.subhero) lines.push(content.subhero)
+  if (content.assets?.length) {
+    lines.push('')
+    for (const asset of content.assets) {
+      lines.push([asset.title, asset.detail, asset.value].filter(Boolean).join(' · '))
+    }
+  }
   if (content.rows?.length) {
     lines.push('')
     for (const row of content.rows) lines.push(`${row.label}: ${row.value}`)

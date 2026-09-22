@@ -3,7 +3,7 @@ import { PublicKey } from '@solana/web3.js'
 import { z } from 'astro/zod'
 import { match } from 'ts-pattern'
 import type { EmailContent } from '@/lib/email-template'
-import { formatFullDate, formatUsd } from '@/lib/format'
+import { formatFullDate, formatUsd, tickerLabel } from '@/lib/format'
 import { CASH_MINT } from '@/lib/gifts'
 import { findGiftAsset } from '@/lib/server/catalog'
 import { sendEmailTo } from '@/lib/server/email'
@@ -134,12 +134,27 @@ export const POST = route(async ({ params, request }) => {
     const opening = sent.gift_items.some((item) => item.mint === CASH_MINT)
       ? 'Open it to keep it.'
       : 'Open it to keep the shares.'
+    const giftAssets = await Promise.all(
+      sent.gift_items.map(async (item) => ({ item, asset: await findGiftAsset(item.mint) })),
+    )
     const giftEmail: EmailContent = {
       subject: `${senderName} sent you ${label}`,
       preview: `${opening} It goes back to ${senderName} in ${GIFT_LIFETIME_DAYS} days.`,
       eyebrow: `${senderName} sent you a gift`,
       hero: label,
       subhero: 'Only you can open it.',
+      assets: giftAssets.flatMap(({ item, asset }) =>
+        asset
+          ? [
+              {
+                mint: asset.isCash ? null : item.mint,
+                title: asset.isCash ? 'Cash' : tickerLabel(asset.ticker),
+                detail: asset.isCash ? 'Ready to spend' : asset.name,
+                value: formatUsd(Number(item.usd_value) || 0),
+              },
+            ]
+          : [],
+      ),
       rows: [
         { label: 'From', value: senderName },
         { label: 'Worth when sent', value: formatUsd(sentUsd) },

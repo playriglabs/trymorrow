@@ -167,6 +167,13 @@ export async function noteStockTransfers(user: UserRow, holdings: StockHolding[]
             eyebrow: 'Shares arrived',
             hero: arrived,
             subhero: 'From an outside account.',
+            assets: [
+              {
+                mint: holding.mint,
+                title: tickerLabel(holding.ticker),
+                value: `+${formatShares(shares)} shares`,
+              },
+            ],
             rows: [
               { label: 'Shares added', value: formatShares(shares) },
               {

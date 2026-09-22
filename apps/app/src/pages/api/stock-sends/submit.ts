@@ -120,6 +120,14 @@ export const POST = route(async ({ request }) => {
                 // The ticker, never the company: some names are far too long for a hero line
                 hero: `${formatShares(view.sharesSent)} ${ticker} shares`,
                 subhero: 'They’re already in your account.',
+                assets: [
+                  {
+                    mint: send.mint,
+                    title: ticker,
+                    detail: asset.name,
+                    value: `${formatShares(view.sharesSent)} shares`,
+                  },
+                ],
                 rows: [
                   { label: 'From', value: senderName },
                   { label: 'Shares', value: formatShares(view.sharesSent) },

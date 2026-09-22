@@ -285,10 +285,11 @@ export async function notifyContribution({
   note?: string | null
 }): Promise<void> {
   const stocks = await getStocks()
-  const tickers = mints.flatMap((mint) => {
+  const bought = mints.flatMap((mint) => {
     const stock = stocks.find((entry) => entry.mint.toBase58() === mint)
-    return stock ? [stock.ticker] : []
+    return stock ? [{ mint, ticker: stock.ticker, name: stock.name }] : []
   })
+  const tickers = bought.map((stock) => stock.ticker)
   const fundName = fund.name ?? `${fund.beneficiary_name}’s fund`
   const amount = formatUsd(usdValue)
   const unlock = new Date(fund.unlock_at).toLocaleDateString('en-US', {
@@ -326,12 +327,14 @@ export async function notifyContribution({
               eyebrow: 'Someone added to the fund',
               hero: `${contributorName} added ${amount}`,
               subhero: fundName,
+              assets: bought.map((stock) => ({
+                mint: stock.mint,
+                title: tickerLabel(stock.ticker),
+                detail: stock.name,
+              })),
               rows: [
                 { label: 'From', value: contributorName },
                 { label: 'Added', value: amount },
-                ...(tickers.length > 0
-                  ? [{ label: 'What it bought', value: tickers.map(tickerLabel).join(', ') }]
-                  : []),
                 { label: 'Locked until', value: unlock },
               ],
               note: note ? { from: contributorName, text: note } : null,

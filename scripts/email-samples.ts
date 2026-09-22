@@ -19,6 +19,15 @@ export const SAMPLES: EmailSample[] = [
       eyebrow: 'Maya sent you a gift',
       hero: '$25.00 of NVDA',
       subhero: 'Only you can open it.',
+      assets: [
+        {
+          mint: 'Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh',
+          title: '$NVDA',
+          detail: 'NVIDIA',
+          value: '$20.00',
+        },
+        { mint: null, title: 'Cash', detail: 'Ready to spend', value: '$5.00' },
+      ],
       rows: [
         { label: 'From', value: 'Maya Putri' },
         { label: 'Worth when sent', value: '$25.00' },
@@ -54,6 +63,13 @@ export const SAMPLES: EmailSample[] = [
       eyebrow: 'Shares arrived',
       hero: '1.25 $TSLA shares',
       subhero: 'From an outside account.',
+      assets: [
+        {
+          mint: 'XsDoVfqeBukxuZHWhdvWHBhgEHjGNst4MLodqsJHzoB',
+          title: '$TSLA',
+          value: '+1.25 shares',
+        },
+      ],
       rows: [
         { label: 'Shares added', value: '1.25' },
         { label: 'Shares you hold now', value: '4.75' },
@@ -70,6 +86,14 @@ export const SAMPLES: EmailSample[] = [
       eyebrow: 'Maya Putri sent you shares',
       hero: '0.5 $NVDA shares',
       subhero: 'They’re already in your account.',
+      assets: [
+        {
+          mint: 'Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh',
+          title: '$NVDA',
+          detail: 'NVIDIA',
+          value: '0.5 shares',
+        },
+      ],
       rows: [
         { label: 'From', value: 'Maya Putri' },
         { label: 'Shares', value: '0.5' },
@@ -86,10 +110,13 @@ export const SAMPLES: EmailSample[] = [
       eyebrow: 'Someone added to the fund',
       hero: 'Rizky added $50',
       subhero: 'Aisyah’s college fund',
+      assets: [
+        { mint: 'Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh', title: '$NVDA', detail: 'NVIDIA' },
+        { mint: 'XsbEhLAtcf6HdfpFZ5xEMdqW8nfAvcsP5bdudRLJzJp', title: '$AAPL', detail: 'Apple' },
+      ],
       rows: [
         { label: 'From', value: 'Rizky Pratama' },
         { label: 'Added', value: '$50.00' },
-        { label: 'What it bought', value: '$NVDA, $AAPL' },
         { label: 'Locked until', value: 'May 2038' },
       ],
       note: { from: 'Rizky', text: 'For when she starts college. Proud of her.' },
