@@ -282,6 +282,7 @@ Email rides the same switch plus `email_enabled`, and only when the call site wr
 - A fund locks rent for years: the relayer pays it, and the creator pays what the fund account costs while the contributor pays for each new vault plus the account the beneficiary will need at unlock. `withdraw` closes the vaults and `close_fund` (daily cron) closes the fund, so the SOL comes home.
 - Cashing out is free when the destination already has a cash account (the network fee is well under a cent). When it doesn't, the relayer opens one and that rent never comes back, so it's charged at cost — taken out of the amount, not added on top, so "All" always works.
 - When you add an on-chain flow, decide who pays rent, whether it comes back, and charge unrecoverable costs at cost.
+- Fees arrive as cash but the relayer spends SOL. `GET /api/cron/relayer-sol` (daily) swaps the treasury's cash to SOL through Jupiter Ultra when the relayer drops under 0.1 SOL, aiming for 0.25 and at most $50 a run. It only runs while the treasury is the relayer: a separate `TREASURY_WALLET` is a key this app never signs for.
 
 ### Limits you'll hit
 
