@@ -160,5 +160,22 @@ const structuredData = JSON.stringify({
         addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}))
       }
     </script>
+    <script>
+      // Privy draws its modals with styled-components, which writes its rules into <style
+      // data-styled> tags in the head. A client-side navigation drops every head element the next
+      // page doesn't also have, so after one the Privy island lives on but its modals render with
+      // no styles and never appear (Reveal key only worked after a hard refresh). Putting the tag
+      // back afterwards isn't enough: the rules go in through insertRule and die with the node.
+      // Marking it persisted, with a matching placeholder in the next page, keeps the node itself.
+      document.addEventListener('astro:before-swap', (event) => {
+        document.head.querySelectorAll('style[data-styled]').forEach((style, index) => {
+          const id = style.dataset.astroTransitionPersist ?? `styled-components-${index}`
+          style.dataset.astroTransitionPersist = id
+          const placeholder = event.newDocument.createElement('style')
+          placeholder.dataset.astroTransitionPersist = id
+          event.newDocument.head.append(placeholder)
+        })
+      })
+    </script>
   </body>
 </html>
