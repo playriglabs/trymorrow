@@ -12,10 +12,12 @@ import clsx from 'clsx'
 import { useEffect, useRef, useState } from 'react'
 import { match } from 'ts-pattern'
 import { type Banner, BannerCarousel } from '@/components/banner-carousel'
+import { Carousel } from '@/components/carousel'
 import { ChangePill } from '@/components/change-pill'
 import { FundCard } from '@/components/fund-card'
 import { GiftRow } from '@/components/gift-row'
 import { byNewest, HoldingRow } from '@/components/holding-row'
+import { PendingOrderCard } from '@/components/pending-order-card'
 import { withProviders } from '@/components/providers'
 import { PullIndicator, usePullToRefresh } from '@/components/pull-to-refresh'
 import { CashLogo, StockLogo } from '@/components/stock-logo'
@@ -28,6 +30,7 @@ import {
   useEarnQuery,
   useFundsQuery,
   useGiftsQuery,
+  useLimitOrdersQuery,
   useNotificationsQuery,
   usePortfolioQuery,
   useStocksQuery,
@@ -185,6 +188,7 @@ function House() {
   const sent = useGiftsQuery('sent', { enabled })
   const feed = useNotificationsQuery({ enabled })
   const funds = useFundsQuery({ enabled })
+  const pendingOrders = useLimitOrdersQuery({ enabled })
   const earn = useEarnQuery({ enabled })
   // Reading the lending market is the priciest call on this screen, so it only goes out for
   // someone who actually holds shares: with nothing to lock there is nothing to say
@@ -499,6 +503,30 @@ function House() {
             ) : (
               <HomeFunds funds={funds.data ?? []} />
             )}
+          </section>
+        )}
+
+        {(pendingOrders.data?.length ?? 0) > 0 && (
+          <section className="flex flex-col gap-3">
+            <div className="flex items-baseline justify-between">
+              <h2 className="font-sans text-lg font-medium tracking-[-0.02em]">
+                {pendingOrders.data?.length === 1
+                  ? 'You have a pending order'
+                  : `You have ${pendingOrders.data?.length} pending orders`}
+              </h2>
+              <a href="/trades" className="text-[14px] text-stone">
+                See all
+              </a>
+            </div>
+            <Carousel
+              holdMs={5000}
+              items={(pendingOrders.data ?? []).map((order) => ({
+                ...order,
+                id: order.order,
+                label: `${order.side === 'buy' ? 'Buy' : 'Sell'} ${order.ticker}`,
+              }))}
+              render={(order) => <PendingOrderCard order={order} />}
+            />
           </section>
         )}
 

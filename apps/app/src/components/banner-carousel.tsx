@@ -1,10 +1,6 @@
 import { CaretRightIcon } from '@phosphor-icons/react'
 import clsx from 'clsx'
-import { useEffect, useRef, useState } from 'react'
-
-const GAP_PX = 12
-/** How long one banner holds the spot before the strip moves itself on */
-const HOLD_MS = 7000
+import { Carousel } from '@/components/carousel'
 
 export type Banner = {
   id: string
@@ -128,100 +124,10 @@ function BannerCard({ banner }: { banner: Banner }) {
  * the same place and can be swiped past.
  */
 export function BannerCarousel({ banners }: { banners: Banner[] }) {
-  const [active, setActive] = useState(0)
-  const strip = useRef<HTMLDivElement>(null)
-  /** Set while a finger is down, so the strip never pulls the card out from under it */
-  const held = useRef(false)
-  const current = Math.min(active, Math.max(0, banners.length - 1))
-
-  const show = (index: number) => {
-    const container = strip.current
-    const card = container?.children[index] as HTMLElement | undefined
-    if (!container || !card) return
-    container.scrollTo({ left: card.offsetLeft - container.offsetLeft, behavior: 'smooth' })
-  }
-
-  // It moves on by itself, wrapping at the end, so a banner further down the strip is seen at all.
-  // The timer restarts whenever the person swipes, pauses while they're touching it and while the
-  // tab is in the background, and never runs for someone who asked for less motion.
-  useEffect(() => {
-    if (banners.length < 2) return
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-    const timer = setInterval(() => {
-      if (held.current || document.hidden) return
-      const container = strip.current
-      const next = (current + 1) % banners.length
-      const card = container?.children[next] as HTMLElement | undefined
-      if (!container || !card) return
-      container.scrollTo({ left: card.offsetLeft - container.offsetLeft, behavior: 'smooth' })
-    }, HOLD_MS)
-    return () => clearInterval(timer)
-  }, [banners.length, current])
-
-  if (banners.length === 0) return null
-  if (banners.length === 1 && banners[0]) return <BannerCard banner={banners[0]} />
-
   return (
-    // biome-ignore lint/a11y/useAriaPropsSupportedByRole: <>
-    <section className="flex min-w-0 flex-col gap-2" aria-roledescription="carousel">
-      <div
-        ref={strip}
-        className="-mx-5 flex snap-x snap-mandatory scroll-px-5 overflow-x-auto overscroll-x-contain px-5 pb-1"
-        style={{ gap: GAP_PX }}
-        onPointerDown={() => {
-          held.current = true
-        }}
-        onPointerUp={() => {
-          held.current = false
-        }}
-        onPointerCancel={() => {
-          held.current = false
-        }}
-        onScroll={(event) => {
-          const container = event.currentTarget
-          const card = container.children[0] as HTMLElement | undefined
-          if (!card) return
-          // The last card can't snap to the start, so reaching the end is what selects it
-          const atEnd = container.scrollLeft >= container.scrollWidth - container.clientWidth - 2
-          setActive(
-            atEnd
-              ? banners.length - 1
-              : Math.round(container.scrollLeft / (card.offsetWidth + GAP_PX)),
-          )
-        }}
-      >
-        {banners.map((banner, index) => (
-          <article
-            key={banner.id}
-            className="w-[88%] max-w-105 shrink-0 snap-start"
-            aria-roledescription="slide"
-            aria-label={`${banner.title}, ${index + 1} of ${banners.length}`}
-          >
-            <BannerCard banner={banner} />
-          </article>
-        ))}
-      </div>
-      {/* Swipe is the control; the dots follow it and also work as one, for a mouse and for
-          anyone who'd rather tap than drag. The tap target is the full height, the dot isn't. */}
-      <div className="flex items-center justify-center">
-        {banners.map((banner, index) => (
-          <button
-            key={banner.id}
-            type="button"
-            aria-label={`Show ${banner.title}`}
-            aria-current={index === current}
-            onClick={() => show(index)}
-            className="flex h-6 items-center justify-center px-[3px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-          >
-            <span
-              className={clsx(
-                'h-1.5 rounded-full transition-[width] motion-reduce:transition-none',
-                index === current ? 'w-4 bg-orange' : 'w-1.5 bg-line',
-              )}
-            />
-          </button>
-        ))}
-      </div>
-    </section>
+    <Carousel
+      items={banners.map((banner) => ({ ...banner, label: banner.title }))}
+      render={(banner) => <BannerCard banner={banner} />}
+    />
   )
 }
