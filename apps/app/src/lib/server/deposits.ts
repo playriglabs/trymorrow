@@ -3,6 +3,7 @@ import { getAssociatedTokenAddressSync } from '@solana/spl-token'
 import { PublicKey, type TokenBalance } from '@solana/web3.js'
 import { formatShares, formatUsd, tickerLabel } from '@/lib/format'
 import { cashAccount } from '@/lib/server/fees'
+import { TRIGGER_PROGRAM } from '@/lib/server/limit-orders'
 import { notify } from '@/lib/server/notify'
 import { connection } from '@/lib/server/solana'
 import { db } from '@/lib/server/supabase'
@@ -28,8 +29,12 @@ async function depositIn(signature: string, account: string): Promise<bigint> {
   })
   if (!transaction?.meta || transaction.meta.err) return 0n
 
+  // An order at a price filling, or being cancelled, lands money from Jupiter's order program;
+  // the fill is in the trade history and a cancel is money coming back, neither a deposit
   const ours = transaction.transaction.message.instructions.some(
-    (instruction) => instruction.programId.toBase58() === MORROW_PROGRAM_ID.toBase58(),
+    (instruction) =>
+      instruction.programId.equals(MORROW_PROGRAM_ID) ||
+      instruction.programId.equals(TRIGGER_PROGRAM),
   )
   if (ours) return 0n
 

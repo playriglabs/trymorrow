@@ -25,6 +25,7 @@ import type {
   GiftFeeQuote,
   GiftView,
   HoldingDetail,
+  LimitOrderView,
   LoanQuote,
   NotificationSettings,
   NotificationView,
@@ -74,6 +75,8 @@ export const queryKeys = {
   notifications: () => ['notifications'] as const,
   notificationFeed: () => ['notification-feed'] as const,
   tradeHistory: () => ['trade-history'] as const,
+  limitOrders: () => ['limit-orders'] as const,
+  limitOrderFee: (side: TradeSide, mint: string) => ['limit-order-fee', side, mint] as const,
   tradeQuote: ({ side, mint, amountRaw }: TradeQuoteParams) =>
     ['trade-quote', side, mint, amountRaw] as const,
   cashoutQuote: (target: string, amountRaw: string) =>
@@ -906,6 +909,96 @@ export function useTradeMutation() {
       queryClient.invalidateQueries({ queryKey: queryKeys.portfolio() })
       queryClient.invalidateQueries({ queryKey: queryKeys.stocks() })
       queryClient.invalidateQueries({ queryKey: queryKeys.tradeHistory() })
+    },
+  })
+}
+
+/** Orders at a price that are still waiting; polled so a fill drops off without a reload */
+export function useLimitOrdersQuery({ enabled = true }: Options = {}) {
+  const api = useApi()
+  return useQuery({
+    queryKey: queryKeys.limitOrders(),
+    enabled,
+    refetchInterval: 60_000,
+    queryFn: () =>
+      api<{ orders: LimitOrderView[] }>('/api/limit-orders').then((data) => data.orders),
+  })
+}
+
+/** What placing an order of this stock costs this person; usually nothing after the first */
+export function useLimitOrderFeeQuery(
+  side: TradeSide,
+  mint: string,
+  { enabled = true }: Options = {},
+) {
+  const api = useApi()
+  return useQuery({
+    queryKey: queryKeys.limitOrderFee(side, mint),
+    enabled: enabled && Boolean(mint),
+    queryFn: () =>
+      api<{ feeUsd: number }>(
+        `/api/limit-orders/fee?side=${side}&mint=${encodeURIComponent(mint)}`,
+      ).then((data) => data.feeUsd),
+  })
+}
+
+export type LimitOrderRequest = {
+  side: TradeSide
+  mint: string
+  /** Cash for a buy, shares for a sell, in raw base units */
+  amount: string
+  limitPriceUsd: number
+  /** Null waits until it fills or is cancelled */
+  expiresInDays: number | null
+}
+
+/** The server builds the order, the person signs it here, the server broadcasts it */
+export function usePlaceLimitOrderMutation() {
+  const api = useApi()
+  const sign = useSignRelayed()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (request: LimitOrderRequest) => {
+      const built = await api<{ transaction: string; order: string; feeUsd: number }>(
+        '/api/limit-orders',
+        { method: 'POST', body: request },
+      )
+      return api<{ signature: string }>('/api/limit-orders/submit', {
+        method: 'POST',
+        body: { transaction: await sign(built.transaction), kind: 'place', order: built.order },
+      })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.limitOrders() })
+      queryClient.invalidateQueries({ queryKey: ['limit-order-fee'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.portfolio() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.stocks() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.notificationFeed() })
+    },
+  })
+}
+
+export function useCancelLimitOrderMutation() {
+  const api = useApi()
+  const sign = useSignRelayed()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (order: string) => {
+      const built = await api<{ transaction: string }>('/api/limit-orders/cancel', {
+        method: 'POST',
+        body: { order },
+      })
+      return api<{ signature: string }>('/api/limit-orders/submit', {
+        method: 'POST',
+        body: { transaction: await sign(built.transaction), kind: 'cancel', order },
+      })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.limitOrders() })
+      queryClient.invalidateQueries({ queryKey: ['limit-order-fee'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.portfolio() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.stocks() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.notificationFeed() })
     },
   })
 }

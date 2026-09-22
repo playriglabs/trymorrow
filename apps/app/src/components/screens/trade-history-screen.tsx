@@ -2,10 +2,11 @@ import { ArrowUpRightIcon, ChartLineUpIcon } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { useEffect, useRef } from 'react'
 import { match } from 'ts-pattern'
+import { LimitOrderRow } from '@/components/limit-order-row'
 import { withProviders } from '@/components/providers'
 import { StockLogo } from '@/components/stock-logo'
 import { Card, LinkButton, Loading, Screen } from '@/components/ui'
-import { useTradeHistoryQuery } from '@/lib/client/queries'
+import { useLimitOrdersQuery, useTradeHistoryQuery } from '@/lib/client/queries'
 import { useSession } from '@/lib/client/session'
 import { formatDayLabel, formatPrice, formatShares, formatUsd, tickerLabel } from '@/lib/format'
 import type { TradeHistoryItem } from '@/lib/types'
@@ -50,6 +51,7 @@ function TradeRow({ trade }: { trade: TradeHistoryItem }) {
 function TradeHistory() {
   const session = useSession()
   const history = useTradeHistoryQuery({ enabled: session.ready })
+  const orders = useLimitOrdersQuery({ enabled: session.ready })
   const loadMoreRef = useRef<HTMLDivElement>(null)
   const { hasNextPage, isFetchingNextPage, fetchNextPage } = history
 
@@ -71,7 +73,11 @@ function TradeHistory() {
   if (!session.ready || history.isPending) return <Loading />
 
   const trades = history.data?.pages.flatMap((page) => page.trades) ?? []
-  const content = match({ error: history.isError, empty: trades.length === 0 })
+  const waiting = orders.data ?? []
+  const content = match({
+    error: history.isError,
+    empty: trades.length === 0 && waiting.length === 0,
+  })
     .with({ error: true }, () => (
       <p className="text-[15px] text-loss">Couldn’t load your trades. Try again.</p>
     ))
@@ -93,6 +99,16 @@ function TradeHistory() {
     ))
     .otherwise(() => (
       <>
+        {waiting.length > 0 && (
+          <section className="mt-2 flex flex-col gap-1.5">
+            <h2 className="px-1 text-[13px] font-medium text-stone">Waiting for a price</h2>
+            <Card className="flex flex-col divide-y divide-line">
+              {waiting.map((order) => (
+                <LimitOrderRow key={order.order} order={order} />
+              ))}
+            </Card>
+          </section>
+        )}
         {trades
           .reduce<{ label: string; items: TradeHistoryItem[] }[]>((groups, trade) => {
             const label = formatDayLabel(trade.createdAt)

@@ -174,6 +174,41 @@ position and the debt back from it, and we record nothing.
 - Not yet: nothing has run on mainnet, nobody is warned as a loan gets close, and the debt farm
   state's 0.00532 SOL isn't reclaimed on full repayment. See TODO.
 
+### Orders at a price
+
+The trade screen's "At a price" mode places limit orders through **Jupiter Trigger V1**
+(`lite-api.jup.ag/trigger/v1`, keyless, program `j1o2qRpjcyUwEvwtcfhEQefh773ZgjxcVRry7LDqg5X`).
+V2 was rejected: it needs an API key and holds the money in a custodial vault. In V1 the order and
+its escrow are accounts of Jupiter's program that only the person can cancel, and Jupiter's keepers
+fill it. `lib/server/limit-orders.ts` builds, `POST /api/limit-orders/submit` verifies and sends.
+
+- **Jupiter's transaction is rebuilt, not passed through.** It makes the maker pay the network fee
+  and fund the idempotent account opening; `relayedInstructions` keeps only the order program's
+  instruction, points the account opening at the relayer and signs it with our compute budget.
+- **The order is exact, so a keeper keeps anything the market gives on top.** That's why the server
+  refuses a buy at or over today's price and a sell at or under it — both would fill immediately and
+  hand the difference away. Minimum $5 (Jupiter's). PreStocks can't be used (transfer fee).
+- **Rent goes back to the maker, never the payer.** Measured on mainnet 2026-09-22 with the relayer
+  as payer: placing cost it 0.005638 SOL (order 0.00254, escrow 0.00149, the TSLAx account the order
+  pays into 0.00156, fees), and cancelling returned 0.004028 to the maker. So `limitOrderFee` charges
+  that rent at cost on someone's first order, and once their SOL covers it (`rentFromWallet`) the next
+  order has them pay the rent themselves and costs nothing, bar a new payout account.
+- The fee comes out of cash; a sell without cash pays it in the shares on offer.
+- Jupiter is the book for what an order holds; `limit_orders` records whose it is, what it was
+  placed as, when it runs out and what the feed has said. `POST /api/limit-orders` writes a draft
+  row, `submit` only sends a transaction naming that row's order and marks it open or cancelled.
+- `syncLimitOrders` catches up whenever someone looks (portfolio, trade history, order list; once a
+  minute per person): fills reach `trade_fills` keyed by their signature, net of Jupiter's fee, so
+  cost basis and trade history see them, and each order that ended is told once. `depositIn`
+  ignores anything the order program did, so a fill or a cancel is never "cash arrived".
+- **Order notifications are feed only** (`order_placed`, `order_filled`, `order_expired`,
+  `order_cancelled`, none of them in `notify`'s toggles): no push, no Telegram, no email.
+- **Expiry** is 1 day, 1 week, 1 month or none, sent as `expiredAt` (unix seconds as a _string_;
+  Jupiter rejects a number). What V1 does with an expired order isn't documented and hasn't been
+  seen: the code handles both a Jupiter-closed `Expired` order (money back, said so) and one still
+  open past its date (shown as "Ran out", with "Take back" running the cancel).
+- Not yet: nothing reaches someone who never opens the app, since there's no cron under daily.
+
 ### Cash out flow
 
 1. `POST /api/cashouts/quote` prices it: `planCashout` validates the address, checks the balance and returns the fee. Nothing is recorded.

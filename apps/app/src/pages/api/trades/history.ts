@@ -1,5 +1,6 @@
 import { getStocks } from '@/lib/server/catalog'
 import { json, route } from '@/lib/server/http'
+import { syncLimitOrders } from '@/lib/server/limit-orders'
 import { db } from '@/lib/server/supabase'
 import { multiplierAt, toUi } from '@/lib/server/tokens'
 import { requireUser, requireWallet } from '@/lib/server/users'
@@ -25,6 +26,8 @@ export const GET = route(async ({ request, url }) => {
   const user = await requireUser(request)
   const wallet = requireWallet(user)
   const before = url.searchParams.get('before')
+  // Orders at a price fill while nobody is looking; the first page is where they'd show up
+  if (!before) await syncLimitOrders(user)
 
   let query = db
     .from('trade_fills')

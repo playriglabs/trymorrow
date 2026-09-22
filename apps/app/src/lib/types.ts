@@ -80,6 +80,30 @@ export type Portfolio = {
 
 export type TradeSide = 'buy' | 'sell'
 
+/** An order waiting for its price */
+export type LimitOrderView = {
+  /** Jupiter's order account, which is also how it's cancelled */
+  order: string
+  side: TradeSide
+  mint: string
+  ticker: string
+  name: string
+  iconUrl: string | null
+  /** Shares it buys, or shares it sells */
+  shares: number
+  /** Cash it spends, or cash it asks for */
+  cashUsd: number
+  limitPriceUsd: number
+  /** Today's price a share, to show how far the order still has to go; null when unknown */
+  priceUsd: number | null
+  filledPct: number
+  /** When it stops filling; null waits until it fills or is cancelled */
+  expiresAt: string | null
+  /** Past its date but still holding the money until it's taken back */
+  expired: boolean
+  createdAt: string
+}
+
 /** One buy or sell, as the trade history lists it */
 export type TradeHistoryItem = {
   id: string
@@ -443,6 +467,11 @@ export type NotificationKind =
   | 'gift_thanks'
   | 'trade_bought'
   | 'trade_sold'
+  /** An order at a price: placed, filled, ran out, or cancelled. Feed only */
+  | 'order_placed'
+  | 'order_filled'
+  | 'order_expired'
+  | 'order_cancelled'
   /** You put money into a fund */
   | 'fund_added'
   /** Someone else added to a fund you started, or one that's for you */

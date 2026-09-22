@@ -236,6 +236,46 @@ export async function loanSetupFee(): Promise<{ raw: bigint; usd: number }> {
   return cashAtCost(rent + 2 * lamportsPerTransaction, solUsd)
 }
 
+/** Jupiter's order account; its rent and the escrow's go back to the maker when it closes */
+const LIMIT_ORDER_ACCOUNT_SIZE = 372
+
+/** A wallet holding any SOL has to keep at least this much, or hold none at all */
+const SYSTEM_ACCOUNT_RENT = 890_880
+
+export type LimitOrderFee = {
+  /** True when the person's own SOL pays the order's rent, left over from an earlier order */
+  rentFromWallet: boolean
+  raw: bigint
+  usd: number
+}
+
+/**
+ * What placing a limit order costs us. The order and the escrow holding what it sells both need
+ * rent, and Jupiter's program returns that rent to the person, never to whoever paid it, when the
+ * order fills or is cancelled. So the first order is charged that rent at cost; it lands in their
+ * account as SOL when the order closes, and every later order spends that SOL instead of ours and
+ * costs nothing. Opening the account the order pays out into never comes back, and is charged at
+ * cost whenever it's needed, like a gift opening a share account.
+ */
+export async function limitOrderFee(
+  wallet: PublicKey,
+  input: GiftAsset,
+  output: GiftAsset,
+): Promise<LimitOrderFee> {
+  const [lamports, outputAccount, orderRent, escrowRent, outputRent] = await Promise.all([
+    connection.getBalance(wallet),
+    connection.getAccountInfo(holdingAccount(wallet, output)),
+    accountRent(LIMIT_ORDER_ACCOUNT_SIZE),
+    shareAccountRent(input),
+    shareAccountRent(output),
+  ])
+  const rentFromWallet = lamports >= orderRent + escrowRent + SYSTEM_ACCOUNT_RENT
+  const owed = (rentFromWallet ? 0 : orderRent + escrowRent) + (outputAccount ? 0 : outputRent)
+  if (owed === 0) return { rentFromWallet, raw: 0n, usd: 0 }
+  const [solUsd, lamportsPerTransaction] = await Promise.all([solPrice(), transactionLamports()])
+  return { rentFromWallet, ...cashAtCost(owed + lamportsPerTransaction, solUsd) }
+}
+
 export type CashoutFee = {
   /** True when the destination has no cash account yet, which is the only thing that costs us */
   opensAccount: boolean

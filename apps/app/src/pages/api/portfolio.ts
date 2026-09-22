@@ -1,11 +1,15 @@
 import { noteDeposits, noteStockTransfers } from '@/lib/server/deposits'
 import { json, route } from '@/lib/server/http'
+import { syncLimitOrders } from '@/lib/server/limit-orders'
 import { getPortfolio } from '@/lib/server/portfolio'
 import { requireUser, requireWallet } from '@/lib/server/users'
 
 export const GET = route(async ({ request }) => {
   const user = await requireUser(request)
-  const portfolio = await getPortfolio(requireWallet(user))
+  const wallet = requireWallet(user)
+  // Fills first: cost basis reads them, and a fill must never be mistaken for a deposit below
+  await syncLimitOrders(user)
+  const portfolio = await getPortfolio(wallet)
 
   // The add-cash screen polls this every 10 seconds, so a deposit reaches the feed about as fast
   // as it reaches the balance. Never let either fail the request: the money is there either way.

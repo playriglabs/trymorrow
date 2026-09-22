@@ -2,6 +2,7 @@ import { HeartIcon, ShareIcon, ShieldCheckIcon, WarningIcon, XIcon } from '@phos
 import clsx from 'clsx'
 import { useEffect, useRef, useState } from 'react'
 import { match, P } from 'ts-pattern'
+import { LimitOrderRow } from '@/components/limit-order-row'
 import { PreIpoFacts } from '@/components/pre-ipo-facts'
 import { PriceChart } from '@/components/price-chart'
 import { withProviders } from '@/components/providers'
@@ -13,10 +14,17 @@ import { TradeShareCard } from '@/components/trade-share-card'
 import { Button, Card, LinkButton, Loading, Notice, Screen } from '@/components/ui'
 import { errorMessage } from '@/lib/client/api'
 import { useDebounced } from '@/lib/client/debounce'
-import { useStocksQuery, useTradeMutation, useTradeQuoteQuery } from '@/lib/client/queries'
+import {
+  useLimitOrderFeeQuery,
+  useLimitOrdersQuery,
+  usePlaceLimitOrderMutation,
+  useStocksQuery,
+  useTradeMutation,
+  useTradeQuoteQuery,
+} from '@/lib/client/queries'
 import { useSession } from '@/lib/client/session'
 import { useWatchlists, watchlistsWith } from '@/lib/client/watchlists'
-import { formatShares, formatUsd } from '@/lib/format'
+import { formatPrice, formatShares, formatUsd, tickerLabel } from '@/lib/format'
 import type { TradeSide } from '@/lib/types'
 
 const BUY_PRESETS = [10, 25, 50, 100]
@@ -31,6 +39,29 @@ const FAIR_PRICE_LIMIT_PCT = 3
 const LISTED_PREMIUM_LIMIT_PCT = 10
 /** Up to 7 whole digits and 2 decimals: dollars and cents */
 const AMOUNT_PATTERN = /^\d{0,7}(\.\d{0,2})?$/
+/** A share price can need more than cents for a cheap stock */
+const PRICE_PATTERN = /^\d{0,7}(\.\d{0,4})?$/
+/** Mirrors `MIN_LIMIT_ORDER_USD`: Jupiter refuses anything smaller */
+const MIN_LIMIT_USD = 5
+/** How far from today's price an order waits: under it for a buy, over it for a sell */
+const LIMIT_STEPS_PCT = [5, 10, 20]
+const LIMIT_START_PCT = 5
+const EXPIRY_OPTIONS = [
+  { days: 1, label: '1 day' },
+  { days: 7, label: '1 week' },
+  { days: 30, label: '1 month' },
+  { days: null, label: 'No end' },
+] as const
+
+type Mode = 'now' | 'limit'
+
+const limitAt = (side: TradeSide, priceUsd: number | null, pct: number) =>
+  priceUsd == null
+    ? ''
+    : (priceUsd * (side === 'buy' ? 1 - pct / 100 : 1 + pct / 100)).toFixed(priceUsd >= 1 ? 2 : 4)
+
+const startingLimit = (side: TradeSide, priceUsd: number | null) =>
+  limitAt(side, priceUsd, LIMIT_START_PCT)
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
@@ -45,14 +76,20 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
   const session = useSession()
   const stocks = useStocksQuery({ enabled: session.ready })
   const trade = useTradeMutation()
+  const placeOrder = usePlaceLimitOrderMutation()
+  const orders = useLimitOrdersQuery({ enabled: session.ready })
   const [side, setSide] = useState<TradeSide>(initialSide)
+  const [mode, setMode] = useState<Mode>('now')
+  /** The share price an order at a price waits for, as typed */
+  const [limitText, setLimitText] = useState('')
+  const [expiresInDays, setExpiresInDays] = useState<number | null>(30)
   /** What the person typed or picked, in dollars */
   const [amountText, setAmountText] = useState('25')
   /** Set when a sell shortcut is picked, so "All" sells exactly every share */
   const [sellPercent, setSellPercent] = useState<number | null>(null)
-  const [stage, setStage] = useState<'overview' | 'amount' | 'review' | 'done'>(
-    initialSide === 'sell' ? 'amount' : 'overview',
-  )
+  const [stage, setStage] = useState<
+    'overview' | 'amount' | 'review' | 'done' | 'limit-review' | 'limit-done'
+  >(initialSide === 'sell' ? 'amount' : 'overview')
   const [shareCardOpen, setShareCardOpen] = useState(false)
   const [watchlistOpen, setWatchlistOpen] = useState(false)
   const { lists: watchlists } = useWatchlists()
@@ -83,6 +120,50 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
       ? amountUsd >= MIN_USD && cashRaw >= amountRaw
       : amountRaw > 0n && !sellingTooMuch
 
+  const limitPrice = Number.parseFloat(limitText) || 0
+  const limitFee = useLimitOrderFeeQuery(side, stock?.mint ?? '', {
+    enabled: session.ready && Boolean(stock) && mode === 'limit' && stage !== 'overview',
+  })
+  const limitFeeUsd = limitFee.data ?? 0
+  // What the order locks, and what it asks for, at the typed price
+  const limitShares = match({ side, limitPrice })
+    .with({ limitPrice: 0 }, () => 0)
+    .with({ side: 'buy' }, () => amountUsd / limitPrice)
+    .otherwise(() =>
+      stock?.ownedShares && ownedRaw > 0n
+        ? (Number(amountRaw) / Number(ownedRaw)) * stock.ownedShares
+        : 0,
+    )
+  const limitCashUsd = side === 'buy' ? amountUsd : limitShares * limitPrice
+  // Jupiter sizes the minimum by what the order locks at today's price
+  const limitLockedUsd = side === 'buy' ? amountUsd : limitShares * (stock?.priceUsd ?? limitPrice)
+  const limitProblem = match({ side, price: stock?.priceUsd ?? null })
+    .when(
+      () => limitPrice <= 0,
+      () => 'Pick the price to wait for.',
+    )
+    .when(
+      ({ side, price }) => side === 'buy' && price != null && limitPrice >= price,
+      () => 'Pick a price under today’s. At or above it, buying now is cheaper.',
+    )
+    .when(
+      ({ side, price }) => side === 'sell' && price != null && limitPrice <= price,
+      () => 'Pick a price over today’s. At or under it, selling now gets you more.',
+    )
+    .when(
+      () => amountRaw > 0n && limitLockedUsd < MIN_LIMIT_USD,
+      () => `Orders at a price start at ${formatUsd(MIN_LIMIT_USD)}.`,
+    )
+    .when(
+      () => side === 'buy' && cashRaw < amountRaw + BigInt(Math.round(limitFeeUsd * USDC_UNITS)),
+      () => 'You don’t have enough cash for that and the fee.',
+    )
+    .otherwise(() => null)
+  const cashShort =
+    side === 'buy' && cashRaw < amountRaw + BigInt(Math.round(limitFeeUsd * USDC_UNITS))
+  const limitReady =
+    mode === 'limit' && amountRaw > 0n && !sellingTooMuch && !limitProblem && limitFee.isSuccess
+
   // Quote once typing pauses; Review waits until the quote matches what's on screen
   const quotedRaw = useDebounced(amountRaw.toString(), 400)
   const settled = quotedRaw === amountRaw.toString()
@@ -95,6 +176,7 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
       enabled:
         session.ready &&
         Boolean(stock) &&
+        mode === 'now' &&
         BigInt(quotedRaw) > 0n &&
         (stage === 'amount' || stage === 'review'),
     },
@@ -239,6 +321,123 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
     )
   }
 
+  if (stage === 'limit-done') {
+    return (
+      <Screen
+        footer={
+          <div className="grid grid-cols-2 gap-2">
+            <LinkButton href="/trades" variant="soft" size="md">
+              See your orders
+            </LinkButton>
+            <LinkButton href="/" size="md">
+              Done
+            </LinkButton>
+          </div>
+        }
+      >
+        <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
+          <SuccessMark />
+          <div className="flex flex-col gap-1.5">
+            <h1 className="font-sans text-[30px] leading-[1.15] font-medium tracking-[-0.02em] text-balance">
+              Your order is waiting
+            </h1>
+            <p className="text-stone text-balance">
+              It {side === 'buy' ? 'buys' : 'sells'} on its own when {tickerLabel(stock.ticker)}{' '}
+              reaches {formatPrice(limitPrice)}
+              {expiresInDays == null
+                ? '.'
+                : `, for ${EXPIRY_OPTIONS.find((option) => option.days === expiresInDays)?.label}.`}{' '}
+              You’ll see it in your notifications when it fills, and can cancel it any time from
+              your trade history.
+            </p>
+          </div>
+        </div>
+      </Screen>
+    )
+  }
+
+  if (stage === 'limit-review') {
+    const buyingAtPrice = side === 'buy'
+    return (
+      <Screen
+        title="Review order"
+        footer={
+          <>
+            {placeOrder.isError && (
+              <p className="mb-1 text-center text-[13px] text-loss">
+                {errorMessage(placeOrder.error)}
+              </p>
+            )}
+            <Button
+              loading={placeOrder.isPending}
+              onClick={() =>
+                placeOrder.mutate(
+                  {
+                    side,
+                    mint: stock.mint,
+                    amount: amountRaw.toString(),
+                    limitPriceUsd: limitPrice,
+                    expiresInDays,
+                  },
+                  { onSuccess: () => setStage('limit-done') },
+                )
+              }
+            >
+              Place order
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setStage('amount')}>
+              Edit order
+            </Button>
+          </>
+        }
+      >
+        <div className="flex items-center gap-3.5 py-2">
+          <StockLogo iconUrl={stock.iconUrl} ticker={stock.ticker} size={52} />
+          <div className="flex flex-col">
+            <span className="text-[13px] text-stone">
+              {buyingAtPrice ? 'Buy when it’s at or under' : 'Sell when it’s at or over'}
+            </span>
+            <span className="font-sans text-[26px] leading-[1.2] font-medium tracking-[-0.02em]">
+              {formatPrice(limitPrice)} a share
+            </span>
+          </div>
+        </div>
+
+        <Card className="flex flex-col divide-y divide-line px-4 text-[15px]">
+          <Row label="Today’s price" value={formatPrice(stock.priceUsd)} />
+          {buyingAtPrice ? (
+            <>
+              <Row label="Cash set aside" value={formatUsd(limitCashUsd)} />
+              <Row label="You get about" value={`${formatShares(limitShares)} shares`} />
+            </>
+          ) : (
+            <>
+              <Row label="Shares set aside" value={formatShares(limitShares)} />
+              <Row label="You get about" value={formatUsd(limitCashUsd)} />
+            </>
+          )}
+          <Row label="Market fee" value="0.1% when it fills" />
+          <Row label="Order fee" value={limitFeeUsd > 0 ? formatUsd(limitFeeUsd) : 'Free'} />
+          <Row
+            label="Lasts"
+            value={
+              expiresInDays == null
+                ? 'Until it fills or you cancel'
+                : `${EXPIRY_OPTIONS.find((option) => option.days === expiresInDays)?.label}, then you take it back`
+            }
+          />
+        </Card>
+
+        <Notice>
+          {buyingAtPrice ? 'The cash' : 'The shares'} stay set aside while the order waits, so you
+          can’t spend them elsewhere. Cancel any time and they come straight back.
+          {limitFeeUsd > 0 &&
+            ' The order fee covers what opening it costs us; once it closes, that pays for your next one.'}
+        </Notice>
+      </Screen>
+    )
+  }
+
   const current = quote.data
   const buying = side === 'buy'
   const deviation = current?.fairPriceDeviationPct ?? null
@@ -362,6 +561,7 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
   }
   const switchSide = (next: TradeSide) => {
     setSide(next)
+    setLimitText(startingLimit(next, stock.priceUsd))
     if (next === 'sell') pickSellPercent(100)
     else {
       setSellPercent(null)
@@ -370,7 +570,20 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
   }
 
   let hint: { text: string; tone: 'muted' | 'error' } | null = null
-  if (buying && amountUsd > 0 && amountUsd < MIN_USD) {
+  if (mode === 'limit') {
+    if (sellingTooMuch) {
+      hint = { text: `You have about ${formatUsd(stock.ownedValueUsd)} to sell.`, tone: 'error' }
+    } else if (limitProblem && amountRaw > 0n) {
+      hint = { text: limitProblem, tone: 'error' }
+    } else {
+      hint = {
+        text: buying
+          ? `${formatUsd(stocks.data?.cashUsd ?? 0)} cash available`
+          : `You have ${formatShares(stock.ownedShares)} shares`,
+        tone: 'muted',
+      }
+    }
+  } else if (buying && amountUsd > 0 && amountUsd < MIN_USD) {
     hint = { text: `The minimum is ${formatUsd(MIN_USD)}.`, tone: 'error' }
   } else if (buying && amountUsd >= MIN_USD && amountUsd < FEE_FRIENDLY_USD) {
     hint = { text: 'Trades under $10 can cost more in fees.', tone: 'muted' }
@@ -383,11 +596,22 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
 
   const estimate = match({
     amountRaw,
-    loading: !settled || (quote.isFetching && !current),
+    loading: mode === 'now' && (!settled || (quote.isFetching && !current)),
     current,
     buying,
   })
     .with({ amountRaw: 0n }, () => ' ')
+    .when(
+      () => mode === 'limit',
+      () =>
+        limitPrice > 0
+          ? `${
+              buying
+                ? `≈ ${formatShares(limitShares)} shares`
+                : `${formatShares(limitShares)} shares for ≈ ${formatUsd(limitCashUsd)}`
+            }${limitFeeUsd > 0 ? ` · ${formatUsd(limitFeeUsd)} order fee` : ''}`
+          : ' ',
+    )
     .with({ loading: true }, () => 'Getting the price…')
     .with(
       { current: P.nonNullable, buying: true },
@@ -466,6 +690,19 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
             <Row label="Cash available" value={formatUsd(stocks.data?.cashUsd ?? 0)} />
           </Card>
 
+          {(orders.data ?? []).some((order) => order.mint === stock.mint) && (
+            <section className="flex flex-col gap-1.5">
+              <h2 className="px-1 text-[13px] font-medium text-stone">Waiting for a price</h2>
+              <Card className="flex flex-col divide-y divide-line">
+                {(orders.data ?? [])
+                  .filter((order) => order.mint === stock.mint)
+                  .map((order) => (
+                    <LimitOrderRow key={order.order} order={order} />
+                  ))}
+              </Card>
+            </section>
+          )}
+
           <PreIpoFacts stock={stock} />
 
           {onLists.length > 0 && (
@@ -499,21 +736,60 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
       back={() => setStage('overview')}
       footer={
         <>
-          {quote.isError && (
+          {mode === 'now' && quote.isError && (
             <p className="text-center text-[13px] text-loss mb-1">{errorMessage(quote.error)}</p>
           )}
-          <Button
-            disabled={!hasEnough || !settled || !current || quote.isError}
-            onClick={() => {
-              trade.reset()
-              setStage('review')
-            }}
-          >
-            Review {buying ? 'buy' : 'sell'}
-          </Button>
+          {mode === 'limit' && limitFee.isError && (
+            <p className="text-center text-[13px] text-loss mb-1">{errorMessage(limitFee.error)}</p>
+          )}
+          {mode === 'now' ? (
+            <Button
+              disabled={!hasEnough || !settled || !current || quote.isError}
+              onClick={() => {
+                trade.reset()
+                setStage('review')
+              }}
+            >
+              Review {buying ? 'buy' : 'sell'}
+            </Button>
+          ) : (
+            <Button
+              disabled={!limitReady}
+              onClick={() => {
+                placeOrder.reset()
+                setStage('limit-review')
+              }}
+            >
+              Review order
+            </Button>
+          )}
         </>
       }
     >
+      {/* PreStocks carry an issuer's transfer fee, which the order program can't hold */}
+      {!stock.transferFeePct && (
+        <div className="mt-3 grid grid-cols-2 gap-1 rounded-button border border-line bg-surface p-1">
+          {(['now', 'limit'] as const).map((value) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={mode === value}
+              onClick={() => {
+                setMode(value)
+                if (value === 'limit' && !limitText) {
+                  setLimitText(startingLimit(side, stock.priceUsd))
+                }
+              }}
+              className={clsx('h-9 rounded-[10px] font-sans text-[14px] font-medium', {
+                'bg-orange-wash text-ink': mode === value,
+                'text-stone': mode !== value,
+              })}
+            >
+              {value === 'now' ? `${buying ? 'Buy' : 'Sell'} now` : 'At a price'}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="flex flex-col items-center gap-2 pt-7 pb-3">
         <div className="mb-2 flex items-center gap-2 rounded-full bg-orange-wash py-1.5 pr-3 pl-1.5">
           <StockLogo iconUrl={stock.iconUrl} ticker={stock.ticker} size={28} />
@@ -564,6 +840,14 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
             })}
           >
             {hint.text}
+            {mode === 'limit' && buying && cashShort && (
+              <>
+                {' '}
+                <a href="/add-cash" className="font-medium text-ink underline">
+                  Add cash
+                </a>
+              </>
+            )}
           </span>
         )}
       </div>
@@ -601,43 +885,112 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
         })}
       </div>
 
-      {buying ? (
-        <Card className="flex items-center gap-3 py-3.5 pr-3.5 pl-4">
-          <div className="flex flex-1 flex-col">
-            <span>Pay with cash</span>
-            <span
-              className={clsx('text-[13px]', {
-                'text-stone': cashRaw >= amountRaw,
-                'text-loss': cashRaw < amountRaw,
+      {mode === 'limit' ? (
+        <Card className="flex flex-col divide-y divide-line px-4">
+          <div className="flex flex-col gap-3 py-3.5">
+            <div className="flex items-center gap-3">
+              <label htmlFor="limit-price" className="flex min-w-0 flex-1 flex-col">
+                <span>{buying ? 'When the price drops to' : 'When the price rises to'}</span>
+                <span className="text-[13px] text-stone">Today {formatPrice(stock.priceUsd)}</span>
+              </label>
+              <div className="flex h-11 w-32 items-center rounded-button border border-line bg-cream px-3 focus-within:border-orange">
+                <span className={clsx({ 'text-steel': !limitText })}>$</span>
+                <input
+                  id="limit-price"
+                  inputMode="decimal"
+                  autoComplete="off"
+                  placeholder="0.00"
+                  value={limitText}
+                  onChange={(event) => {
+                    const next = event.target.value.replace(',', '.').replace(/[^\d.]/g, '')
+                    if (PRICE_PATTERN.test(next)) setLimitText(next)
+                  }}
+                  className="min-w-0 flex-1 bg-transparent text-right tabular-nums outline-none placeholder:text-steel"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {LIMIT_STEPS_PCT.map((pct) => {
+                const value = limitAt(side, stock.priceUsd, pct)
+                return (
+                  <button
+                    key={pct}
+                    type="button"
+                    onClick={() => setLimitText(value)}
+                    className={clsx('h-9 rounded-button border text-[14px]', {
+                      'border-orange bg-orange-wash': limitText === value,
+                      'border-line bg-surface': limitText !== value,
+                    })}
+                  >
+                    {pct}% {buying ? 'lower' : 'higher'}
+                  </button>
+                )
               })}
-            >
-              {formatUsd(stocks.data?.cashUsd ?? 0)} available
-              {cashRaw >= amountRaw ? '' : ' · not enough'}
-            </span>
+            </div>
           </div>
-          <LinkButton href="/add-cash" variant="soft" size="sm">
-            Add cash
-          </LinkButton>
+          <div className="flex flex-col gap-3 py-3.5">
+            <span>Order lasts</span>
+            <div className="grid grid-cols-4 gap-2">
+              {EXPIRY_OPTIONS.map((option) => (
+                <button
+                  key={option.label}
+                  type="button"
+                  aria-pressed={expiresInDays === option.days}
+                  onClick={() => setExpiresInDays(option.days)}
+                  className={clsx('h-9 rounded-button border text-[14px]', {
+                    'border-orange bg-orange-wash': expiresInDays === option.days,
+                    'border-line bg-surface': expiresInDays !== option.days,
+                  })}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </Card>
       ) : (
-        <Card className="flex flex-col px-4 py-3.5">
-          <span>You have {formatShares(stock.ownedShares)} shares</span>
-          <span className="text-[13px] text-stone">
-            Worth about {formatUsd(stock.ownedValueUsd)}
-          </span>
-        </Card>
-      )}
+        <>
+          {buying ? (
+            <Card className="flex items-center gap-3 py-3.5 pr-3.5 pl-4">
+              <div className="flex flex-1 flex-col">
+                <span>Pay with cash</span>
+                <span
+                  className={clsx('text-[13px]', {
+                    'text-stone': cashRaw >= amountRaw,
+                    'text-loss': cashRaw < amountRaw,
+                  })}
+                >
+                  {formatUsd(stocks.data?.cashUsd ?? 0)} available
+                  {cashRaw >= amountRaw ? '' : ' · not enough'}
+                </span>
+              </div>
+              <LinkButton href="/add-cash" variant="soft" size="sm">
+                Add cash
+              </LinkButton>
+            </Card>
+          ) : (
+            <Card className="flex flex-col px-4 py-3.5">
+              <span>You have {formatShares(stock.ownedShares)} shares</span>
+              <span className="text-[13px] text-stone">
+                Worth about {formatUsd(stock.ownedValueUsd)}
+              </span>
+            </Card>
+          )}
 
-      <div className="flex flex-col text-[15px]">
-        <div className="flex justify-between py-1">
-          <span className="text-stone">Fees</span>
-          <span>{current ? `${current.feePct.toFixed(1)}%, included` : 'Included in price'}</span>
-        </div>
-        <div className="flex justify-between py-1">
-          <span className="text-stone">Arrives</span>
-          <span>In under a minute</span>
-        </div>
-      </div>
+          <div className="flex flex-col text-[15px]">
+            <div className="flex justify-between py-1">
+              <span className="text-stone">Fees</span>
+              <span>
+                {current ? `${current.feePct.toFixed(1)}%, included` : 'Included in price'}
+              </span>
+            </div>
+            <div className="flex justify-between py-1">
+              <span className="text-stone">Arrives</span>
+              <span>In under a minute</span>
+            </div>
+          </div>
+        </>
+      )}
     </Screen>
   )
 }
