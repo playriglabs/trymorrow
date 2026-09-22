@@ -68,6 +68,48 @@ export function initHomeMotion(root: HTMLElement) {
             clearProps: 'all',
           })
         })
+        // Controlled by you: tied to the scroll, so the words rise one at a time as the section
+        // comes up and the lock drops into its slot between them, then the promise underneath.
+        const ownership = root.querySelector<HTMLElement>('.ownership-section')
+        if (ownership) {
+          const reveal = gsap.timeline({
+            scrollTrigger: {
+              trigger: ownership,
+              start: 'top 85%',
+              end: 'top 20%',
+              scrub: 0.6,
+              // Measured after the pinned "together" section above has added its scroll, which
+              // is created later in this file; measured first, the words played off-screen.
+              refreshPriority: -1,
+            },
+          })
+          reveal
+            .from('.own-word', {
+              yPercent: 60,
+              rotation: 4,
+              opacity: 0,
+              stagger: 0.12,
+              duration: 0.5,
+              ease: 'power3.out',
+            })
+            .from(
+              '.own-lock',
+              {
+                y: -80,
+                scale: 0.4,
+                rotation: -25,
+                opacity: 0,
+                duration: 0.55,
+                ease: 'back.out(2)',
+              },
+              0.35,
+            )
+            .from(
+              '.own-copy',
+              { y: 24, opacity: 0, stagger: 0.1, duration: 0.4, ease: 'power2.out' },
+              0.6,
+            )
+        }
         // App tour: pin the section and crossfade phone preview as steps advance.
         const tourSection = root.querySelector<HTMLElement>('#app-tour')
         if (tourSection) {
@@ -122,23 +164,66 @@ export function initHomeMotion(root: HTMLElement) {
             cleanupFns.push(() => window.removeEventListener('scroll', onScroll))
           }
         }
-        // Feature cards: while the section is pinned, scrolling down walks the row sideways.
-        // Only above lg — below it the same row is an ordinary swipe list.
+        // Feature cards: once the section pins, the cards deal out of one stack in the middle
+        // of the screen, then scrolling down walks the row sideways. Only above lg — below it
+        // the same row is an ordinary swipe list.
         const featureSection = root.querySelector<HTMLElement>('#made-for-you')
         const featureTrack = featureSection?.querySelector<HTMLElement>('.features-track')
         const featurePin = featureSection?.querySelector<HTMLElement>('.features-pin')
         if (featureSection && featureTrack && featurePin) {
           const wide = window.matchMedia('(min-width: 1024px)')
+          const featureCards = gsap.utils.toArray<HTMLElement>(':scope > article', featureTrack)
+          const featureCaptions = featureCards.map((card) => card.lastElementChild as HTMLElement)
+          // How each card sits in the stack: the first on top, the rest fanned a little behind
+          const fan = [
+            { x: 0, y: 0, rotation: 0 },
+            { x: -16, y: 10, rotation: -4 },
+            { x: 16, y: 10, rotation: 4 },
+            { x: -28, y: 20, rotation: -7 },
+            { x: 28, y: 20, rotation: 7 },
+            { x: 0, y: 26, rotation: -2 },
+          ]
+          // The first fifth of the pinned scroll deals the stack out, the rest walks the row
+          const dealShare = 0.2
+          const dealEase = gsap.parseEase('power2.inOut')
           let onScroll: (() => void) | undefined
 
           const start = () => {
             if (onScroll) return
             featureSection.classList.add('features-live')
+            // The deal owns these cards' transforms now, so their fade-in must not fight it
+            gsap.killTweensOf(featureCards)
+            gsap.set(featureCards, { clearProps: 'opacity,transform' })
             onScroll = () => {
               const rect = featureSection.getBoundingClientRect()
               const distance = rect.height - window.innerHeight
               if (distance <= 0) return
               const progress = Math.min(1, Math.max(0, -rect.top / distance))
+              const deal = dealEase(Math.min(1, progress / dealShare))
+              const walk = Math.max(0, (progress - dealShare) / (1 - dealShare))
+              const stackAt = featurePin.clientWidth / 2
+              // Cards measured against the pin whichever of track or pin the browser treats as
+              // their offset parent, so the stack lands on the middle of the screen either way
+              const trackLeft = featureTrack.offsetLeft
+              featureCards.forEach((card, i) => {
+                const spot = fan[i % fan.length]
+                const rest = 1 - deal
+                gsap.set(card, {
+                  x:
+                    (stackAt -
+                      (card.offsetLeft +
+                        (card.offsetParent === featureTrack ? trackLeft : 0) +
+                        card.offsetWidth / 2) +
+                      spot.x) *
+                    rest,
+                  y: spot.y * rest,
+                  rotation: spot.rotation * rest,
+                  scale: 1 - 0.1 * rest,
+                  zIndex: featureCards.length - i,
+                })
+              })
+              // The words would pile up in the stack, so they arrive as the cards finish parting
+              gsap.set(featureCaptions, { opacity: Math.max(0, (deal - 0.6) / 0.4) })
               // Measured live, so the last card comes to rest against the same gutter the first
               // one starts on, whatever the window width
               const gutter = Number.parseFloat(getComputedStyle(featurePin).paddingLeft) || 0
@@ -146,7 +231,7 @@ export function initHomeMotion(root: HTMLElement) {
                 0,
                 featureTrack.scrollWidth + 2 * gutter - featurePin.clientWidth,
               )
-              gsap.set(featureTrack, { x: -travel * progress })
+              gsap.set(featureTrack, { x: -travel * walk })
             }
             onScroll()
             window.addEventListener('scroll', onScroll, { passive: true })
@@ -159,6 +244,8 @@ export function initHomeMotion(root: HTMLElement) {
             window.removeEventListener('resize', onScroll)
             onScroll = undefined
             gsap.set(featureTrack, { clearProps: 'transform' })
+            gsap.set(featureCards, { clearProps: 'transform,zIndex' })
+            gsap.set(featureCaptions, { clearProps: 'opacity' })
           }
           const sync = () => (wide.matches ? start() : stop())
 
@@ -267,6 +354,55 @@ export function initHomeMotion(root: HTMLElement) {
         for (const cleanup of cleanupFns) cleanup()
         context.revert()
       }
+    },
+    root,
+  )
+  // Small gestures: above lg the three cards wait as one stack in the middle and deal out into
+  // their columns as the row scrolls in. Below lg the row is a swipe list and stays still.
+  media.add(
+    '(prefers-reduced-motion: no-preference) and (min-width: 1024px)',
+    () => {
+      const row = root.querySelector<HTMLElement>('.gesture-row')
+      if (!row) return
+      const cards = gsap.utils.toArray<HTMLElement>('.gesture-card', row)
+      const captions = gsap.utils.toArray<HTMLElement>('.gesture-caption', row)
+      if (cards.length !== 3) return
+      // Middle card on top, the other two tucked behind it and fanned a little, like a deck
+      const stack = [
+        { x: -18, y: 14, rotation: -6, z: 1 },
+        { x: 0, y: 0, rotation: 0, z: 3 },
+        { x: 18, y: 14, rotation: 6, z: 2 },
+      ]
+      const context = gsap.context(() => {
+        const timeline = gsap.timeline({
+          scrollTrigger: {
+            trigger: row,
+            start: 'top 85%',
+            end: 'top 25%',
+            scrub: 0.6,
+            invalidateOnRefresh: true,
+          },
+        })
+        cards.forEach((card, i) => {
+          const spot = stack[i]
+          gsap.set(card, { zIndex: spot.z })
+          timeline.from(
+            card,
+            {
+              x: () => row.clientWidth / 2 - (card.offsetLeft + card.offsetWidth / 2) + spot.x,
+              y: spot.y,
+              rotation: spot.rotation,
+              scale: 0.9,
+              ease: 'power2.inOut',
+              duration: 1,
+            },
+            0,
+          )
+        })
+        // The words would pile up while stacked, so they arrive once the cards have parted
+        timeline.from(captions, { opacity: 0, y: 16, duration: 0.35, stagger: 0.05 }, 0.7)
+      }, root)
+      return () => context.revert()
     },
     root,
   )

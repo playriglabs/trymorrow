@@ -16,14 +16,6 @@ import LockMark from './lock-mark.svelte'
 import SocialIcon from './social-icon.svelte'
 import StockMark from './stock-mark.svelte'
 
-// The marks beside the two ways in: where Morrow is, in one narrow column
-const appSocials = [
-  { name: 'telegram', label: 'Telegram', href: telegramUrl },
-  { name: 'x', label: 'X', href: 'https://x.com/trymorrow' },
-  { name: 'reddit', label: 'Reddit', href: 'https://www.reddit.com/r/TRYMORROW/' },
-  { name: 'linkedin', label: 'LinkedIn', href: 'https://www.linkedin.com/company/trymorrow' },
-] as const
-
 const giftSteps = [
   {
     title: 'Pick what goes inside',
@@ -266,9 +258,9 @@ onMount(() => {
       </div>
       <!-- Below lg the cards swipe sideways and bleed to the screen edge, so the next one peeks in. -->
       <div
-        class="reveal -mx-5 flex snap-x snap-mandatory scroll-px-5 gap-4 overflow-x-auto px-5 pb-2 [scrollbar-width:none] md:-mx-10 md:scroll-px-10 md:gap-5 md:px-10 lg:mx-0 lg:grid lg:snap-none lg:grid-cols-3 lg:overflow-visible lg:px-0 lg:pb-0 [&::-webkit-scrollbar]:hidden"
+        class="gesture-row reveal -mx-5 flex snap-x snap-mandatory scroll-px-5 gap-4 overflow-x-auto px-5 pb-2 [scrollbar-width:none] md:-mx-10 md:scroll-px-10 md:gap-5 md:px-10 lg:mx-0 lg:grid lg:snap-none lg:grid-cols-3 lg:overflow-visible lg:px-0 lg:pb-0 [&::-webkit-scrollbar]:hidden"
       >
-        <article class="w-[82%] shrink-0 snap-start md:w-[46%] lg:w-auto">
+        <article class="gesture-card relative w-[82%] shrink-0 snap-start md:w-[46%] lg:w-auto">
           <div
             class="group relative flex aspect-[0.92] items-center justify-center overflow-hidden rounded-3xl bg-[#f1dfc7] px-8"
           >
@@ -282,14 +274,14 @@ onMount(() => {
               >Less stuff. More future.</span
             >
           </div>
-          <div class="px-2 pt-5">
+          <div class="gesture-caption px-2 pt-5">
             <h3 class="text-xl">Give a little ownership.</h3>
             <p class="mt-2 max-w-70 text-sm leading-relaxed text-stone">
               A piece of a company they love. A personal note from you. A gift that’s theirs.
             </p>
           </div>
         </article>
-        <article class="w-[82%] shrink-0 snap-start md:w-[46%] lg:w-auto">
+        <article class="gesture-card relative w-[82%] shrink-0 snap-start md:w-[46%] lg:w-auto">
           <div
             class="group relative flex aspect-[0.92] items-center justify-center overflow-hidden rounded-3xl bg-[#dfe7d6]"
           >
@@ -328,14 +320,14 @@ onMount(() => {
               </div>
             </div>
           </div>
-          <div class="px-2 pt-5">
+          <div class="gesture-caption px-2 pt-5">
             <h3 class="text-xl">Send a little happiness.</h3>
             <p class="mt-2 max-w-70 text-sm leading-relaxed text-stone">
               Coffee money or a birthday surprise. Send cash with a little extra thought.
             </p>
           </div>
         </article>
-        <article class="w-[82%] shrink-0 snap-start md:w-[46%] lg:w-auto">
+        <article class="gesture-card relative w-[82%] shrink-0 snap-start md:w-[46%] lg:w-auto">
           <div
             class="group relative flex aspect-[0.92] items-center justify-center overflow-hidden rounded-3xl bg-[#ded4ef] px-7"
           >
@@ -369,7 +361,7 @@ onMount(() => {
               </div>
             </div>
           </div>
-          <div class="px-2 pt-5">
+          <div class="gesture-caption px-2 pt-5">
             <h3 class="text-xl">Build a little, together.</h3>
             <p class="mt-2 max-w-70 text-sm leading-relaxed text-stone">
               Start a fund for someone’s future. Invite your people. Give it time.
@@ -547,8 +539,8 @@ onMount(() => {
       </div>
     </section>
 
-    <!-- Above lg this section is tall and pinned: scrolling down walks the cards sideways, and
-         normal scrolling picks up again once the last one has passed. -->
+    <!-- Above lg this section is tall and pinned: the cards deal out of a stack, scrolling down
+         walks them sideways, and normal scrolling picks up once the last one has passed. -->
     <section
       id="made-for-you"
       aria-labelledby="features-title"
@@ -773,14 +765,49 @@ onMount(() => {
             </div>
             <div class="px-2 pt-5">
               <h3 class="text-xl">Cash, without selling.</h3>
-              <p class="mt-2 max-w-116.5 text-sm leading-relaxed text-stone">
+              <p class="mt-2 max-w-125.5 text-sm leading-relaxed text-stone">
                 Borrow cash against the shares you hold and pay it back when you like. If the stock
-                falls far enough, shares are sold to cover the loan, so you always see how far that
-                is.
+                falls far enough, shares are sold to cover the loan, so you always see how far.
               </p>
             </div>
           </article>
         </div>
+      </div>
+    </section>
+
+    <!-- The words rise one by one and the lock drops in as the section scrolls up (home-motion) -->
+    <section
+      aria-labelledby="ownership-title"
+      class="ownership-section bg-orange px-5 py-24 text-cream md:py-36"
+    >
+      <div class="mx-auto max-w-page text-center">
+        <h2
+          id="ownership-title"
+          class="font-sans text-[clamp(42px,7.5vw,104px)] leading-[1.08] tracking-tighter"
+        >
+          <span class="block"
+            ><span class="own-word inline-block">Controlled</span>
+            <span class="own-word inline-block">by</span>
+            <span class="own-word inline-block">you.</span></span
+          >
+          <span class="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 md:gap-x-6">
+            <span class="own-word inline-block">Yours</span><span
+              class="own-lock inline-flex size-14 shrink-0 items-center justify-center rounded-[18px] bg-cream text-ink md:size-24 md:rounded-3xl"
+              ><LockMark class="size-9 md:size-14" /></span
+            ><span class="own-word inline-block">to keep.</span>
+          </span>
+        </h2>
+        <p class="own-copy mx-auto mt-8 max-w-120 text-sm leading-relaxed text-ink md:text-base">
+          You control your account and approve every move.<br class="hidden sm:block" /> Morrow never
+          holds your money.
+        </p>
+        <a
+          href="/how-it-works"
+          class="own-copy btn-liquid group mx-auto mt-10 flex min-h-14 w-fit items-center justify-center gap-5 rounded-full px-7 text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cream"
+          >See how it works <span class="transition-transform group-hover:translate-x-1"
+            ><Icon size={21} /></span
+          ></a
+        >
       </div>
     </section>
 
@@ -858,152 +885,47 @@ onMount(() => {
       </div>
     </section>
 
-    <!-- Two doors into the same app, laid out as one panel: the statement, the two ways in,
-         and the marks that open them. Neither is a store download. -->
+    <!-- Two doors into the same app, said once and big: the headline carries the mark, the two
+         buttons are the two ways in. Neither is a store download. -->
     <section
       id="get-morrow"
       aria-labelledby="get-title"
-      class="mx-auto max-w-page scroll-mt-10 px-5 pt-8 pb-24 md:px-10 md:pt-16 md:pb-32"
+      class="scroll-mt-10 bg-[#f1dfc7] px-5 py-28 text-ink md:py-40"
     >
-      <div
-        class="reveal rounded-[36px] bg-[#f1dfc7] p-3 md:rounded-[48px] md:p-4 lg:grid lg:grid-cols-[1.35fr_1fr_auto] lg:gap-4"
-      >
-        <div class="grid gap-3 md:gap-4 lg:contents">
-          <article
-            class="flex flex-col justify-between gap-10 rounded-[28px] bg-surface p-7 md:rounded-[36px] md:p-10 lg:col-start-1 lg:row-span-2 lg:row-start-1"
-          >
-            <div>
-              <span class="text-[10px] tracking-widest text-stone">TWO WAYS IN</span>
-              <h2
-                id="get-title"
-                class="mt-4 font-sans text-[clamp(40px,5vw,72px)] leading-[0.97] tracking-[-0.06em]"
-              >
-                Home screen,<br />or Telegram.
-              </h2>
-            </div>
-            <div>
-              <p class="max-w-90 text-sm leading-relaxed text-stone">
-                Nothing to download from a store, nothing to update. The same Morrow either way,
-                with the same account behind it.
-              </p>
-              <div class="mt-7 flex items-center gap-3">
-                <img
-                  src="/trymorrow-logo-rounded.png"
-                  alt=""
-                  width="29"
-                  height="29"
-                  class="size-11 rounded-[14px]"
-                />
-                <span class="font-sans text-2xl leading-none tracking-tighter"
-                  >morrow<span class="text-orange">*</span></span
-                >
-              </div>
-            </div>
-          </article>
-
-          <article
-            class="rounded-[28px] bg-surface p-7 md:rounded-[36px] md:p-8 lg:col-start-2 lg:row-start-1"
-          >
-            <h3 class="font-sans text-2xl tracking-[-0.04em]">Keep it on your home screen</h3>
-            <div class="mt-5 rounded-[20px] bg-cream p-4">
-              <div class="flex items-center gap-3">
-                <img
-                  src="/trymorrow-logo-rounded.png"
-                  alt=""
-                  width="29"
-                  height="29"
-                  class="size-10 rounded-[12px]"
-                />
-                <div>
-                  <p class="font-sans text-sm leading-none">Morrow</p>
-                  <p class="mt-1 text-[10px] text-stone">app.trymorrow.money</p>
-                </div>
-                <span class="ml-auto flex items-center gap-1.5 text-[11px] text-stone"
-                  ><Icon name="plus" size={14} /> Add</span
-                >
-              </div>
-            </div>
-            <p class="mt-4 text-sm leading-relaxed text-stone">
-              Open it once in your browser and add it to your home screen. Full screen, works
-              offline, updates itself.
-            </p>
-            <a
-              href="{appUrl}/login"
-              class="cta group mt-6 inline-flex min-h-12 items-center justify-center gap-4 rounded-full bg-ink px-6 text-sm text-cream"
-              >Open the web app <span class="transition-transform group-hover:translate-x-1"
-                ><Icon size={18} /></span
-              ></a
-            >
-          </article>
-
-          <article
-            class="rounded-[28px] bg-surface p-7 md:rounded-[36px] md:p-8 lg:col-start-2 lg:row-start-2"
-          >
-            <h3 class="font-sans text-2xl tracking-[-0.04em]">Or keep it inside Telegram</h3>
-            <div class="mt-5 rounded-[20px] bg-white p-4">
-              <div class="rounded-[20px] rounded-bl-md bg-[#e3eef8] px-4 py-3 text-xs">
-                You have a gift from @alex ✨
-              </div>
-            </div>
-            <p class="mt-4 text-sm leading-relaxed text-stone">
-              The Mini App knows you the moment it opens, gifts can go to a Telegram name, and news
-              of one arrives as a message.
-            </p>
-            <a
-              href={telegramUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              class="cta group mt-6 inline-flex min-h-12 items-center justify-center gap-4 rounded-full bg-ink px-6 text-sm text-cream"
-              >Open in Telegram <span class="transition-transform group-hover:translate-x-1"
-                ><Icon size={18} /></span
-              ></a
-            >
-          </article>
-
-          <!-- The marks on their own, centred: every place Morrow answers, the Mini App first -->
-          <aside
-            class="flex items-center justify-center gap-3 rounded-[28px] bg-surface p-4 md:rounded-[36px] lg:col-start-3 lg:row-span-2 lg:row-start-1 lg:flex-col lg:gap-4 lg:px-4"
-          >
-            {#each appSocials as social}
-              <a
-                href={social.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={`Morrow on ${social.label}`}
-                class="flex size-14 items-center justify-center rounded-[20px] bg-cream text-ink transition-colors hover:bg-orange-wash hover:text-orange md:size-16"
-                ><SocialIcon name={social.name} /></a
-              >
-            {/each}
-          </aside>
-        </div>
-      </div>
-    </section>
-
-    <section aria-labelledby="ownership-title" class="bg-orange px-5 py-24 text-cream md:py-36">
       <div class="reveal mx-auto max-w-page text-center">
+        <p class="mx-auto max-w-120 text-sm leading-relaxed text-stone md:text-base">
+          Nothing to download from a store, nothing to update.<br class="hidden sm:block" /> Home screen
+          or Telegram, the same account behind it.
+        </p>
         <h2
-          id="ownership-title"
-          class="font-sans text-[clamp(42px,7.5vw,104px)] leading-[1.08] tracking-tighter"
+          id="get-title"
+          class="mt-8 font-sans text-[clamp(42px,7.5vw,104px)] leading-[1.08] tracking-tighter"
         >
-          <span class="block">Controlled by you.</span>
+          <span class="block">Get started.</span>
           <span class="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 md:gap-x-6">
-            Yours <span
-              class="inline-flex size-14 shrink-0 items-center justify-center rounded-[18px] bg-cream text-ink md:size-24 md:rounded-3xl"
-              ><LockMark class="size-9 md:size-14" /></span
-            > to keep.
+            Open <img
+              src="/trymorrow-logo-rounded.png"
+              alt=""
+              width="29"
+              height="29"
+              class="size-14 shrink-0 rounded-[18px] md:size-24 md:rounded-3xl"
+            /> Morrow.
           </span>
         </h2>
-        <p class="mx-auto mt-8 max-w-120 text-sm leading-relaxed text-ink md:text-base">
-          You control your account and approve every move.<br class="hidden sm:block" /> Morrow never
-          holds your money.
-        </p>
-        <a
-          href="/how-it-works"
-          class="btn-liquid group mx-auto mt-10 flex min-h-14 w-fit items-center justify-center gap-5 rounded-full px-7 text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cream"
-          >See how it works <span class="transition-transform group-hover:translate-x-1"
-            ><Icon size={21} /></span
-          ></a
-        >
+        <div class="mt-12 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <a
+            href="{appUrl}/login"
+            class="cta flex min-h-16 w-full max-w-72 items-center justify-center gap-3 rounded-full bg-surface px-8 text-base text-ink sm:w-auto"
+            ><Icon name="phone" size={20} /> Open the web app</a
+          >
+          <a
+            href={telegramUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="cta flex min-h-16 w-full max-w-72 items-center justify-center gap-3 rounded-full bg-ink px-8 text-base text-cream sm:w-auto"
+            ><SocialIcon name="telegram" /> Open in Telegram</a
+          >
+        </div>
       </div>
     </section>
   </main>

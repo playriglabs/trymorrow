@@ -249,8 +249,9 @@
 /* Feature cards walk sideways while the section is pinned, above lg only and only once motion
    has started (.features-live), so reduced motion keeps the ordinary two-column grid. */
 @media (min-width: 1024px) {
+  /* The extra height is the deal out of the stack, so the sideways walk keeps its old pace */
   #made-for-you.features-live {
-    height: 370svh;
+    height: 430svh;
     padding-block: 0;
   }
   /* Full bleed, so cards run off the right edge of the screen rather than the page column.
@@ -286,6 +287,7 @@
   }
   /* One width and one art height for every card, so the row reads as a single band */
   .features-live .features-track > article {
+    position: relative;
     width: 34rem;
   }
   .features-live .features-track > article .feature-art {

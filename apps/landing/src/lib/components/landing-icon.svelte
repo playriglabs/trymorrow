@@ -16,6 +16,7 @@ const paths: Record<string, string> = {
   bell: 'M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4',
   send: 'm21 3-7 18-4-7-7-4 18-7ZM10 14 21 3',
   menu: 'M4 8h16M4 16h16',
+  phone: 'M8 3h8a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1ZM11 18h2',
   close: 'm6 6 12 12M6 18 18 6',
 }
 </script>
