@@ -1,10 +1,10 @@
 import {
+  CaretRightIcon,
   CheckIcon,
   CopyIcon,
   LockIcon,
   MagnifyingGlassIcon,
   ShareIcon,
-  WarningIcon,
   XIcon,
 } from '@phosphor-icons/react'
 import clsx from 'clsx'
@@ -14,16 +14,7 @@ import { MonthPicker } from '@/components/month-picker'
 import { withProviders } from '@/components/providers'
 import { StockLogo } from '@/components/stock-logo'
 import { SuccessMark } from '@/components/success-mark'
-import {
-  Button,
-  Card,
-  Label,
-  LinkButton,
-  Loading,
-  Notice,
-  Screen,
-  TextInput,
-} from '@/components/ui'
+import { Button, Card, Label, LinkButton, Loading, Screen, TextInput } from '@/components/ui'
 import { errorMessage } from '@/lib/client/api'
 import { copyText } from '@/lib/client/copy'
 import {
@@ -33,7 +24,7 @@ import {
   useStocksQuery,
 } from '@/lib/client/queries'
 import { useSession } from '@/lib/client/session'
-import { formatUsd, formatUsdWhole } from '@/lib/format'
+import { formatUsd } from '@/lib/format'
 import {
   FUND_PURPOSES,
   MAX_FUND_STOCKS,
@@ -42,8 +33,6 @@ import {
   STEADY_MIX,
 } from '@/lib/funds'
 import type { FundPurpose, FundView, StockListing } from '@/lib/types'
-
-const GOAL_PRESETS = [1_000, 5_000, 25_000]
 
 const DEFAULT_YEARS = 10
 
@@ -275,19 +264,35 @@ function CreateFund() {
           value={beneficiaryName}
           onChange={(event) => setBeneficiaryName(event.target.value)}
         />
-        <label className="flex items-start gap-2.5 text-[14px] text-stone">
-          <input
-            type="checkbox"
-            checked={forSomeoneElse}
-            onChange={(event) => setForSomeoneElse(event.target.checked)}
-            className="mt-0.5 size-4.5 accent-orange"
-          />
-          They have their own email, and only they should be able to take it out
-        </label>
+        {/** biome-ignore lint/a11y/useSemanticElements: <> */}
+        <div
+          role="group"
+          aria-label="Who takes it out at unlock"
+          className="grid grid-cols-2 gap-1 rounded-button border border-line bg-surface p-1"
+        >
+          {[
+            { value: false, label: 'I take it out' },
+            { value: true, label: 'They take it out' },
+          ].map((option) => (
+            <button
+              key={option.label}
+              type="button"
+              aria-pressed={forSomeoneElse === option.value}
+              onClick={() => setForSomeoneElse(option.value)}
+              className={clsx(
+                'h-9 rounded-xl font-sans text-[14px] font-medium transition-colors duration-150',
+                forSomeoneElse === option.value ? 'bg-orange-wash text-ink' : 'text-stone',
+              )}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
         {forSomeoneElse && (
           <TextInput
             type="email"
-            placeholder="aisyah@example.com"
+            aria-label="Their email"
+            placeholder="Their email"
             autoCapitalize="none"
             autoCorrect="off"
             value={email}
@@ -296,14 +301,14 @@ function CreateFund() {
         )}
         <p className="text-[13px] leading-[1.45] text-stone">
           {forSomeoneElse
-            ? 'At unlock, only that email can take the money out. This can never be changed.'
-            : `You hold it for ${beneficiaryName.trim() || 'them'} and take it out at unlock. This can never be changed.`}
+            ? 'Only that email can take it out at unlock. This can never be changed.'
+            : `You hold it for ${beneficiaryName.trim() || 'them'}. This can never be changed.`}
         </p>
       </div>
 
       <div className="flex flex-col gap-2">
         <Label>What it’s for</Label>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="flex flex-wrap gap-1.5">
           {FUND_PURPOSES.map((option) => (
             <button
               key={option.value}
@@ -311,48 +316,13 @@ function CreateFund() {
               aria-pressed={purpose === option.value}
               onClick={() => setPurpose(option.value)}
               className={clsx(
-                'flex h-11 items-center justify-center rounded-link border px-4 font-sans text-[15px] font-medium',
-                {
-                  'border-orange bg-orange-wash': purpose === option.value,
-                  'border-line bg-surface': purpose !== option.value,
-                },
+                'h-9 rounded-link border px-3.5 font-sans text-[14px] font-medium',
+                purpose === option.value
+                  ? 'border-orange bg-orange-wash text-ink'
+                  : 'border-line bg-surface text-ink',
               )}
             >
               {option.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <div className="flex items-baseline justify-between">
-          <Label htmlFor="goal">Goal</Label>
-          <span className="text-[13px] text-stone">Optional</span>
-        </div>
-        <div className="flex gap-2">
-          <TextInput
-            id="goal"
-            inputMode="decimal"
-            placeholder="$5,000"
-            value={goalText ? `$${goalText}` : ''}
-            onChange={(event) => {
-              const next = event.target.value.replace(/[^\d.]/g, '')
-              if (/^\d{0,8}(\.\d{0,2})?$/.test(next)) setGoalText(next)
-            }}
-          />
-        </div>
-        <div className="grid grid-cols-3 gap-2">
-          {GOAL_PRESETS.map((value) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setGoalText(String(value))}
-              className={clsx('h-11 rounded-button border font-sans text-[15px] font-medium', {
-                'border-orange bg-orange-wash': goalUsd === value,
-                'border-line bg-surface': goalUsd !== value,
-              })}
-            >
-              {formatUsdWhole(value)}
             </button>
           ))}
         </div>
@@ -372,79 +342,59 @@ function CreateFund() {
       </div>
 
       <div className="flex flex-col gap-2">
-        <div className="flex items-baseline justify-between">
-          <Label>What it buys</Label>
-          {custom && (
-            <button
-              type="button"
-              onClick={() => setCustom(null)}
-              className="text-[13px] text-stone underline"
-            >
-              Use the steady mix
-            </button>
-          )}
-        </div>
-        {steadyAvailable && (
-          <button
-            type="button"
-            aria-pressed={custom === null}
-            onClick={() => setCustom(null)}
-            className={clsx('flex flex-col gap-1 rounded-card border p-4 text-left', {
-              'border-orange bg-orange-wash': custom === null,
-              'border-line bg-surface': custom !== null,
-            })}
-          >
-            <span className="flex items-center gap-2 font-sans text-[15px] font-medium">
-              Steady mix
-              {custom === null && <CheckIcon className="size-4 text-orange" />}
-            </span>
-            <span className="text-[13px] text-stone">
-              {STEADY_MIX.map(({ ticker, percent }) => `${ticker} ${percent}%`).join(' · ')}
-            </span>
-          </button>
-        )}
-        <div className="flex flex-wrap items-center gap-1.5">
-          {allocations.map((allocation) => {
-            const stock = stockOf(allocation.mint)
-            return stock ? (
-              <span
-                key={stock.mint}
-                className="flex h-10 items-center gap-2 rounded-link border border-orange bg-orange-wash pr-2 pl-1.5 font-sans text-[14px] font-medium"
-              >
-                <StockLogo iconUrl={stock.iconUrl} ticker={stock.ticker} size={28} />
-                {stock.ticker}
-              </span>
-            ) : null
-          })}
-          <button
-            type="button"
-            onClick={() => {
-              setPickerSearch('')
-              setPickerOpen(true)
-            }}
-            className="flex h-10 items-center rounded-link border border-line bg-surface px-3 font-sans text-[14px] font-medium text-stone"
-          >
-            {custom ? 'Change' : 'Customize'}
-          </button>
-        </div>
-        <p className="text-[13px] text-stone">
-          {custom
-            ? `Split evenly: ${allocations.map((item) => `${stockOf(item.mint)?.ticker ?? ''} ${item.percent}%`).join(' · ')}`
-            : `Every dollar added buys this mix. Pick up to ${MAX_FUND_STOCKS} of your own instead.`}
-        </p>
+        <Label htmlFor="goal">Goal</Label>
+        <TextInput
+          id="goal"
+          inputMode="decimal"
+          placeholder="Optional, like $5,000"
+          value={goalText ? `$${goalText}` : ''}
+          onChange={(event) => {
+            const next = event.target.value.replace(/[^\d.]/g, '')
+            if (/^\d{0,8}(\.\d{0,2})?$/.test(next)) setGoalText(next)
+          }}
+        />
       </div>
 
-      <div className="flex flex-col gap-2 text-[15px]">
+      <div className="flex flex-col gap-2">
+        <Label>What it buys</Label>
+        <button
+          type="button"
+          onClick={() => {
+            setPickerSearch('')
+            setPickerOpen(true)
+          }}
+          aria-label={`Change what it buys. ${custom ? 'Your own mix' : 'Steady mix'}.`}
+          className="flex min-h-16 w-full items-center gap-3 rounded-card border border-line bg-surface px-3.5 py-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+        >
+          <span className="flex shrink-0 -space-x-2">
+            {allocations.map((allocation) => {
+              const stock = stockOf(allocation.mint)
+              return stock ? (
+                <span key={stock.mint} className="rounded-full ring-2 ring-surface">
+                  <StockLogo iconUrl={stock.iconUrl} ticker={stock.ticker} size={32} />
+                </span>
+              ) : null
+            })}
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="font-sans text-[15px] font-medium">
+              {custom ? 'Your own mix' : 'Steady mix'}
+            </span>
+            <span className="truncate text-[13px] text-stone">
+              {allocations
+                .map((item) => `${stockOf(item.mint)?.ticker ?? ''} ${item.percent}%`)
+                .join(' · ')}
+            </span>
+          </span>
+          <CaretRightIcon className="size-5 shrink-0 text-stone" />
+        </button>
+      </div>
+
+      <div className="flex flex-col gap-1.5 text-[15px]">
         <div className="flex justify-between">
           <span className="text-stone">Cost to open</span>
           <span>{feeLabel}</span>
         </div>
-        {feeUsd > 0 && (
-          <p className="text-[13px] leading-[1.45] text-stone">
-            This is what it costs us to keep the fund open for all those years, at cost. Adding
-            money later is free unless it’s the first of a stock.
-          </p>
-        )}
         {cashShort > 0 && (
           <p className="text-[13px] text-loss">
             Add {formatUsd(cashShort)} cash to open this fund.{' '}
@@ -453,12 +403,11 @@ function CreateFund() {
             </a>
           </p>
         )}
+        <p className="text-[13px] leading-[1.45] text-stone">
+          {feeUsd > 0 && 'What keeping it open for years costs us, at cost. '}
+          Stocks go up and down, so a locked fund can end up worth less than what went in.
+        </p>
       </div>
-
-      <Notice tone="warning" icon={<WarningIcon className="size-4.5" />}>
-        Stocks go up and down, and a fund locked for years can be worth less than what went in. The
-        company behind these shares can also pause them. Only put in what you can leave alone.
-      </Notice>
 
       {pickerOpen && (
         <div className="modal-backdrop-in fixed inset-0 z-40 flex items-end justify-center bg-ink/30">
@@ -483,7 +432,9 @@ function CreateFund() {
                   Choose stocks
                 </h2>
                 <p className="text-[13px] text-stone">
-                  {allocations.length} of {MAX_FUND_STOCKS} selected
+                  {custom
+                    ? `${allocations.length} of ${MAX_FUND_STOCKS} selected, split evenly`
+                    : `The steady mix, or up to ${MAX_FUND_STOCKS} of your own`}
                 </p>
               </div>
               <button
@@ -495,6 +446,25 @@ function CreateFund() {
                 <XIcon className="size-5" />
               </button>
             </div>
+            {steadyAvailable && (
+              <button
+                type="button"
+                aria-pressed={custom === null}
+                onClick={() => setCustom(null)}
+                className={clsx(
+                  'mx-5 mb-3 flex shrink-0 items-center gap-3 rounded-card border px-4 py-3 text-left',
+                  custom === null ? 'border-orange bg-orange-wash' : 'border-line bg-surface',
+                )}
+              >
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="font-sans text-[15px] font-medium">Steady mix</span>
+                  <span className="truncate text-[13px] text-stone">
+                    {STEADY_MIX.map(({ ticker, percent }) => `${ticker} ${percent}%`).join(' · ')}
+                  </span>
+                </span>
+                {custom === null && <CheckIcon className="size-5 text-orange" weight="bold" />}
+              </button>
+            )}
             <div className="mx-5 mb-3 flex h-11 shrink-0 items-center gap-2.5 rounded-button border border-line bg-surface px-3.5 focus-within:border-orange focus-within:ring-4 focus-within:ring-orange-wash">
               <MagnifyingGlassIcon className="size-4.5 shrink-0 text-stone" />
               <input
