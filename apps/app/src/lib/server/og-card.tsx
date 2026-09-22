@@ -6,7 +6,7 @@
 import { PUBLIC_APP_URL } from 'astro:env/client'
 import { Buffer } from 'node:buffer'
 import pilatDataUrl from '@morrow/ui/fonts/Pilat-Book.woff2?inline'
-import { create, type Font } from 'fontkitten'
+import { create, type Font, type Glyph } from 'fontkitten'
 import sharp from 'sharp'
 import { match, P } from 'ts-pattern'
 import roundedLogoDataUrl from '@/../public/trymorrow-logo-rounded.png?inline'
@@ -63,10 +63,70 @@ const escapeXml = (value: string) =>
 
 const text = (value: string) => escapeXml(value)
 
+// Pilat only covers Latin, and its missing-glyph box looks like a hand, so a name in Japanese
+// came out as a row of ✌. Characters it lacks are outlined from a Noto face instead, fetched
+// from Google Fonts subset to just those characters (a few KB, not a whole CJK font).
+const FALLBACK_FAMILIES = [
+  'Noto Sans',
+  'Noto Sans JP',
+  'Noto Sans KR',
+  'Noto Sans SC',
+  'Noto Sans TC',
+  'Noto Sans Thai',
+  'Noto Sans Arabic',
+  'Noto Sans Hebrew',
+  'Noto Sans Devanagari',
+]
+
+const fallbackFonts = new Map<number, Font>()
+
+async function fallbackFont(family: string, characters: string): Promise<Font | null> {
+  try {
+    const query = new URLSearchParams({ family, text: characters })
+    // Without a browser user agent Google serves TrueType, which fontkitten reads directly
+    const css = await fetch(`https://fonts.googleapis.com/css2?${query}`, {
+      signal: AbortSignal.timeout(3_000),
+    })
+    if (!css.ok) return null
+    const url = (await css.text()).match(/url\((https:[^)]+)\)/)?.[1]
+    if (!url) return null
+    const file = await fetch(url, { signal: AbortSignal.timeout(3_000) })
+    if (!file.ok) return null
+    const font = create(Buffer.from(await file.arrayBuffer()))
+    return font.isCollection ? null : font
+  } catch {
+    return null
+  }
+}
+
+async function loadFallbacks(values: string[]): Promise<void> {
+  const missing = [...new Set([...values.join('').replace(/\s/g, '')])].filter((character) => {
+    const codePoint = character.codePointAt(0) ?? 0
+    return !pilat.hasGlyphForCodePoint(codePoint) && !fallbackFonts.has(codePoint)
+  })
+  if (missing.length === 0) return
+  const fonts = await Promise.all(
+    FALLBACK_FAMILIES.map((family) => fallbackFont(family, missing.join(''))),
+  )
+  for (const character of missing) {
+    const codePoint = character.codePointAt(0) ?? 0
+    const font = fonts.find((candidate) => candidate?.hasGlyphForCodePoint(codePoint))
+    if (font) fallbackFonts.set(codePoint, font)
+  }
+}
+
+/** Each character's glyph from the first font that has it; ones nobody has are left out */
+function glyphRun(value: string): { glyph: Glyph; scale: number }[] {
+  return [...value].flatMap((character) => {
+    const codePoint = character.codePointAt(0) ?? 0
+    const font = pilat.hasGlyphForCodePoint(codePoint) ? pilat : fallbackFonts.get(codePoint)
+    return font ? [{ glyph: font.glyphForCodePoint(codePoint), scale: 1 / font.unitsPerEm }] : []
+  })
+}
+
 function textWidth(value: string, size: number): number {
   return (
-    (pilat.glyphsForString(value).reduce((sum, glyph) => sum + glyph.advanceWidth, 0) * size) /
-    pilat.unitsPerEm
+    glyphRun(value).reduce((sum, { glyph, scale }) => sum + glyph.advanceWidth * scale, 0) * size
   )
 }
 
@@ -96,7 +156,6 @@ function outlineText(svg: string): string {
       }
       const style = brandStyles[attrs.class ?? '']
       const size = Number(attrs['font-size'] ?? style?.size ?? 18)
-      const scale = size / pilat.unitsPerEm
       const spacing = Number(attrs['letter-spacing'] ?? 0)
       const entities: Record<string, string> = {
         amp: '&',
@@ -109,13 +168,14 @@ function outlineText(svg: string): string {
         /&(amp|lt|gt|quot|apos);/g,
         (_, entity: string) => entities[entity] ?? '',
       )
-      const glyphs = pilat.glyphsForString(value)
+      const glyphs = glyphRun(value).map(({ glyph, scale }) => ({ glyph, scale: scale * size }))
       const width =
-        glyphs.reduce((sum, glyph) => sum + glyph.advanceWidth * scale + spacing, 0) - spacing
+        glyphs.reduce((sum, { glyph, scale }) => sum + glyph.advanceWidth * scale + spacing, 0) -
+        spacing
       let cursor = Number(attrs.x ?? 0)
       if (attrs['text-anchor'] === 'end') cursor -= width
       if (attrs['text-anchor'] === 'middle') cursor -= width / 2
-      const paths = glyphs.map((glyph) => {
+      const paths = glyphs.map(({ glyph, scale }) => {
         const path = `<path d="${glyph.path.toSVG()}" transform="translate(${cursor} ${Number(attrs.y ?? 0)}) scale(${scale} ${-scale})"/>`
         cursor += glyph.advanceWidth * scale + spacing
         return path
@@ -223,6 +283,9 @@ function assetList(assets: OgAsset[], x: number, y: number, width: number, headi
 async function pngResponse(svg: string): Promise<Response> {
   // Supersample the vector artwork for smoother glyphs, curves, and fine perforations.
   // The final OG dimensions stay unchanged, and PNG preserves the result losslessly.
+  await loadFallbacks(
+    [...svg.matchAll(/<text\s[^>]*>([^<]*)<\/text>/g)].map((match) => match[1] ?? ''),
+  )
   const png = await sharp(Buffer.from(outlineText(svg)), { density: 144 })
     .resize(WIDTH, HEIGHT, { kernel: sharp.kernel.lanczos3 })
     .png()
@@ -268,7 +331,15 @@ function giftOrnament(card: GiftOgCard): string {
 }
 
 export async function giftOgImage(card: GiftOgCard): Promise<Response> {
-  const assets = await withEmbeddedImages(card.assets)
+  // Loaded before layout too, so widths and truncation measure the glyphs that will be drawn
+  const [assets] = await Promise.all([
+    withEmbeddedImages(card.assets),
+    loadFallbacks([
+      card.senderName,
+      card.recipientName ?? '',
+      ...card.assets.flatMap((asset) => [asset.name, asset.detail ?? '']),
+    ]),
+  ])
   const state = match(card)
     .with({ status: 'claimed' }, () => ({ label: 'Opened', copy: 'This gift has been opened' }))
     .with({ status: 'refunded' }, () => ({ label: 'Returned', copy: 'This gift was returned' }))
