@@ -264,7 +264,7 @@ function GiftCardScreen() {
     .with({ feeData: undefined }, () => 'Checking…')
     .with(
       { feeStock: P.nonNullable },
-      ({ feeStock: stock }) => `${formatUsd(feeUsd)} in ${stock.name}`,
+      ({ feeStock: stock }) => `${formatUsd(feeUsd)} in $${stock.ticker}`,
     )
     .when(
       ({ feeFromCardUsd: fromCard }) => fromCard > 0,
@@ -498,7 +498,7 @@ function GiftCardScreen() {
         )}
         {feeStock && (
           <p className="text-[13px] leading-[1.45] text-stone">
-            Not enough cash, so the fee is paid with {formatUsd(feeUsd)} of your {feeStock.name}{' '}
+            Not enough cash, so the fee is paid with {formatUsd(feeUsd)} of your ${feeStock.ticker}{' '}
             shares, on top of the card.
           </p>
         )}

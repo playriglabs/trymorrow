@@ -416,7 +416,7 @@ function SendGift() {
     .with({ feeUsd: 0 }, () => 'Free')
     .with(
       { feeStock: P.nonNullable },
-      ({ feeStock: stock }) => `${formatUsd(feeUsd)} in ${stock.name}`,
+      ({ feeStock: stock }) => `${formatUsd(feeUsd)} in $${stock.ticker}`,
     )
     .when(
       ({ feeFromGiftUsd: fromGift }) => fromGift > 0,
@@ -722,7 +722,7 @@ function SendGift() {
               <span key={stock.mint}>
                 {stock.isCash
                   ? cashReceivedLabel
-                  : `${formatShares(perStock / (stock.priceUsd ?? 1))} ${stock.name} shares`}
+                  : `${formatShares(perStock / (stock.priceUsd ?? 1))} $${stock.ticker} shares`}
               </span>
             ))}
           </span>
@@ -751,7 +751,7 @@ function SendGift() {
         )}
         {feeStock && (
           <p className="text-[13px] leading-[1.45] text-stone">
-            Not enough cash, so the fee is paid with {formatUsd(feeUsd)} of your {feeStock.name}{' '}
+            Not enough cash, so the fee is paid with {formatUsd(feeUsd)} of your ${feeStock.ticker}{' '}
             shares, on top of the gift.
           </p>
         )}
