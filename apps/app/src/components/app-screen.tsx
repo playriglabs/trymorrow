@@ -31,6 +31,7 @@ const loaders = {
   'send-gift-screen': () => import('@/components/screens/send-gift-screen'),
   'send-stocks-screen': () => import('@/components/screens/send-stocks-screen'),
   'stocks-screen': () => import('@/components/screens/stocks-screen'),
+  'trade-history-screen': () => import('@/components/screens/trade-history-screen'),
   'trade-screen': () => import('@/components/screens/trade-screen'),
   'watchlist-screen': () => import('@/components/screens/watchlist-screen'),
 }
@@ -68,6 +69,7 @@ const routes: Record<string, ScreenName> = {
   '/notifications/settings': 'notifications-settings-screen',
   '/funds/new': 'create-fund-screen',
   '/watchlist': 'watchlist-screen',
+  '/trades': 'trade-history-screen',
 }
 
 function preload(href: string) {

@@ -80,6 +80,29 @@ export type Portfolio = {
 
 export type TradeSide = 'buy' | 'sell'
 
+/** One buy or sell, as the trade history lists it */
+export type TradeHistoryItem = {
+  id: string
+  side: TradeSide
+  mint: string
+  ticker: string
+  name: string
+  iconUrl: string | null
+  /** Shares as they stood that day; null when the stock has left the catalog */
+  shares: number | null
+  /** Cash in (buy) or out (sell) */
+  usd: number
+  pricePerShare: number | null
+  signature: string
+  createdAt: string
+}
+
+export type TradeHistoryPage = {
+  trades: TradeHistoryItem[]
+  /** Pass back as `before` for the next page; null on the last one */
+  nextCursor: string | null
+}
+
 /** A private company's pre-IPO shares, with the issuer's own numbers beside ours */
 export type PreIpoListing = {
   /** What the issuer last valued the whole company at */

@@ -1,4 +1,10 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { useApi } from '@/lib/client/api'
 import { useSignRelayed } from '@/lib/client/sign'
@@ -29,6 +35,7 @@ import type {
   StockSendQuote,
   StockSendView,
   StocksResponse,
+  TradeHistoryPage,
   TradeQuote,
   TradeResult,
   TradeSide,
@@ -66,6 +73,7 @@ export const queryKeys = {
     ['loan-quote', mint, sharesRaw, cashRaw] as const,
   notifications: () => ['notifications'] as const,
   notificationFeed: () => ['notification-feed'] as const,
+  tradeHistory: () => ['trade-history'] as const,
   tradeQuote: ({ side, mint, amountRaw }: TradeQuoteParams) =>
     ['trade-quote', side, mint, amountRaw] as const,
   cashoutQuote: (target: string, amountRaw: string) =>
@@ -897,7 +905,25 @@ export function useTradeMutation() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.portfolio() })
       queryClient.invalidateQueries({ queryKey: queryKeys.stocks() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.tradeHistory() })
     },
+  })
+}
+
+/** Every buy and sell, newest first, fetched a page at a time as the list scrolls */
+export function useTradeHistoryQuery({ enabled = true }: Options = {}) {
+  const api = useApi()
+  return useInfiniteQuery({
+    queryKey: queryKeys.tradeHistory(),
+    enabled,
+    initialPageParam: null as string | null,
+    getNextPageParam: (page: TradeHistoryPage) => page.nextCursor,
+    queryFn: ({ pageParam }) =>
+      api<TradeHistoryPage>(
+        pageParam
+          ? `/api/trades/history?before=${encodeURIComponent(pageParam)}`
+          : '/api/trades/history',
+      ),
   })
 }
 

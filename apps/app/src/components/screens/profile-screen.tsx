@@ -2,6 +2,7 @@ import { navigate } from 'astro:transitions/client'
 import {
   ArrowLineUpRightIcon,
   CaretRightIcon,
+  ClockCounterClockwiseIcon,
   CopyIcon,
   GiftIcon,
   KeyIcon,
@@ -113,6 +114,11 @@ function ProfilePage() {
             <span className="flex-1">Add cash</span>
             <CaretRightIcon className="size-4.5 text-steel" />
           </a>
+          <a href="/trades" className="flex h-13 items-center gap-3">
+            <ClockCounterClockwiseIcon className="size-5" />
+            <span className="flex-1">Trade history</span>
+            <CaretRightIcon className="size-4.5 text-steel" />
+          </a>
           <a href="/send-stocks" className="flex h-13 items-center gap-3">
             <PaperPlaneTiltIcon className="size-5" />
             <span className="flex-1">Send stocks</span>
@@ -131,7 +137,7 @@ function ProfilePage() {
           {account && (
             <button
               type="button"
-              className="flex h-13 items-center gap-3 text-left"
+              className="flex h-13 items-center cursor-pointer gap-3 text-left"
               onClick={() => {
                 if (!address) return
                 setExportError(null)
