@@ -168,13 +168,15 @@ const structuredData = JSON.stringify({
       // back afterwards isn't enough: the rules go in through insertRule and die with the node.
       // Marking it persisted, with a matching placeholder in the next page, keeps the node itself.
       document.addEventListener('astro:before-swap', (event) => {
-        document.head.querySelectorAll('style[data-styled]').forEach((style, index) => {
-          const id = style.dataset.astroTransitionPersist ?? `styled-components-${index}`
-          style.dataset.astroTransitionPersist = id
-          const placeholder = event.newDocument.createElement('style')
-          placeholder.dataset.astroTransitionPersist = id
-          event.newDocument.head.append(placeholder)
-        })
+        document.head
+          .querySelectorAll<HTMLStyleElement>('style[data-styled]')
+          .forEach((style, index) => {
+            const id = style.dataset.astroTransitionPersist ?? `styled-components-${index}`
+            style.dataset.astroTransitionPersist = id
+            const placeholder = event.newDocument.createElement('style')
+            placeholder.dataset.astroTransitionPersist = id
+            event.newDocument.head.append(placeholder)
+          })
       })
     </script>
   </body>
