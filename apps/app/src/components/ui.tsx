@@ -9,13 +9,16 @@ import type {
   ReactNode,
 } from 'react'
 
+// Shiny buttons fade by colour, not opacity: a translucent layer with outer shadows
+// composites as a rectangle and shows pale corners under the radius.
 const variants = {
-  filled: 'button-shiny bg-orange text-white',
-  soft: 'glass-soft text-ink',
-  outline: 'button-shiny-light border border-line bg-surface text-ink',
-  dark: 'button-shiny bg-ink text-surface',
-  ghost: 'bg-transparent text-ink',
-  danger: 'bg-transparent text-loss',
+  filled:
+    'button-shiny bg-orange text-white disabled:bg-[color-mix(in_srgb,var(--color-orange)_50%,var(--color-cream))]',
+  soft: 'glass-soft text-ink disabled:opacity-50',
+  outline: 'button-shiny-light border border-line bg-surface text-ink disabled:text-steel',
+  dark: 'button-shiny bg-ink text-surface disabled:bg-[color-mix(in_srgb,var(--color-ink)_50%,var(--color-cream))]',
+  ghost: 'bg-transparent text-ink disabled:opacity-50',
+  danger: 'bg-transparent text-loss disabled:opacity-50',
 } as const
 
 const sizes = {
@@ -30,7 +33,7 @@ const buttonClass = ({ variant = 'filled', size = 'lg' }: ButtonStyle, className
   clsx(
     'inline-flex items-center justify-center gap-2 rounded-button font-sans font-medium tracking-[-0.02em]',
     'transition-[filter,opacity] duration-150 hover:brightness-95 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink',
-    'disabled:pointer-events-none disabled:opacity-50',
+    'disabled:pointer-events-none',
     variants[variant],
     sizes[size],
     className,

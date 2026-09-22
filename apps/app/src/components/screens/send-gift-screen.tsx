@@ -523,7 +523,7 @@ function SendGift() {
             {stocks.map((holding) => (
               <span
                 key={holding.mint}
-                className="flex h-9 min-w-0 items-center gap-2 rounded-link bg-orange-wash pr-3 pl-1.5 font-sans text-[14px] font-medium"
+                className="flex h-9 min-w-0 items-center gap-2 rounded-link border border-line bg-white pr-3 pl-1.5 font-sans text-[14px] font-medium"
               >
                 {holding.isCash ? (
                   <CashLogo size={26} />
