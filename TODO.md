@@ -230,8 +230,8 @@ place to borrow it against these shares.
       "Tell them on X" through X's composer
 - [ ] Apply `20260923120000_gift_x_recipients.sql` and set `SOCIALDATA_API_KEY`
 - [ ] Try it end to end on mainnet: send $1 to a fresh X account, sign in with X, claim
-- [ ] "Link X" in settings, and store the X id on `users`, so an email account can receive X gifts
-      and a tweet can be matched to its author
+- [x] "Link your X account" on Profile, so an email account can receive X gifts and tip by tweet
+- [ ] Merge two accounts when the X account already has its own (today: help@ and a manual delete)
 - [x] Tip by tweeting: parser, `tips` table, signed webhook, @trymorrow replies, tips on Home,
       confirm through the send screen
 - [ ] Apply `20260923130000_tips.sql` and `20260923140000_x_accounts.sql`

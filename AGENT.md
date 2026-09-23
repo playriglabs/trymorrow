@@ -273,7 +273,8 @@ X account, and after 30 days it goes back to the sender like any other.
 - After sending, "Tell @rahx on X" opens X's own composer filled in with the gift link, and the
   sender posts it from their account. Posting from ours would cost $0.20 per post with a link.
 - Same gotcha as Google: someone already on Morrow by email who signs in with X gets a second
-  account. Linking X in settings (TODO) closes that.
+  account. "Link your X account" on Profile closes that; an X account that already has its own
+  Morrow account can't be linked (Privy refuses) until that one is deleted.
 
 ### Tips by tweet
 
@@ -293,7 +294,7 @@ each matching tweet to `POST /api/x/webhook`; `handleTipTweet` (`tips.ts`) decid
   (`ack_reply_id`, `sent_reply_id`), `MAX_REPLIES_PER_DAY` across everyone, and
   `MAX_TIPS_PER_SENDER_PER_DAY`. A tip lasts `TIP_LIFETIME_HOURS` (24); no cron, it just stops
   showing.
-- The webhook verifies HMAC-SHA256 over `{X-Event-Id}.{X-Timestamp}.{raw body}` with
+- The webhook verifies `X-Signature: v1=<hex>`, HMAC-SHA256 over `{X-Event-Id}.{X-Timestamp}.{raw body}` with
   `SOCIALDATA_WEBHOOK_SECRET` and a 5-minute window, and refuses everything while it's unset.
   SocialData doesn't retry, so a tweet that fails is logged, not bounced.
 - The parser (`lib/tips.ts`) takes `$1 NVDA`, `$NVDA $1`, `$1 of nvda`, `$1 cash`; a word it
