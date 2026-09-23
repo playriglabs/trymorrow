@@ -20,6 +20,7 @@ import { useState } from 'react'
 import { AvatarPicker } from '@/components/avatar-picker'
 import { withProviders } from '@/components/providers'
 import { TabBar } from '@/components/tab-bar'
+import { TipSettings } from '@/components/tip-settings'
 import { Button, Card, Loading, Notice } from '@/components/ui'
 import { copyText } from '@/lib/client/copy'
 import { useSession } from '@/lib/client/session'
@@ -116,11 +117,14 @@ function ProfilePage() {
 
         <Card className="flex flex-col divide-y divide-line px-4">
           {x ? (
-            <div className="flex h-13 items-center gap-3">
-              <XLogoIcon weight="bold" className="size-5" />
-              <span className="flex-1">X</span>
-              <span className="text-[14px] text-stone">@{x.username}</span>
-            </div>
+            <>
+              <div className="flex h-13 items-center gap-3">
+                <XLogoIcon weight="bold" className="size-5" />
+                <span className="flex-1">X</span>
+                <span className="text-[14px] text-stone">@{x.username}</span>
+              </div>
+              {address && <TipSettings profile={profile} address={address} />}
+            </>
           ) : (
             <button
               type="button"

@@ -52,7 +52,7 @@ export const POST = route(async ({ request }) => {
     /\btip\b/i.test(post.text ?? 'tip')
   ) {
     await fetchTweet(post.id)
-      .then((tweet) => (tweet ? handleTipTweet(tweet) : undefined))
+      .then((tweet) => (tweet ? handleTipTweet(tweet, request) : undefined))
       .catch((error) => console.error('Tip mention failed', error))
   }
   return json({ ok: true })

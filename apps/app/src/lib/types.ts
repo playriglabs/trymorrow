@@ -12,6 +12,8 @@ export type Profile = {
   country: string | null
   /** Region check passed and a name + gift link are set */
   onboarded: boolean
+  /** Tips tweeted at @trymorrow send themselves when `auto` is on, up to these dollar limits */
+  tips: { auto: boolean; maxUsd: number; dailyUsd: number }
 }
 
 export type PublicProfile = {
@@ -470,19 +472,6 @@ export type NotificationSettings = {
   pushEnabled: boolean
   /** Whether the same things also reach their inbox */
   emailEnabled: boolean
-}
-
-/** A tip someone tweeted (`@trymorrow tip @rahx $1 NVDA`) that's waiting for them to send it */
-export type TipView = {
-  id: string
-  recipientUsername: string
-  recipientName: string | null
-  amountUsd: number
-  /** "$1 of NVDA", "$1 in cash" */
-  label: string
-  /** The send screen, filled in with this tip */
-  sendPath: string
-  expiresAt: string
 }
 
 export type NotificationKind =

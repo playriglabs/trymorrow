@@ -232,9 +232,14 @@ place to borrow it against these shares.
 - [ ] Try it end to end on mainnet: send $1 to a fresh X account, sign in with X, claim
 - [x] "Link your X account" on Profile, so an email account can receive X gifts and tip by tweet
 - [ ] Merge two accounts when the X account already has its own (today: help@ and a manual delete)
-- [x] Tip by tweeting: parser, `tips` table, signed webhook, @trymorrow replies, tips on Home,
-      confirm through the send screen
-- [ ] Apply `20260923130000_tips.sql` and `20260923140000_x_accounts.sql`
+- [x] Tip by tweeting: parser, `tips` table, signed webhooks (X mentions and SocialData),
+      @trymorrow replies
+- [x] Tips send themselves for people who turn it on (Privy signer bounded by the tip policy,
+      per-tip and daily limits, every tweet confirmed with X before money moves)
+- [ ] Apply `20260923150000_tip_auto_send.sql`
+- [ ] Vercel production: `PRIVY_AUTHORIZATION_KEY`, `PUBLIC_PRIVY_TIP_SIGNER_ID`,
+      `PUBLIC_PRIVY_TIP_POLICY_ID` (the public two are baked in at build, so set them before deploy)
+- [ ] First real auto tip on mainnet: cash, then a stock
 - [ ] X developer app for @trymorrow (pay-per-use, read and write), set `X_API_KEY`,
       `X_API_SECRET`, `X_ACCESS_TOKEN`, `X_ACCESS_TOKEN_SECRET`; set a monthly spend cap there
 - [ ] Mark @trymorrow as automated in X settings

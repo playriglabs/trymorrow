@@ -25,10 +25,14 @@ export type UserRow = {
   /** Cash balance at the last look, in USDC base units; deposits are what came in above it */
   cash_seen_raw: string | null
   cash_seen_signature: string | null
+  /** Tips tweeted at @trymorrow send themselves, within the two limits below (dollars) */
+  tip_auto: boolean
+  tip_max_usd: string
+  tip_daily_usd: string
 }
 
 export const USER_COLUMNS =
-  'id, privy_id, email, wallet_address, handle, name, avatar_path, country, terms_accepted_at, telegram_user_id, cash_seen_raw, cash_seen_signature'
+  'id, privy_id, email, wallet_address, handle, name, avatar_path, country, terms_accepted_at, telegram_user_id, cash_seen_raw, cash_seen_signature, tip_auto, tip_max_usd, tip_daily_usd'
 
 export { HANDLE_PATTERN } from '@/lib/handles'
 // Every top-level page route, plus the names we keep for ourselves: a handle that matches one
@@ -149,6 +153,11 @@ export function toProfile(row: UserRow): Profile {
     walletAddress: row.wallet_address,
     country: row.country,
     onboarded: isOnboarded(row),
+    tips: {
+      auto: row.tip_auto,
+      maxUsd: Number(row.tip_max_usd),
+      dailyUsd: Number(row.tip_daily_usd),
+    },
   }
 }
 
