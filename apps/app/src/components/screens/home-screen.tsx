@@ -316,11 +316,14 @@ function House() {
   const balanceFontSize = Math.max(24, 44 - Math.max(0, balanceLabel.length - 7) * 3)
 
   const toClaim = received.data?.filter((gift) => gift.status === 'pending') ?? []
-  // Home shows the five that arrived most recently — what someone just bought is what they came
-  // back to look at. `/stocks` holds the whole portfolio, biggest first.
-  const stocks = (portfolio.data?.holdings.filter((holding) => !holding.isCash) ?? []).sort(
-    byNewest,
-  )
+  // Home is a useful recent-activity glance, not a list of token-account dust. Start with stocks
+  // that have a spendable balance worth more than a cent, then show the latest acquisitions first.
+  // `/stocks` still holds the complete portfolio, biggest first.
+  const stocks = (
+    portfolio.data?.holdings.filter(
+      (holding) => !holding.isCash && holding.amount > 0 && (holding.valueUsd ?? 0) > 0.01,
+    ) ?? []
+  ).sort(byNewest)
   const pricedStocks = new Map((stockPrices.data?.stocks ?? []).map((stock) => [stock.mint, stock]))
   const watched = (watchlist?.mints ?? []).flatMap((mint) => {
     const stock = pricedStocks.get(mint)
