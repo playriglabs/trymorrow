@@ -180,13 +180,19 @@ export async function toGiftViews(gifts: GiftRow[], viewer: UserRow | null): Pro
   const ids = [
     ...new Set(gifts.flatMap((gift) => [gift.sender_id, gift.recipient_id]).filter(Boolean)),
   ]
-  const [{ data, error }, stocks] = await Promise.all([
+  const giftIds = gifts.map((gift) => gift.id)
+  const [{ data, error }, stocks, { data: tipRows }] = await Promise.all([
     ids.length
       ? db.from('users').select('id, handle, name, avatar_path').in('id', ids)
       : Promise.resolve({ data: [], error: null }),
     getStocks(),
+    giftIds.length
+      ? db.from('tips').select('gift_id').in('gift_id', giftIds)
+      : Promise.resolve({ data: [] }),
   ])
   if (error) throw error
+  // A gift sent by tweeting at @trymorrow is shown as a tip; nothing else about it differs
+  const tipGiftIds = new Set(((tipRows ?? []) as { gift_id: string }[]).map((row) => row.gift_id))
   const stockByMint = new Map(stocks.map((stock) => [stock.mint.toBase58(), stock]))
   const users = new Map(
     (data as Pick<UserRow, 'id' | 'handle' | 'name' | 'avatar_path'>[]).map((user) => [
@@ -258,6 +264,7 @@ export async function toGiftViews(gifts: GiftRow[], viewer: UserRow | null): Pro
       recipientLabel,
       recipientIsEmail: !codeCard && !recipient?.handle && !recipientX,
       recipientX,
+      isTip: tipGiftIds.has(gift.id),
       codeCard,
       items,
       usdValue,

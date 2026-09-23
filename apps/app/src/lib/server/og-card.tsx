@@ -10,6 +10,7 @@ import { create, type Font, type Glyph } from 'fontkitten'
 import sharp from 'sharp'
 import { match, P } from 'ts-pattern'
 import roundedLogoDataUrl from '@/../public/trymorrow-logo-rounded.png?inline'
+import { MODULE_RADIUS, qrLayout } from '@/lib/client/qr-layout'
 
 const loadedPilat = create(Buffer.from(pilatDataUrl.split(',')[1] ?? '', 'base64'))
 if (loadedPilat.isCollection) throw new Error('The gift card font must be a single font.')
@@ -32,6 +33,10 @@ export type GiftOgCard = {
   codeCard?: boolean
   totalValue: string | null
   assets: OgAsset[]
+  /** The gift's page; drawn as a code on the card so a screenshot still leads somewhere */
+  url?: string
+  /** Sent by tweeting at @trymorrow, so the card says tip */
+  tip?: boolean
 }
 
 const WIDTH = 1200
@@ -280,6 +285,38 @@ function assetList(assets: OgAsset[], x: number, y: number, width: number, headi
   `
 }
 
+/**
+ * The same code as the app's `QrCode`: shared module grid, rounded finders, the Morrow mark in the
+ * middle. A square tile sized in pixels, placed with its top-left corner at x, y.
+ */
+function qrTile(value: string, x: number, y: number, size: number): string {
+  const padding = 10
+  const layout = qrLayout(value, 0.22)
+  const scale = (size - padding * 2) / layout.total
+  const ink = COLORS.ink
+  const cells = layout.cells
+    .map(
+      (cell) =>
+        `<rect x="${cell.x}" y="${cell.y}" width="1" height="1" rx="${MODULE_RADIUS}" fill="${ink}"/>`,
+    )
+    .join('')
+  const finders = layout.finders
+    .map(
+      (finder) => `
+        <rect x="${finder.x}" y="${finder.y}" width="7" height="7" rx="2" fill="${ink}"/>
+        <rect x="${finder.x + 1}" y="${finder.y + 1}" width="5" height="5" rx="1.4" fill="${COLORS.white}"/>
+        <rect x="${finder.x + 2}" y="${finder.y + 2}" width="3" height="3" rx="1" fill="${ink}"/>`,
+    )
+    .join('')
+  const logo = layout.logo
+    ? `<image x="${layout.logo.position}" y="${layout.logo.position}" width="${layout.logo.size}" height="${layout.logo.size}" xlink:href="${roundedLogoDataUrl}"/>`
+    : ''
+  return `
+    <rect x="${x}" y="${y}" width="${size}" height="${size}" rx="18" fill="${COLORS.white}"/>
+    <g transform="translate(${x + padding} ${y + padding}) scale(${scale})">${cells}${finders}${logo}</g>
+  `
+}
+
 async function pngResponse(svg: string): Promise<Response> {
   // Supersample the vector artwork for smoother glyphs, curves, and fine perforations.
   // The final OG dimensions stay unchanged, and PNG preserves the result losslessly.
@@ -327,7 +364,9 @@ function giftOrnament(card: GiftOgCard): string {
       <circle r="15"/>
     </g>`,
   ]
-  return `<g transform="translate(536 446)" fill="${COLORS.white}" opacity=".09">${ornaments[hash % ornaments.length]}</g>`
+  // With a code in the corner the ornament moves up, behind the amount, so neither covers the other
+  const at = card.url ? '560 230' : '536 446'
+  return `<g transform="translate(${at})" fill="${COLORS.white}" opacity=".09">${ornaments[hash % ornaments.length]}</g>`
 }
 
 export async function giftOgImage(card: GiftOgCard): Promise<Response> {
@@ -340,9 +379,11 @@ export async function giftOgImage(card: GiftOgCard): Promise<Response> {
       ...card.assets.flatMap((asset) => [asset.name, asset.detail ?? '']),
     ]),
   ])
+  // A tip from X is a gift underneath, but it's called what the person tweeted
+  const noun = card.tip ? 'tip' : 'gift'
   const state = match(card)
-    .with({ status: 'claimed' }, () => ({ label: 'Opened', copy: 'This gift has been opened' }))
-    .with({ status: 'refunded' }, () => ({ label: 'Returned', copy: 'This gift was returned' }))
+    .with({ status: 'claimed' }, () => ({ label: 'Opened', copy: `This ${noun} has been opened` }))
+    .with({ status: 'refunded' }, () => ({ label: 'Returned', copy: `This ${noun} was returned` }))
     .with({ codeCard: true }, () => ({ label: null, copy: 'Anyone with the code can redeem it' }))
     .otherwise(() => ({ label: null, copy: 'Only the person it’s for can open it' }))
   const recipient = match(card)
@@ -384,14 +425,15 @@ export async function giftOgImage(card: GiftOgCard): Promise<Response> {
       ${giftOrnament(card)}
 
       ${state.label ? `<rect x="85" y="134" width="${state.label.length * 10 + 42}" height="36" rx="18" fill="${COLORS.white}"/><text x="106" y="158" fill="${COLORS.orangeDark}" font-size="17">${text(state.label)}</text>` : ''}
-      <text x="85" y="214" fill="${COLORS.white}" opacity=".88" font-size="24">A Morrow gift</text>
+      <text x="85" y="214" fill="${COLORS.white}" opacity=".88" font-size="24">A Morrow ${noun}</text>
       <text x="85" y="292" fill="${COLORS.white}" font-size="${heroSize}" font-weight="700" letter-spacing="-1.5">${text(hero)}</text>
       <text x="85" y="341" fill="${COLORS.white}" font-size="28">${text(recipient)}</text>
 
       <text x="85" y="474" fill="${COLORS.white}" opacity=".8" font-size="19">From</text>
       <text x="85" y="511" fill="${COLORS.white}" font-size="29" font-weight="700">${text(card.senderName)}</text>
       <text x="85" y="548" fill="${COLORS.white}" opacity=".78" font-size="17">${text(state.copy)}</text>
-      ${assetList(assets, 678, 116, 458, 'Inside this gift')}
+      ${card.url ? qrTile(card.url, 480, 400, 148) : ''}
+      ${assetList(assets, 678, 116, 458, `Inside this ${noun}`)}
       <path d="${ticketInsetPath}" clip-path="url(#gift-ticket-left)" fill="none" stroke="${COLORS.white}" stroke-opacity=".72" stroke-width="1" stroke-dasharray="5 8" stroke-linecap="round"/>
       </g>
     `),

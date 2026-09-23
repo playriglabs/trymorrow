@@ -36,7 +36,7 @@ export function GiftRow({ gift, sent }: { gift: GiftView; sent: boolean }) {
       </span>
       <div className="flex min-w-0 flex-1 flex-col">
         <span className="truncate">
-          {sent ? 'Sent ' : 'Sent you '}
+          {gift.isTip ? (sent ? 'Tipped ' : 'Tipped you ') : sent ? 'Sent ' : 'Sent you '}
           {giftAmountLabel(gift.usdValue, labelItems)}
         </span>
         <span className="truncate text-[13px] text-stone">

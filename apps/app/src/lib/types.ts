@@ -302,6 +302,8 @@ export type GiftView = {
   recipientIsEmail: boolean
   /** The X name it was sent to, while its person has no Morrow profile to show instead */
   recipientX: string | null
+  /** Sent by tweeting at @trymorrow: the same gift underneath, called a tip on screen */
+  isTip: boolean
   /** Locked to a redeem code rather than a person; whoever redeems it becomes the recipient */
   codeCard: boolean
   /** The stocks inside, largest first */
