@@ -76,7 +76,7 @@ function GiftCard({ gift }: { gift: GiftView }) {
         <span className="text-[15px] text-white">
           {gift.codeCard
             ? `${gift.sender.name} made a gift card`
-            : `${gift.sender.name} sent you a gift`}
+            : `${gift.sender.name} sent you a ${gift.isTip ? 'tip' : 'gift'}`}
         </span>
       </div>
       <div className="relative flex flex-col gap-1">
@@ -242,6 +242,9 @@ function Gift({ giftId }: { giftId: string }) {
   }
 
   const view = gift.data
+  // A tip from X is a gift underneath; only the word changes
+  const noun = view.isTip ? 'tip' : 'gift'
+  const Noun = view.isTip ? 'Tip' : 'Gift'
   const assets = giftAssetsLabel(view.items)
   const bundle = view.items.length > 1
   const hasCash = view.items.some((item) => item.isCash)
@@ -252,7 +255,7 @@ function Gift({ giftId }: { giftId: string }) {
     thank.mutate({ note: text })
   }
   const heading = match({ viewer: view.viewer, bundle, hasCash })
-    .with({ viewer: 'sender' }, () => `${view.recipientLabel} claimed your gift`)
+    .with({ viewer: 'sender' }, () => `${view.recipientLabel} claimed your ${noun}`)
     .with({ hasCash: true, bundle: false }, () => 'The cash is yours')
     .with({ bundle: true }, () => `${assets} are yours`)
     .otherwise(() => `${assets} is yours`)
@@ -273,7 +276,7 @@ function Gift({ giftId }: { giftId: string }) {
             <SuccessMark />
             <div className="flex flex-col gap-1.5">
               <h1 className="font-sans text-[30px] leading-[1.15] font-medium tracking-[-0.02em] text-balance">
-                {tookBack ? 'You took your gift back' : 'Your gift came back'}
+                {tookBack ? `You took your ${noun} back` : `Your ${noun} came back`}
               </h1>
               <p className="text-stone">
                 The {giftAmountLabel(view.usdValue, view.items)} is yours again.
@@ -284,12 +287,12 @@ function Gift({ giftId }: { giftId: string }) {
       )
     }
     return (
-      <Screen back="/" title="Gift" footer={<LinkButton href="/">Go home</LinkButton>}>
+      <Screen back="/" title={Noun} footer={<LinkButton href="/">Go home</LinkButton>}>
         <GiftCard gift={view} />
         <Notice icon={<LockIcon className="size-4.5 text-stone" />}>
           {view.viewer === 'recipient'
-            ? `This gift went back to ${view.sender.name} before it was opened.`
-            : `This gift wasn’t opened in time, so it went back to ${view.sender.name}.`}
+            ? `This ${noun} went back to ${view.sender.name} before it was opened.`
+            : `This ${noun} wasn’t opened in time, so it went back to ${view.sender.name}.`}
         </Notice>
       </Screen>
     )
@@ -331,7 +334,7 @@ function Gift({ giftId }: { giftId: string }) {
     return (
       <Screen
         back="/gifts"
-        title="Gift"
+        title={Noun}
         footer={
           <>
             {thank.isError && (
@@ -387,7 +390,7 @@ function Gift({ giftId }: { giftId: string }) {
     return (
       <Screen
         back="/"
-        title="Your gift"
+        title={`Your ${noun}`}
         footer={
           <>
             {takeBack.isError && (
@@ -446,7 +449,7 @@ function Gift({ giftId }: { giftId: string }) {
       )
     }
     return (
-      <Screen title="Gift" back="/">
+      <Screen title={Noun} back="/">
         <GiftCard gift={view} />
         <div className="flex flex-col gap-1.5">
           <h2 className="font-sans text-xl font-medium tracking-[-0.02em]">It’s yours to keep</h2>
@@ -455,16 +458,16 @@ function Gift({ giftId }: { giftId: string }) {
               .with(
                 { recipientX: P.string },
                 () =>
-                  `This gift is for ${view.recipientLabel}. Sign in with that X account to open it.`,
+                  `This ${noun} is for ${view.recipientLabel}. Sign in with that X account to open it.`,
               )
               .with(
                 { recipientIsEmail: true },
                 () =>
-                  `This gift is for ${view.recipientLabel}. Sign in with that email to open it.`,
+                  `This ${noun} is for ${view.recipientLabel}. Sign in with that email to open it.`,
               )
               .otherwise(
                 () =>
-                  `This gift is for ${view.recipientLabel}. Sign in to their Morrow account to open it.`,
+                  `This ${noun} is for ${view.recipientLabel}. Sign in to their Morrow account to open it.`,
               )}
           </p>
         </div>
@@ -499,7 +502,7 @@ function Gift({ giftId }: { giftId: string }) {
     }
     return (
       <Screen
-        title="Gift"
+        title={Noun}
         back="/"
         footer={
           <Button variant="soft" onClick={() => session.logout().then(() => location.reload())}>
@@ -509,7 +512,7 @@ function Gift({ giftId }: { giftId: string }) {
       >
         <GiftCard gift={view} />
         <Notice tone="warning" icon={<UserCircleIcon className="size-4.5" />}>
-          This gift is for {view.recipientLabel}, and you’re signed in as{' '}
+          This {noun} is for {view.recipientLabel}, and you’re signed in as{' '}
           {session.profile?.email ?? 'someone else'}.{' '}
           {view.recipientX
             ? 'Switch account and sign in with that X account to open it.'
@@ -521,7 +524,7 @@ function Gift({ giftId }: { giftId: string }) {
 
   return (
     <Screen
-      title="Gift"
+      title={Noun}
       back="/"
       footer={
         <>
@@ -533,7 +536,7 @@ function Gift({ giftId }: { giftId: string }) {
             onClick={() => claim.mutate(undefined, { onSuccess: () => setOpened(true) })}
           >
             {match({ bundle, hasCash })
-              .with({ bundle: true }, () => 'Claim your gift')
+              .with({ bundle: true }, () => `Claim your ${noun}`)
               .with({ hasCash: true }, () => `Claim ${formatUsd(view.usdValue)} in cash`)
               .otherwise(() => `Claim ${formatUsd(view.usdValue)} of ${assets}`)}
           </Button>

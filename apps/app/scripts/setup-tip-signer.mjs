@@ -72,6 +72,27 @@ const policy = await privy.policies().create({
         },
       ],
     },
+    // Cash is a classic-token mint, and `feeTransferInstruction` pays it with a plain Transfer
+    // (TransferChecked would cost 33 bytes some transactions don't have)
+    {
+      name: 'Cash fee (classic Transfer) to the Morrow treasury',
+      method: 'signTransaction',
+      action: 'ALLOW',
+      conditions: [
+        {
+          field_source: 'solana_token_program_instruction',
+          field: 'instructionName',
+          operator: 'eq',
+          value: 'Transfer',
+        },
+        {
+          field_source: 'solana_token_program_instruction',
+          field: 'Transfer.destination',
+          operator: 'eq',
+          value: treasuryCash,
+        },
+      ],
+    },
   ],
 })
 console.log('Policy:', policy.id)

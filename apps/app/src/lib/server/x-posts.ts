@@ -1,4 +1,5 @@
 import { X_ACCESS_TOKEN, X_ACCESS_TOKEN_SECRET, X_API_KEY, X_API_SECRET } from 'astro:env/server'
+import { Buffer } from 'node:buffer'
 import { createHmac, randomBytes } from 'node:crypto'
 
 /**
@@ -45,8 +46,37 @@ function oauthHeader(method: string, url: string, query: Record<string, string> 
     .join(', ')}`
 }
 
+const MEDIA_URL = 'https://api.x.com/2/media/upload'
+
+/**
+ * Uploads a picture for a post and returns its media id, or null when X refuses it. The image
+ * goes base64 in a JSON body, which OAuth 1.0a leaves out of the signature like any JSON body.
+ */
+export async function uploadImageToX(png: Uint8Array): Promise<string | null> {
+  if (!xRepliesAvailable()) return null
+  const response = await fetch(MEDIA_URL, {
+    method: 'POST',
+    headers: { authorization: oauthHeader('POST', MEDIA_URL), 'content-type': 'application/json' },
+    body: JSON.stringify({
+      media: Buffer.from(png).toString('base64'),
+      media_category: 'tweet_image',
+    }),
+    signal: AbortSignal.timeout(15_000),
+  })
+  if (!response.ok) {
+    console.error('X image upload failed', response.status, await response.text().catch(() => ''))
+    return null
+  }
+  const body = (await response.json()) as { data?: { id?: string } }
+  return body.data?.id ?? null
+}
+
 /** Posts a reply and returns its id, or null when replies are off or X refused it */
-export async function replyOnX(inReplyTo: string, text: string): Promise<string | null> {
+export async function replyOnX(
+  inReplyTo: string,
+  text: string,
+  mediaIds: string[] = [],
+): Promise<string | null> {
   if (!xRepliesAvailable()) return null
   const response = await fetch(TWEETS_URL, {
     method: 'POST',
@@ -54,7 +84,11 @@ export async function replyOnX(inReplyTo: string, text: string): Promise<string 
       authorization: oauthHeader('POST', TWEETS_URL),
       'content-type': 'application/json',
     },
-    body: JSON.stringify({ text, reply: { in_reply_to_tweet_id: inReplyTo } }),
+    body: JSON.stringify({
+      text,
+      reply: { in_reply_to_tweet_id: inReplyTo },
+      ...(mediaIds.length > 0 ? { media: { media_ids: mediaIds } } : {}),
+    }),
     signal: AbortSignal.timeout(8_000),
   })
   if (!response.ok) {

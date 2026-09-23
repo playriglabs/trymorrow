@@ -303,9 +303,17 @@ mention event doesn't. Both fetch the tweet in SocialData's shape and call `hand
   limits and `MAX_TIPS_PER_SENDER_PER_DAY`, and they hold the amount. Last, X itself must confirm
   the post (`readPostOnX`, $0.005): same author, same recipient id, same command. Never answer
   with a reason: "not enough cash" in public tells everyone their balance.
-- **One reply per tip, after it lands**, from `completeTipForGift`: "@rahx @kyy sent you $1 of
-  NVDA 🎁" with "Receipt: <signature>" under it, bare so anyone can look it up. $0.01, never a
-  link (a link makes it $0.20), `MAX_REPLIES_PER_DAY` across everyone. A
+- **One reply per tip, after it lands**, from `completeTipForGift`: "Sent: $1.00 of $NVDA 🎁 …"
+  with "Receipt: <signature>" under it, bare so anyone can look it up. Stocks go as cashtags. The
+  words name nobody: X already puts the thread's people in front of a reply, and a reply stacked
+  with repeated handles gets folded away as spam. It carries the gift's card (`giftOgCard` →
+  `giftOgImage`, uploaded with `uploadImageToX`); if the card fails the words go alone. $0.01,
+  never a link (a link makes it $0.20), `MAX_REPLIES_PER_DAY` across everyone.
+- **A tip is called a tip, only in words.** `GiftView.isTip` (a `tips` row names the gift) turns
+  "gift" into "tip" on the gift page, the list rows ("Tipped you"), the card image ("A Morrow
+  tip"), and the notifications and email. The flow, routes and `/gift/[id]` stay the gift's.
+- The gift card image carries a QR code to the gift page (`qrTile`, the same module grid and
+  centre mark as the app's `QrCode`), so a screenshot of it still leads somewhere. A
   tip that fails is kept with `status = 'failed'` and the reason in `failure`, and gets no reply.
 - `/api/x/events` answers X's CRC (`GET ?crc_token`) and checks `X-Twitter-Webhooks-Signature`,
   both HMAC-SHA256 with the consumer secret (`X_API_SECRET`), base64 with `sha256=`. Each

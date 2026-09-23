@@ -1,10 +1,13 @@
 import { PublicKey } from '@solana/web3.js'
+import { formatUsd, tickerLabel } from '@/lib/format'
 import { CASH_MINT } from '@/lib/gifts'
-import { getStocks } from '@/lib/server/catalog'
+import { findGiftAsset, getStocks } from '@/lib/server/catalog'
 import { cashBalance } from '@/lib/server/fees'
 import { createGiftDrafts } from '@/lib/server/gift-drafts'
+import { giftOgCard } from '@/lib/server/gift-og'
 import { submitGiftTransaction } from '@/lib/server/gift-submit'
-import { getGift } from '@/lib/server/gifts'
+import { type GiftRow, getGift } from '@/lib/server/gifts'
+import { giftOgImage } from '@/lib/server/og-card'
 import { getTokenPrices } from '@/lib/server/prices'
 import { privy } from '@/lib/server/privy'
 import type { GiftRecipient } from '@/lib/server/recipients'
@@ -12,7 +15,7 @@ import { tokenBalance } from '@/lib/server/solana'
 import { db, UNIQUE_VIOLATION } from '@/lib/server/supabase'
 import { signTipTransaction, tipSigningAvailable } from '@/lib/server/tip-signer'
 import { findUserByPrivyId, isOnboarded, type UserRow } from '@/lib/server/users'
-import { readPostOnX, replyOnX } from '@/lib/server/x-posts'
+import { readPostOnX, replyOnX, uploadImageToX } from '@/lib/server/x-posts'
 import { parseTipCommand, TIP_ACCOUNT, TIP_LIFETIME_HOURS, tickerMatches } from '@/lib/tips'
 
 /**
@@ -223,8 +226,12 @@ async function affordableAsset(
   return chosen ? { mint: chosen.mint, ticker: chosen.ticker, amountRaw: chosen.amountRaw } : null
 }
 
-/** Posts the reply unless one was posted already, and keeps under the daily reply budget */
-async function replyOnce(tip: TipRow, text: string): Promise<void> {
+/**
+ * Posts the reply unless one was posted already, and keeps under the daily reply budget. It
+ * carries the gift's card, the same picture as its link preview; if the card can't be drawn or
+ * uploaded, the words go out alone rather than not at all.
+ */
+async function replyOnce(tip: TipRow, giftId: string, text: string): Promise<void> {
   if (tip.sent_reply_id) return
   const { count } = await db
     .from('tips')
@@ -233,7 +240,16 @@ async function replyOnce(tip: TipRow, text: string): Promise<void> {
     .gte('created_at', dayAgo())
   if ((count ?? 0) >= MAX_REPLIES_PER_DAY) return
 
-  const replyId = await replyOnX(tip.tweet_id, text)
+  const mediaId = await giftOgCard(giftId)
+    .then((card) => (card ? giftOgImage(card) : null))
+    .then(async (image) =>
+      image ? uploadImageToX(new Uint8Array(await image.arrayBuffer())) : null,
+    )
+    .catch((error) => {
+      console.error('Tip card failed', error)
+      return null
+    })
+  const replyId = await replyOnX(tip.tweet_id, text, mediaId ? [mediaId] : [])
   if (replyId) await db.from('tips').update({ sent_reply_id: replyId }).eq('id', tip.id)
 }
 
@@ -262,26 +278,41 @@ export async function linkTipToGift(
 
 /**
  * After the gift lands on-chain: marks its tip sent and tells the recipient, in the same thread.
- * The receipt is the bare signature, so anyone can look it up; as a link it would cost $0.20 a
- * reply instead of $0.01.
+ * X already puts everyone in the thread at the front of a reply, so the words name nobody again —
+ * a reply stacked with repeated handles reads as spam and gets folded away. The receipt is the
+ * bare signature, so anyone can look it up; as a link it would cost $0.20 a reply, not $0.01.
  */
-export async function completeTipForGift(
-  giftId: string,
-  label: string,
-  receipt: string | null,
-): Promise<void> {
+export async function completeTipForGift(gift: GiftRow): Promise<void> {
   const { data, error } = await db
     .from('tips')
     .update({ status: 'sent' })
-    .eq('gift_id', giftId)
+    .eq('gift_id', gift.id)
     .eq('status', 'pending')
     .select(TIP_COLUMNS)
     .maybeSingle()
   if (error) throw error
   const tip = data as TipRow | null
   if (!tip) return
+  const receipt = gift.create_signature ? `\n\nReceipt: ${gift.create_signature}` : ''
   await replyOnce(
     tip,
-    `@${tip.recipient_x_username} @${tip.sender_x_username} sent you ${label} 🎁 Sign in to Morrow with X to open it.${receipt ? `\n\nReceipt: ${receipt}` : ''}`,
+    gift.id,
+    `Sent: ${await replyLabel(gift)} 🎁 Sign in to Morrow with X to open it.${receipt}`,
   )
+}
+
+/**
+ * "$1.00 in cash", "$1.00 of $POLYMARKET": stocks as cashtags, which X links to the company. The
+ * issuer's trailing x (NVDAx) isn't part of the name people search by.
+ */
+async function replyLabel(gift: GiftRow): Promise<string> {
+  const parts = await Promise.all(
+    gift.gift_items.map(async (item) => {
+      const value = formatUsd(Number(item.usd_value) || 0)
+      const asset = await findGiftAsset(item.mint)
+      if (!asset || asset.isCash) return `${value} in cash`
+      return `${value} of ${tickerLabel(asset.ticker.replace(/x$/, ''))}`
+    }),
+  )
+  return parts.join(' and ')
 }

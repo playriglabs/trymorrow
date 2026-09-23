@@ -124,6 +124,13 @@ export async function submitGiftTransaction(
   try {
     const label = await giftLabel(sent)
     const senderName = viewer.name ?? 'Someone'
+    // A tip from X is told as a tip; everything else about it is a gift
+    const { count: tipCount } = await db
+      .from('tips')
+      .select('id', { count: 'exact', head: true })
+      .eq('gift_id', sent.id)
+    const noun = (tipCount ?? 0) > 0 ? 'tip' : 'gift'
+    const sentVerb = noun === 'tip' ? 'tipped' : 'sent'
     const sentUsd = sent.gift_items.reduce((sum, item) => sum + (Number(item.usd_value) || 0), 0)
     const opening = sent.gift_items.some((item) => item.mint === CASH_MINT)
       ? 'Open it to keep it.'
@@ -132,9 +139,9 @@ export async function submitGiftTransaction(
       sent.gift_items.map(async (item) => ({ item, asset: await findGiftAsset(item.mint) })),
     )
     const giftEmail: EmailContent = {
-      subject: `${senderName} sent you ${label}`,
+      subject: `${senderName} ${sentVerb} you ${label}`,
       preview: `${opening} It goes back to ${senderName} in ${GIFT_LIFETIME_DAYS} days.`,
-      eyebrow: `${senderName} sent you a gift`,
+      eyebrow: `${senderName} sent you a ${noun}`,
       hero: label,
       subhero: 'Only you can open it.',
       assets: giftAssets.flatMap(({ item, asset }) =>
@@ -155,7 +162,7 @@ export async function submitGiftTransaction(
         { label: 'Open before', value: formatFullDate(sent.expires_at) },
       ],
       note: sent.message ? { from: senderName, text: sent.message } : null,
-      cta: { label: 'Open your gift', path: `/gift/${sent.id}` },
+      cta: { label: `Open your ${noun}`, path: `/gift/${sent.id}` },
       footnote: `Not opened in ${GIFT_LIFETIME_DAYS} days? It goes back to ${senderName}, in full.`,
     }
     // A take-back doesn't notify: the sender did it themselves and sees the result on screen,
@@ -166,7 +173,7 @@ export async function submitGiftTransaction(
         {
           userId: sent.sender_id,
           kind: 'gift_sent',
-          title: `You sent ${label}`,
+          title: `You ${sentVerb} ${label}`,
           body:
             action === 'createGiftCard'
               ? 'Anyone with the code can add it to their account. Not redeemed in 30 days? It comes back to you.'
@@ -179,7 +186,7 @@ export async function submitGiftTransaction(
               {
                 userId: sent.recipient_id,
                 kind: 'gift_received' as const,
-                title: `${viewer.name ?? 'Someone'} sent you ${label}`,
+                title: `${viewer.name ?? 'Someone'} ${sentVerb} you ${label}`,
                 body: opening,
                 giftId: sent.id,
                 url: `/gift/${sent.id}`,
@@ -195,7 +202,7 @@ export async function submitGiftTransaction(
           title:
             action === 'claimGiftCard'
               ? `${viewer.name ?? 'Someone'} redeemed your gift card`
-              : `${viewer.name ?? 'They'} claimed your gift`,
+              : `${viewer.name ?? 'They'} claimed your ${noun}`,
           body: label,
           giftId: sent.id,
           url: `/gift/${sent.id}`,
@@ -221,9 +228,7 @@ export async function submitGiftTransaction(
 
   // A gift that answers a tweet gets its reply in the same thread; best effort, like the above
   if (action === 'createGift') {
-    await giftLabel(sent)
-      .then((label) => completeTipForGift(sent.id, label, sent.create_signature))
-      .catch((error) => console.error('Tip reply failed', error))
+    await completeTipForGift(sent).catch((error) => console.error('Tip reply failed', error))
   }
 
   return sent
