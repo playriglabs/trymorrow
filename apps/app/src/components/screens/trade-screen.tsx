@@ -15,6 +15,7 @@ import { Button, Card, LinkButton, Loading, Notice, Screen } from '@/components/
 import { errorMessage } from '@/lib/client/api'
 import { useDebounced } from '@/lib/client/debounce'
 import {
+  useLimitOrderEstimateQuery,
   useLimitOrderFeeQuery,
   useLimitOrdersQuery,
   usePlaceLimitOrderMutation,
@@ -125,6 +126,17 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
     enabled: session.ready && Boolean(stock) && mode === 'limit' && stage !== 'overview',
   })
   const limitFeeUsd = limitFee.data ?? 0
+  // The order asks a little under the typed price (over, for a buy) so it fills the moment
+  // today's price reaches it; the gap is what a trade this size costs in the market
+  const orderPrice = useLimitOrderEstimateQuery(
+    side,
+    stock?.mint ?? '',
+    amountRaw.toString(),
+    limitPrice,
+    { enabled: session.ready && Boolean(stock) && stage === 'limit-review' },
+  )
+  const askPrice = orderPrice.data ?? limitPrice
+  const marketCostPct = limitPrice > 0 ? Math.abs(1 - askPrice / limitPrice) * 100 : 0
   // What the order locks, and what it asks for, at the typed price
   const limitShares = match({ side, limitPrice })
     .with({ limitPrice: 0 }, () => 0)
@@ -363,13 +375,14 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
         title="Review order"
         footer={
           <>
-            {placeOrder.isError && (
+            {(placeOrder.isError || orderPrice.isError) && (
               <p className="mb-1 text-center text-[13px] text-loss">
-                {errorMessage(placeOrder.error)}
+                {errorMessage(placeOrder.error ?? orderPrice.error)}
               </p>
             )}
             <Button
               loading={placeOrder.isPending}
+              disabled={!orderPrice.isSuccess}
               onClick={() =>
                 placeOrder.mutate(
                   {
@@ -408,15 +421,22 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
           {buyingAtPrice ? (
             <>
               <Row label="Cash set aside" value={formatUsd(limitCashUsd)} />
-              <Row label="You get about" value={`${formatShares(limitShares)} shares`} />
+              <Row label="You get about" value={`${formatShares(amountUsd / askPrice)} shares`} />
             </>
           ) : (
             <>
               <Row label="Shares set aside" value={formatShares(limitShares)} />
-              <Row label="You get about" value={formatUsd(limitCashUsd)} />
+              <Row label="You get about" value={formatUsd(limitShares * askPrice)} />
             </>
           )}
-          <Row label="Market fee" value="0.1% when it fills" />
+          <Row
+            label="Market costs"
+            value={
+              orderPrice.isSuccess
+                ? `About ${marketCostPct < 0.1 ? '0.1' : marketCostPct.toFixed(1)}%, already taken off`
+                : '…'
+            }
+          />
           <Row label="Order fee" value={limitFeeUsd > 0 ? formatUsd(limitFeeUsd) : 'Free'} />
           <Row
             label="Lasts"
@@ -430,7 +450,9 @@ function Trade({ ticker, side: initialSide = 'buy' }: { ticker: string; side?: T
 
         <Notice>
           {buyingAtPrice ? 'The cash' : 'The shares'} stay set aside while the order waits, so you
-          can’t spend them elsewhere. Cancel any time and they come straight back.
+          can’t spend them elsewhere. Cancel any time and they come straight back. It fills as soon
+          as today’s price reaches {formatPrice(limitPrice)}; what a trade this size costs in the
+          market is already taken off what you get.
           {limitFeeUsd > 0 &&
             ' The order fee covers what opening it costs us; once it closes, that pays for your next one.'}
         </Notice>

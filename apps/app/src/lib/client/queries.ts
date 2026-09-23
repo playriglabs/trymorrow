@@ -77,6 +77,8 @@ export const queryKeys = {
   tradeHistory: () => ['trade-history'] as const,
   limitOrders: () => ['limit-orders'] as const,
   limitOrderFee: (side: TradeSide, mint: string) => ['limit-order-fee', side, mint] as const,
+  limitOrderEstimate: (side: TradeSide, mint: string, amount: string, limitPriceUsd: number) =>
+    ['limit-order-estimate', side, mint, amount, limitPriceUsd] as const,
   tradeQuote: ({ side, mint, amountRaw }: TradeQuoteParams) =>
     ['trade-quote', side, mint, amountRaw] as const,
   cashoutQuote: (target: string, amountRaw: string) =>
@@ -939,6 +941,28 @@ export function useLimitOrderFeeQuery(
       api<{ feeUsd: number }>(
         `/api/limit-orders/fee?side=${side}&mint=${encodeURIComponent(mint)}`,
       ).then((data) => data.feeUsd),
+  })
+}
+
+/** The price per share this order actually gets, once the market's costs come off the limit */
+export function useLimitOrderEstimateQuery(
+  side: TradeSide,
+  mint: string,
+  amount: string,
+  limitPriceUsd: number,
+  { enabled = true }: Options = {},
+) {
+  const api = useApi()
+  return useQuery({
+    queryKey: queryKeys.limitOrderEstimate(side, mint, amount, limitPriceUsd),
+    enabled: enabled && Boolean(mint) && amount !== '0' && limitPriceUsd > 0,
+    staleTime: 15_000,
+    queryFn: () => {
+      const params = new URLSearchParams({ side, mint, amount, limit: String(limitPriceUsd) })
+      return api<{ orderPriceUsd: number }>(`/api/limit-orders/estimate?${params}`).then(
+        (data) => data.orderPriceUsd,
+      )
+    },
   })
 }
 

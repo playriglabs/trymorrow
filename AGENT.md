@@ -188,6 +188,14 @@ fill it. `lib/server/limit-orders.ts` builds, `POST /api/limit-orders/submit` ve
 - **The order is exact, so a keeper keeps anything the market gives on top.** That's why the server
   refuses a buy at or over today's price and a sell at or under it — both would fill immediately and
   hand the difference away. Minimum $5 (Jupiter's). PreStocks can't be used (transfer fee).
+- **The typed price is when it fills, not what it pays.** A keeper can only pay the order's price
+  once a real trade of that size gets there, after the size moves the pool and Jupiter's 0.1%. An
+  order at exactly the typed price therefore sat unfilled while the screen showed the price past it
+  (CYPH, 2026-09-22: $3.76 ask, ~0.6% short at $3.78). `marketGap` prices the same trade through
+  Ultra now and places the order at `limit × gap`, so it fills when today's price reaches the limit;
+  the review screen shows the cost as "Market costs" and what they get after it. Over 3% the market
+  is too thin and the order is refused (`thin_market`). `limit_orders.limit_price_usd` keeps the
+  typed price, and that's what the screens show.
 - **Rent goes back to the maker, never the payer.** Measured on mainnet 2026-09-22 with the relayer
   as payer: placing cost it 0.005638 SOL (order 0.00254, escrow 0.00149, the TSLAx account the order
   pays into 0.00156, fees), and cancelling returned 0.004028 to the maker. So `limitOrderFee` charges

@@ -16,6 +16,7 @@ import {
   limitOrderFee,
 } from '@/lib/server/fees'
 import { badRequest, HttpError } from '@/lib/server/http'
+import { getOrder } from '@/lib/server/jupiter'
 import { notify } from '@/lib/server/notify'
 import { getTokenPrices } from '@/lib/server/prices'
 import { relayer, signRelayed, tokenBalance } from '@/lib/server/solana'
@@ -36,6 +37,9 @@ export const TRIGGER_PROGRAM = new PublicKey('j1o2qRpjcyUwEvwtcfhEQefh773ZgjxcVR
 
 /** Jupiter refuses anything smaller */
 export const MIN_LIMIT_ORDER_USD = 5
+
+/** Jupiter's cut of every fill, taken from what the order receives */
+const TRIGGER_FEE = 0.001
 
 type TriggerTrade = {
   inputMint: string
@@ -155,10 +159,68 @@ async function orderStock(mint: string): Promise<StockAsset> {
   return stock
 }
 
+/** A trade this size costing more than this against today's price is too thin to promise */
+const MAX_MARKET_GAP = 0.03
+
+/**
+ * What a real trade of this size gets against today's price, as a ratio of the price per share:
+ * under 1 for a sell, over 1 for a buy. The size moves the market and Jupiter takes its cut of
+ * every fill, so an order placed at exactly the typed price only fills once today's price has gone
+ * a little past it. Placing it at `limit × gap` makes it fill when today's price reaches the limit.
+ * 1 when there's nothing to measure against, which is the old exact behaviour.
+ */
+async function marketGap(side: TradeSide, stock: StockAsset, amount: bigint): Promise<number> {
+  if (stock.priceUsd == null) return 1
+  const [input, output] = side === 'buy' ? [USDC, stock] : [stock, USDC]
+  const [multiplier, quote] = await Promise.all([
+    uiMultiplier(stock.mint.toBase58()),
+    getOrder({
+      inputMint: input.mint.toBase58(),
+      outputMint: output.mint.toBase58(),
+      amount,
+    }).catch(() => null),
+  ])
+  if (!quote) return 1
+  // Ultra takes its own fee out of the quote; a keeper's fill pays Jupiter's trigger fee instead
+  const received = (Number(quote.outAmount) / (1 - quote.feeBps / 10_000)) * (1 - TRIGGER_FEE)
+  const perShare =
+    side === 'buy'
+      ? Number(amount) / 1e6 / ((received / 10 ** stock.decimals) * multiplier)
+      : received / 1e6 / toUi(amount, stock.decimals, multiplier)
+  if (!(perShare > 0)) return 1
+  const gap = perShare / stock.priceUsd
+  // Never better than today's price: that would be a quote glitch, not a market
+  if (side === 'sell' ? gap > 1 : gap < 1) return 1
+  if (Math.abs(1 - gap) > MAX_MARKET_GAP) {
+    throw badRequest(
+      'Not enough people trade this stock to fill that many shares near your price. Try a smaller amount.',
+      'thin_market',
+    )
+  }
+  return gap
+}
+
+/** The price per share the order actually asks for, so it fills when today's price hits the limit */
+export async function orderPrice({
+  side,
+  mint,
+  amount,
+  limitPriceUsd,
+}: {
+  side: TradeSide
+  mint: string
+  /** Cash for a buy, shares for a sell, in raw base units */
+  amount: bigint
+  limitPriceUsd: number
+}): Promise<number> {
+  const stock = await orderStock(mint)
+  return limitPriceUsd * (await marketGap(side, stock, amount))
+}
+
 /**
  * A buy locks `amount` of cash until the stock is at or under `limitPriceUsd` a share; a sell
- * locks `amount` raw shares until it's at or over. Either way the order is exact: Jupiter fills it
- * at that price or better, less its 0.1% fee, or not at all.
+ * locks `amount` raw shares until it's at or over. The order itself asks for `limit × gap`
+ * (`marketGap`), so it fills when today's price reaches the limit rather than a little past it.
  */
 export async function planLimitOrder({
   wallet,
@@ -178,8 +240,8 @@ export async function planLimitOrder({
 }): Promise<LimitOrderPlan> {
   const stock = await orderStock(mint)
   if (!(limitPriceUsd > 0)) throw badRequest('Pick a price above zero.')
-  // The order is exact: a keeper fills it at the limit and keeps whatever the market gave on top.
-  // A buy over today's price (or a sell under it) would hand that difference away.
+  // A keeper fills at the order's price and keeps whatever the market gave on top, so a buy over
+  // today's price (or a sell under it) would hand that difference away.
   if (stock.priceUsd != null) {
     if (side === 'buy' && limitPriceUsd >= stock.priceUsd) {
       throw badRequest(
@@ -192,12 +254,14 @@ export async function planLimitOrder({
     }
   }
   const [input, output] = side === 'buy' ? [USDC, stock] : [stock, USDC]
-  const [multiplier, fee, balance, cash] = await Promise.all([
+  const [multiplier, fee, balance, cash, gap] = await Promise.all([
     uiMultiplier(mint),
     limitOrderFee(wallet, input, output),
     tokenBalance(wallet, input.mint),
     cashBalance(wallet),
+    marketGap(side, stock, amount),
   ])
+  const askUsd = limitPriceUsd * gap
 
   const shareUnit = 10 ** stock.decimals
   let making = amount
@@ -212,7 +276,7 @@ export async function planLimitOrder({
     if (cash < amount + fee.raw) {
       throw badRequest('You don’t have enough cash for that. Add cash first.', 'insufficient')
     }
-    const shares = Number(amount) / 1e6 / limitPriceUsd
+    const shares = Number(amount) / 1e6 / askUsd
     taking = BigInt(Math.floor((shares / multiplier) * shareUnit))
   } else {
     if (balance < amount) throw badRequest('You don’t have that many shares.', 'insufficient')
@@ -226,7 +290,7 @@ export async function planLimitOrder({
       if (making <= 0n) throw badRequest('That’s too few shares to sell at a price.', 'too_small')
     }
     const shares = toUi(making, stock.decimals, multiplier)
-    taking = BigInt(Math.floor(shares * limitPriceUsd * 1e6))
+    taking = BigInt(Math.floor(shares * askUsd * 1e6))
   }
   if (taking <= 0n) throw badRequest('That order is too small.', 'too_small')
 
@@ -274,7 +338,10 @@ export async function planCancel(wallet: PublicKey, order: string): Promise<Vers
   return signRelayed(relayedInstructions(built.transaction))
 }
 
-const toView = async (order: TriggerOrder): Promise<LimitOrderView | null> => {
+const toView = async (
+  order: TriggerOrder,
+  typedPrices: Map<string, number>,
+): Promise<LimitOrderView | null> => {
   const buy = order.inputMint === USDC.mint.toBase58()
   const stockMint = buy ? order.outputMint : order.inputMint
   if ((buy ? order.inputMint : order.outputMint) !== USDC.mint.toBase58()) return null
@@ -295,7 +362,8 @@ const toView = async (order: TriggerOrder): Promise<LimitOrderView | null> => {
     iconUrl: stock.iconUrl,
     shares,
     cashUsd,
-    limitPriceUsd: shares > 0 ? cashUsd / shares : 0,
+    // What the person typed; the order's own amounts are that less the market's costs
+    limitPriceUsd: typedPrices.get(order.orderKey) ?? (shares > 0 ? cashUsd / shares : 0),
     priceUsd: stock.priceUsd,
     filledPct: making > 0 ? (1 - Number(order.rawRemainingMakingAmount) / making) * 100 : 0,
     expiresAt: order.expiredAt,
@@ -307,7 +375,17 @@ const toView = async (order: TriggerOrder): Promise<LimitOrderView | null> => {
 /** Orders still waiting for their price, newest first */
 export async function openLimitOrders(wallet: PublicKey): Promise<LimitOrderView[]> {
   const { orders } = await triggerOrders(wallet, 'active')
-  const views = await Promise.all(orders.map(toView))
+  const { data } = await db
+    .from('limit_orders')
+    .select('order_key, limit_price_usd')
+    .in(
+      'order_key',
+      orders.map((order) => order.orderKey),
+    )
+  const typedPrices = new Map(
+    (data ?? []).map((row) => [row.order_key as string, Number(row.limit_price_usd)]),
+  )
+  const views = await Promise.all(orders.map((order) => toView(order, typedPrices)))
   return views
     .filter((view): view is LimitOrderView => view !== null)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
