@@ -278,8 +278,11 @@ X account, and after 30 days it goes back to the sender like any other.
 
 ### Tips by tweet
 
-`@trymorrow tip @rahx $1 NVDA` (no stock named means cash). SocialData's search monitor posts
-each matching tweet to `POST /api/x/webhook`; `handleTipTweet` (`tips.ts`) decides, and
+`@trymorrow tip @rahx $1 NVDA` (no stock named means cash). Two routes deliver tweets: X's own
+Activity API (`post.mention.create` for @trymorrow) posts to `/api/x/events`, and SocialData's
+search monitor posts to `POST /api/x/webhook`. X's search hides some tweets, so the monitor alone
+misses tips; the mention event doesn't. Both fetch the tweet in SocialData's shape and call
+`handleTipTweet`, and `tips.tweet_id` is unique, so a tweet seen twice is handled once. `handleTipTweet` (`tips.ts`) decides, and
 @trymorrow answers through X's own API (`x-posts.ts`, OAuth 1.0a with the account's tokens).
 
 - **A tweet is a request, never a payment.** It writes a `tips` row; the sender opens Morrow
@@ -294,7 +297,10 @@ each matching tweet to `POST /api/x/webhook`; `handleTipTweet` (`tips.ts`) decid
   (`ack_reply_id`, `sent_reply_id`), `MAX_REPLIES_PER_DAY` across everyone, and
   `MAX_TIPS_PER_SENDER_PER_DAY`. A tip lasts `TIP_LIFETIME_HOURS` (24); no cron, it just stops
   showing.
-- The webhook verifies `X-Signature: v1=<hex>`, HMAC-SHA256 over `{X-Event-Id}.{X-Timestamp}.{raw body}` with
+- `/api/x/events` answers X's CRC (`GET ?crc_token`) and checks `X-Twitter-Webhooks-Signature`,
+  both HMAC-SHA256 with the consumer secret (`X_API_SECRET`), base64 with `sha256=`. Each
+  delivered mention costs $0.005 whether or not it's a tip, and only ones saying "tip" are fetched.
+- The SocialData webhook verifies `X-Signature: v1=<hex>`, HMAC-SHA256 over `{X-Event-Id}.{X-Timestamp}.{raw body}` with
   `SOCIALDATA_WEBHOOK_SECRET` and a 5-minute window, and refuses everything while it's unset.
   SocialData doesn't retry, so a tweet that fails is logged, not bounced.
 - The parser (`lib/tips.ts`) takes `$1 NVDA`, `$NVDA $1`, `$1 of nvda`, `$1 cash`; a word it

@@ -1,5 +1,6 @@
 import { SOCIALDATA_API_KEY } from 'astro:env/server'
 import { db } from '@/lib/server/supabase'
+import type { TipTweet } from '@/lib/server/tips'
 
 /**
  * X names come through SocialData rather than X's own API: a profile costs $0.0002 there against
@@ -135,4 +136,19 @@ async function fetchAndStore(name: string): Promise<XAccount | null> {
   })
   if (error) console.error('Saving an X lookup failed', error)
   return account
+}
+
+/**
+ * One tweet in the shape `handleTipTweet` reads (SocialData's v1.1 object), whoever delivered
+ * its id. X's own events carry a v2 post, so this keeps one parser for both routes.
+ */
+export async function fetchTweet(id: string): Promise<TipTweet | null> {
+  if (!SOCIALDATA_API_KEY || !/^\d+$/.test(id)) return null
+  const response = await fetch(`${API}/twitter/tweets/${id}`, {
+    headers: { authorization: `Bearer ${SOCIALDATA_API_KEY}`, accept: 'application/json' },
+    signal: AbortSignal.timeout(8_000),
+  })
+  if (response.status === 404) return null
+  if (!response.ok) throw new Error(`SocialData tweet lookup failed: ${response.status}`)
+  return (await response.json()) as TipTweet
 }
