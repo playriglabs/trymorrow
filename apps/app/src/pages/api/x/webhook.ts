@@ -32,7 +32,9 @@ export const POST = route(async ({ request }) => {
   const event = JSON.parse(body) as { event?: string; data?: TipTweet }
   // Failed deliveries aren't retried, so a tweet we choke on is logged rather than bounced
   if (event.event === 'new_tweet' && event.data?.id_str) {
-    await handleTipTweet(event.data).catch((error) => console.error('Tip tweet failed', error))
+    await handleTipTweet(event.data, request).catch((error) =>
+      console.error('Tip tweet failed', error),
+    )
   }
   return json({ ok: true })
 })

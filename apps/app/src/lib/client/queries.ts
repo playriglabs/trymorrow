@@ -1,3 +1,5 @@
+import { PUBLIC_PRIVY_TIP_POLICY_ID, PUBLIC_PRIVY_TIP_SIGNER_ID } from 'astro:env/client'
+import { useSigners } from '@privy-io/react-auth'
 import {
   keepPreviousData,
   useInfiniteQuery,
@@ -36,7 +38,6 @@ import type {
   StockSendQuote,
   StockSendView,
   StocksResponse,
-  TipView,
   TradeHistoryPage,
   TradeQuote,
   TradeResult,
@@ -55,7 +56,6 @@ export const queryKeys = {
   gift: (giftId: string, viewerId?: string | null) =>
     viewerId === undefined ? (['gift', giftId] as const) : (['gift', giftId, viewerId] as const),
   recipient: (query: string, x: boolean) => ['recipient', query, x] as const,
-  tips: () => ['tips'] as const,
   giftFee: (recipients: string[], mints: string[]) =>
     ['gift-fee', [...recipients].sort().join(','), [...mints].sort().join(',')] as const,
   giftCardFee: (mints: string[]) => ['gift-card-fee', [...mints].sort().join(',')] as const,
@@ -157,16 +157,6 @@ export function useGiftQuery(
     queryKey: queryKeys.gift(giftId, viewerId),
     enabled,
     queryFn: () => api<{ gift: GiftView }>(`/api/gifts/${giftId}`).then((data) => data.gift),
-  })
-}
-
-/** Tips tweeted at @trymorrow that are still waiting to be sent */
-export function useTipsQuery({ enabled = true }: Options = {}) {
-  const api = useApi()
-  return useQuery({
-    queryKey: queryKeys.tips(),
-    enabled,
-    queryFn: () => api<{ tips: TipView[] }>('/api/tips').then((data) => data.tips),
   })
 }
 
@@ -557,6 +547,39 @@ export function useUpdateProfileMutation() {
   })
 }
 
+export type TipSettingsUpdate = { auto?: boolean; maxUsd?: number; dailyUsd?: number }
+
+/**
+ * Tips from X. Turning it on adds Morrow's signer to the wallet, bounded by the tip policy, before
+ * the server is told; turning it off removes the signer first, so the server can't sign even for a
+ * moment after someone switches it off.
+ */
+export function useTipSettingsMutation() {
+  const api = useApi()
+  const storeProfile = useStoreProfile()
+  const { addSigners, removeSigners } = useSigners()
+  return useMutation({
+    mutationFn: async ({ address, ...update }: TipSettingsUpdate & { address: string }) => {
+      if (update.auto === true) {
+        if (!PUBLIC_PRIVY_TIP_SIGNER_ID || !PUBLIC_PRIVY_TIP_POLICY_ID) {
+          throw new Error('Tips from X aren’t available yet.')
+        }
+        await addSigners({
+          address,
+          signers: [
+            { signerId: PUBLIC_PRIVY_TIP_SIGNER_ID, policyIds: [PUBLIC_PRIVY_TIP_POLICY_ID] },
+          ],
+        })
+      }
+      if (update.auto === false) await removeSigners({ address })
+      return api<{ profile: Profile }>('/api/me/tips', { method: 'PATCH', body: update }).then(
+        (data) => data.profile,
+      )
+    },
+    onSuccess: storeProfile,
+  })
+}
+
 export function useUploadAvatarMutation() {
   const api = useApi()
   const storeProfile = useStoreProfile()
@@ -648,8 +671,6 @@ export type SendGiftInput = {
     usdValue: number
   }[]
   message: string
-  /** The tweeted tip this gift answers, so @trymorrow can reply once it lands */
-  tipId?: string
 }
 
 export type SendGiftResult = {
@@ -693,7 +714,6 @@ export function useSendGiftMutation() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.portfolio() })
       queryClient.invalidateQueries({ queryKey: queryKeys.gifts() })
-      queryClient.invalidateQueries({ queryKey: queryKeys.tips() })
     },
   })
 }

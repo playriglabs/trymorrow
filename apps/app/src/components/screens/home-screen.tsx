@@ -18,7 +18,6 @@ import { FundCard } from '@/components/fund-card'
 import { GiftRow } from '@/components/gift-row'
 import { byNewest, HoldingRow } from '@/components/holding-row'
 import { PendingOrderCard } from '@/components/pending-order-card'
-import { PendingTips } from '@/components/pending-tips'
 import { withProviders } from '@/components/providers'
 import { PullIndicator, usePullToRefresh } from '@/components/pull-to-refresh'
 import { CashLogo, StockLogo } from '@/components/stock-logo'
@@ -35,7 +34,6 @@ import {
   useNotificationsQuery,
   usePortfolioQuery,
   useStocksQuery,
-  useTipsQuery,
 } from '@/lib/client/queries'
 import { useSession } from '@/lib/client/session'
 import { useWatchlists, watchedMints } from '@/lib/client/watchlists'
@@ -191,7 +189,6 @@ function House() {
   const feed = useNotificationsQuery({ enabled })
   const funds = useFundsQuery({ enabled })
   const pendingOrders = useLimitOrdersQuery({ enabled })
-  const tips = useTipsQuery({ enabled })
   const earn = useEarnQuery({ enabled })
   // Reading the lending market is the priciest call on this screen, so it only goes out for
   // someone who actually holds shares: with nothing to lock there is nothing to say
@@ -470,8 +467,6 @@ function House() {
             ))}
           </section>
         )}
-
-        <PendingTips tips={tips.data ?? []} />
 
         {(funds.isPending || (funds.data?.length ?? 0) > 0) && (
           <section className="flex flex-col gap-3">

@@ -1,34 +1,36 @@
 import { PublicKey } from '@solana/web3.js'
-import { formatUsd } from '@/lib/format'
 import { CASH_MINT } from '@/lib/gifts'
 import { getStocks } from '@/lib/server/catalog'
 import { cashBalance } from '@/lib/server/fees'
+import { createGiftDrafts } from '@/lib/server/gift-drafts'
+import { submitGiftTransaction } from '@/lib/server/gift-submit'
+import { getGift } from '@/lib/server/gifts'
 import { getTokenPrices } from '@/lib/server/prices'
 import { privy } from '@/lib/server/privy'
 import type { GiftRecipient } from '@/lib/server/recipients'
 import { tokenBalance } from '@/lib/server/solana'
 import { db, UNIQUE_VIOLATION } from '@/lib/server/supabase'
-import { sendPhoneNotifications } from '@/lib/server/telegram'
-import { findUserByPrivyId, type UserRow } from '@/lib/server/users'
-import { replyOnX } from '@/lib/server/x-posts'
+import { signTipTransaction, tipSigningAvailable } from '@/lib/server/tip-signer'
+import { findUserByPrivyId, isOnboarded, type UserRow } from '@/lib/server/users'
+import { readPostOnX, replyOnX } from '@/lib/server/x-posts'
 import { parseTipCommand, TIP_ACCOUNT, TIP_LIFETIME_HOURS, tickerMatches } from '@/lib/tips'
-import type { TipView } from '@/lib/types'
 
 /**
- * Tips by tweet. SocialData's search monitor hands every tweet matching `@trymorrow tip` to the
- * webhook; this decides whether it's a tip, records it, and answers. A tweet is only a request —
- * the money moves when its sender confirms in the app and signs, as an ordinary gift.
+ * Tips by tweet. X's mention events and SocialData's search monitor hand tweets to
+ * `handleTipTweet`; for someone who turned on tips from X, the gift is created, signed by Morrow's
+ * policy-bound signer and sent right away, then @trymorrow replies once in the thread.
  *
- * Silence is the default. A tweet that doesn't parse, isn't from someone on Morrow, or asks for
- * more than they hold gets no row and no reply: answering costs an X API call, and "not enough
- * cash" in public would tell everyone their balance.
+ * Silence is the default. A tweet that doesn't parse, isn't from someone who turned tips on, asks
+ * for more than they hold or more than their limits, or that X itself doesn't confirm, gets no
+ * reply: answering costs an X API call, and "not enough cash" in public would tell everyone their
+ * balance. Only tips past every check are recorded.
  */
 
 /** A tweet delivered later than this is old news; tipping on it would surprise its author */
 const MAX_TWEET_AGE_MS = 30 * 60 * 1000
-/** Per sender per day, so a runaway script can't queue a thousand requests */
+/** Per sender per day, whatever their dollar limit, so a runaway script stops early */
 const MAX_TIPS_PER_SENDER_PER_DAY = 10
-/** Every reply costs $0.01; past this in a day we still record tips but stop answering */
+/** Every reply costs $0.01; past this in a day tips still send but @trymorrow stays quiet */
 const MAX_REPLIES_PER_DAY = 200
 
 /** The part of SocialData's tweet object we read (the v1.1 shape) */
@@ -49,24 +51,23 @@ type TipRow = {
   sender_x_username: string
   recipient_x_id: string
   recipient_x_username: string
-  recipient_x_name: string | null
   amount_usd: string
-  mint: string | null
-  status: 'pending' | 'sent'
+  status: 'pending' | 'sent' | 'failed'
   gift_id: string | null
-  expires_at: string
-  ack_reply_id: string | null
   sent_reply_id: string | null
-  created_at: string
 }
 
 const TIP_COLUMNS =
-  'id, tweet_id, sender_id, sender_x_username, recipient_x_id, recipient_x_username, recipient_x_name, amount_usd, mint, status, gift_id, expires_at, ack_reply_id, sent_reply_id, created_at'
+  'id, tweet_id, sender_id, sender_x_username, recipient_x_id, recipient_x_username, amount_usd, status, gift_id, sent_reply_id'
 
 const dayAgo = () => new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
-export async function handleTipTweet(tweet: TipTweet): Promise<void> {
-  // Cheap checks first: most of what the monitor sees never reaches a database or an RPC
+/** What a tip pays in, in raw units, once the sender is known to hold it */
+type TipAsset = { mint: string; ticker: string | null; amountRaw: bigint }
+
+export async function handleTipTweet(tweet: TipTweet, request: Request): Promise<void> {
+  // Cheap checks first: most of what arrives never reaches a database, an RPC or a paid API
+  if (!tipSigningAvailable()) return
   const command = parseTipCommand(tweet.full_text ?? tweet.text ?? '')
   if (!command) return
   const author = tweet.user
@@ -90,17 +91,31 @@ export async function handleTipTweet(tweet: TipTweet): Promise<void> {
   if (seen) return
 
   const sender = await senderForX(author.id_str)
-  if (!sender?.wallet_address) return
+  if (!sender?.wallet_address || !sender.tip_auto || !isOnboarded(sender)) return
+  if (command.amountUsd > Number(sender.tip_max_usd)) return
 
-  const { count: recent } = await db
+  const { data: today } = await db
     .from('tips')
-    .select('id', { count: 'exact', head: true })
+    .select('amount_usd')
     .eq('sender_id', sender.id)
+    .eq('status', 'sent')
     .gte('created_at', dayAgo())
-  if ((recent ?? 0) >= MAX_TIPS_PER_SENDER_PER_DAY) return
+  const sentToday = (today ?? []) as { amount_usd: string }[]
+  if (sentToday.length >= MAX_TIPS_PER_SENDER_PER_DAY) return
+  const spent = sentToday.reduce((sum, row) => sum + Number(row.amount_usd), 0)
+  if (spent + command.amountUsd > Number(sender.tip_daily_usd)) return
 
   const asset = await affordableAsset(new PublicKey(sender.wallet_address), command)
   if (!asset) return
+
+  // Last, because it's the one that costs: X itself has to agree who wrote what to whom
+  const post = await readPostOnX(tweet.id_str)
+  const confirmed =
+    post != null &&
+    post.authorId === author.id_str &&
+    post.mentions.some((entry) => entry.id === mention.id_str) &&
+    JSON.stringify(parseTipCommand(post.text)) === JSON.stringify(command)
+  if (!confirmed) return
 
   const { data, error } = await db
     .from('tips')
@@ -117,34 +132,47 @@ export async function handleTipTweet(tweet: TipTweet): Promise<void> {
     })
     .select(TIP_COLUMNS)
     .single()
-  // Two deliveries of one tweet racing each other: the first one answers
+  // Two deliveries of one tweet racing each other: the first one sends
   if (error?.code === UNIQUE_VIOLATION) return
   if (error) throw error
   const tip = data as TipRow
-  const what = tipLabel(command.amountUsd, asset.ticker)
 
-  await Promise.allSettled([
-    sendPhoneNotifications(
-      new Map([
-        [
-          sender.id,
-          {
-            title: 'Confirm your tip',
-            body: `${what} for @${mention.screen_name}. Tap to send it.`,
-            url: sendPath(tip, asset.ticker),
-          },
-        ],
-      ]),
-    ),
-    replyOnce(
-      tip,
-      'ack_reply_id',
-      `@${author.screen_name} got it 🎁 Open Morrow to send ${what} to @${mention.screen_name}.`,
-    ),
-  ])
+  try {
+    await sendTip(tip, sender, asset, command.amountUsd, request)
+  } catch (sendError) {
+    const failure = sendError instanceof Error ? sendError.message : String(sendError)
+    console.error('Tip send failed', tip.id, failure)
+    await db.from('tips').update({ status: 'failed', failure }).eq('id', tip.id)
+  }
 }
 
-/** Someone on Morrow who has signed in with this X account */
+/**
+ * The same gift the send screen makes, to the X account they tagged, signed by Morrow's signer and
+ * submitted through the same checks. `submitGiftTransaction` marks the tip sent and replies.
+ */
+async function sendTip(
+  tip: TipRow,
+  sender: UserRow,
+  asset: TipAsset,
+  amountUsd: number,
+  request: Request,
+): Promise<void> {
+  const { gifts, feePaidInShares } = await createGiftDrafts(sender, {
+    recipients: [`x.com/${tip.recipient_x_username}`],
+    items: [{ mint: asset.mint, amountRaw: asset.amountRaw.toString(), usdValue: amountUsd }],
+    tipId: tip.id,
+  })
+  const [draft] = gifts
+  if (!draft?.gift) throw new Error('No gift was drafted')
+  // The policy only lets the signer pay a fee in cash, so a fee in shares would be refused anyway
+  if (feePaidInShares) throw new Error('Fee would be paid in shares')
+
+  const signed = await signTipTransaction(sender.privy_id, draft.transaction)
+  const gift = await getGift(draft.gift.id)
+  await submitGiftTransaction(gift, signed, sender, request)
+}
+
+/** Someone on Morrow who has signed in with, or linked, this X account */
 async function senderForX(subject: string): Promise<UserRow | null> {
   try {
     const user = await privy.users().getByTwitterSubject({ subject })
@@ -155,17 +183,17 @@ async function senderForX(subject: string): Promise<UserRow | null> {
 }
 
 /**
- * What the tip is paid in, only when the sender holds at least the amount of it right now. The
- * fee and the final price are settled when they confirm; this only keeps empty accounts quiet.
+ * What the tip is paid in, only when the sender holds at least the amount of it right now: cash,
+ * or shares worth the amount at today's price ($1 of NVDA at $180 is 0.0056 shares).
  */
 async function affordableAsset(
   owner: PublicKey,
   command: { amountUsd: number; ticker: string | null },
-): Promise<{ mint: string; ticker: string | null } | null> {
+): Promise<TipAsset | null> {
   if (!command.ticker) {
-    const cash = await cashBalance(owner)
-    return cash >= BigInt(Math.round(command.amountUsd * 1_000_000))
-      ? { mint: CASH_MINT, ticker: null }
+    const amountRaw = BigInt(Math.round(command.amountUsd * 1_000_000))
+    return (await cashBalance(owner)) >= amountRaw
+      ? { mint: CASH_MINT, ticker: null, amountRaw }
       : null
   }
 
@@ -178,98 +206,40 @@ async function affordableAsset(
     Promise.all(candidates.map((stock) => tokenBalance(owner, stock.mint))),
     getTokenPrices(mints),
   ])
-  let best: { mint: string; ticker: string; value: number } | null = null
+  let best: (TipAsset & { balance: bigint }) | null = null
   candidates.forEach((stock, index) => {
     const mint = mints[index] ?? ''
-    const value = (Number(balances[index] ?? 0n) / 10 ** stock.decimals) * (prices[mint] ?? 0)
-    if (value >= command.amountUsd && (!best || value > best.value)) {
-      best = { mint, ticker: stock.ticker, value }
+    const price = prices[mint]
+    const balance = balances[index] ?? 0n
+    if (!price) return
+    // `tokenPriceUsd` is per whole raw token, so this is raw units, not shares as people see them
+    const amountRaw = BigInt(Math.floor((command.amountUsd / price) * 10 ** stock.decimals))
+    if (amountRaw <= 0n || balance < amountRaw) return
+    if (!best || balance > best.balance) {
+      best = { mint, ticker: stock.ticker, amountRaw, balance }
     }
   })
-  const chosen = best as { mint: string; ticker: string } | null
-  return chosen ? { mint: chosen.mint, ticker: chosen.ticker } : null
+  const chosen = best as (TipAsset & { balance: bigint }) | null
+  return chosen ? { mint: chosen.mint, ticker: chosen.ticker, amountRaw: chosen.amountRaw } : null
 }
 
-const tipLabel = (amountUsd: number, ticker: string | null) =>
-  ticker
-    ? `${formatUsd(amountUsd)} of ${ticker.replace(/x$/, '')}`
-    : `${formatUsd(amountUsd)} in cash`
-
-/** The send screen, filled in: recipient locked by their X link, the stock, the amount */
-function sendPath(tip: TipRow, ticker: string | null): string {
-  const params = new URLSearchParams({ to: `x.com/${tip.recipient_x_username}` })
-  if (ticker) {
-    params.set('stock', ticker.toUpperCase())
-    params.set('amount', String(Number(tip.amount_usd)))
-  } else {
-    params.set('cash', String(Number(tip.amount_usd)))
-  }
-  params.set('tip', tip.id)
-  return `/send?${params}`
-}
-
-/** Posts a reply unless one was posted already, and keeps under the daily reply budget */
-async function replyOnce(
-  tip: TipRow,
-  column: 'ack_reply_id' | 'sent_reply_id',
-  text: string,
-): Promise<void> {
-  if (tip[column]) return
-  const since = dayAgo()
-  const [{ count: acks }, { count: sents }] = await Promise.all([
-    db
-      .from('tips')
-      .select('id', { count: 'exact', head: true })
-      .not('ack_reply_id', 'is', null)
-      .gte('created_at', since),
-    db
-      .from('tips')
-      .select('id', { count: 'exact', head: true })
-      .not('sent_reply_id', 'is', null)
-      .gte('created_at', since),
-  ])
-  if ((acks ?? 0) + (sents ?? 0) >= MAX_REPLIES_PER_DAY) return
+/** Posts the reply unless one was posted already, and keeps under the daily reply budget */
+async function replyOnce(tip: TipRow, text: string): Promise<void> {
+  if (tip.sent_reply_id) return
+  const { count } = await db
+    .from('tips')
+    .select('id', { count: 'exact', head: true })
+    .not('sent_reply_id', 'is', null)
+    .gte('created_at', dayAgo())
+  if ((count ?? 0) >= MAX_REPLIES_PER_DAY) return
 
   const replyId = await replyOnX(tip.tweet_id, text)
-  if (replyId)
-    await db
-      .from('tips')
-      .update({ [column]: replyId })
-      .eq('id', tip.id)
-}
-
-/** Tips someone tweeted and hasn't sent yet, newest first */
-export async function pendingTips(sender: UserRow): Promise<TipView[]> {
-  const { data, error } = await db
-    .from('tips')
-    .select(TIP_COLUMNS)
-    .eq('sender_id', sender.id)
-    .eq('status', 'pending')
-    .gt('expires_at', new Date().toISOString())
-    .order('created_at', { ascending: false })
-    .limit(10)
-  if (error) throw error
-  const rows = data as TipRow[]
-  const stocks = new Map((await getStocks()).map((stock) => [stock.mint.toBase58(), stock]))
-  return rows.map((tip) => {
-    const ticker =
-      tip.mint && tip.mint !== CASH_MINT ? (stocks.get(tip.mint)?.ticker ?? null) : null
-    return {
-      id: tip.id,
-      recipientUsername: tip.recipient_x_username,
-      recipientName: tip.recipient_x_name,
-      amountUsd: Number(tip.amount_usd),
-      label: tipLabel(Number(tip.amount_usd), ticker),
-      sendPath: sendPath(tip, ticker),
-      expiresAt: tip.expires_at,
-    }
-  })
+  if (replyId) await db.from('tips').update({ sent_reply_id: replyId }).eq('id', tip.id)
 }
 
 /**
  * Ties a gift being created to the tip it answers. Only when it really is that tip: the sender who
- * tweeted it, still pending, and exactly one recipient who is the X account they tagged. Anything
- * else is just a gift, and the tip stays open.
+ * tweeted it, still pending, and exactly one recipient who is the X account they tagged.
  */
 export async function linkTipToGift(
   tipId: string,
@@ -304,7 +274,6 @@ export async function completeTipForGift(giftId: string, label: string): Promise
   if (!tip) return
   await replyOnce(
     tip,
-    'sent_reply_id',
     `@${tip.recipient_x_username} @${tip.sender_x_username} sent you ${label} 🎁 Sign in to Morrow with X to open it.`,
   )
 }

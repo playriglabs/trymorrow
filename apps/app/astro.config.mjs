@@ -61,6 +61,18 @@ export default defineConfig({
         access: 'public',
         optional: true,
       }),
+      // Morrow's tip signer and the Privy policy that bounds it, added to someone's wallet when
+      // they turn on tips from X. Unset means the switch doesn't show and nothing sends itself.
+      PUBLIC_PRIVY_TIP_SIGNER_ID: envField.string({
+        context: 'client',
+        access: 'public',
+        optional: true,
+      }),
+      PUBLIC_PRIVY_TIP_POLICY_ID: envField.string({
+        context: 'client',
+        access: 'public',
+        optional: true,
+      }),
       // VAPID public key the browser needs to subscribe to push. Unset means no phone
       // notifications: the feed still works, the app just never asks for permission.
       PUBLIC_VAPID_PUBLIC_KEY: envField.string({
@@ -125,6 +137,13 @@ export default defineConfig({
       }),
       // @trymorrow's X API keys (OAuth 1.0a, read and write), for replying to tip tweets.
       // Unset means no replies: tips still arrive in the app.
+      // Private half of the tip signer (P-256, base64 PKCS8) from scripts/setup-tip-signer.mjs.
+      // It can sign only what the Privy policy allows: Morrow gifts and a cash fee.
+      PRIVY_AUTHORIZATION_KEY: envField.string({
+        context: 'server',
+        access: 'secret',
+        optional: true,
+      }),
       X_API_KEY: envField.string({ context: 'server', access: 'secret', optional: true }),
       X_API_SECRET: envField.string({ context: 'server', access: 'secret', optional: true }),
       X_ACCESS_TOKEN: envField.string({ context: 'server', access: 'secret', optional: true }),

@@ -9,7 +9,7 @@ Morrow is a mobile-first PWA for gifting tokenized stocks (xStocks, plus PreStoc
 ## Rules that aren't negotiable
 
 - **No crypto words in the UI.** Cash, not USDC. Shares, not tokens. Receipt, not transaction hash. Account, not wallet. The deposit screen is the only exception, because exchanges need the details.
-- **Non-custodial, no KYC.** Money only moves from the user's own Privy embedded wallet, signed by them. The server builds transactions and the relayer co-signs; it never holds user funds.
+- **Non-custodial, no KYC.** Money only moves from the user's own Privy embedded wallet, signed by them. The server builds transactions and the relayer co-signs; it never holds user funds. **One exception, opted into:** someone who turns on "Send tips from X" adds Morrow's signer to their wallet, and it signs only what the Privy tip policy allows (Morrow's gift program, compute budget, a cash fee into the treasury), within limits they set. Nothing else may use `PRIVY_AUTHORIZATION_KEY`, and the policy must never be widened to make something pass.
 - **Never print secrets.** Read `apps/app/.env` programmatically if you must (e.g. `node --env-file=.env`), print derived facts only (a hostname, a public key, whether a value is empty). Don't echo keys, RPC URLs with API keys, or `CRON_SECRET`.
 - **Anything that spends SOL or touches mainnet state needs the user's go-ahead**: deploys, transfers, creating accounts from scripts. The app doing it in response to the user clicking is fine.
 - **Code conventions**: kebab-case component files, `@/` imports in `apps/app` (never `../`), all browser fetching through React Query hooks in `@/lib/client/queries`. Match the surrounding comment style: comments explain why, not what.
@@ -278,31 +278,40 @@ X account, and after 30 days it goes back to the sender like any other.
 
 ### Tips by tweet
 
-`@trymorrow tip @rahx $1 NVDA` (no stock named means cash). Two routes deliver tweets: X's own
-Activity API (`post.mention.create` for @trymorrow) posts to `/api/x/events`, and SocialData's
-search monitor posts to `POST /api/x/webhook`. X's search hides some tweets, so the monitor alone
-misses tips; the mention event doesn't. Both fetch the tweet in SocialData's shape and call
-`handleTipTweet`, and `tips.tweet_id` is unique, so a tweet seen twice is handled once. `handleTipTweet` (`tips.ts`) decides, and
-@trymorrow answers through X's own API (`x-posts.ts`, OAuth 1.0a with the account's tokens).
+`@trymorrow tip @rahx $1 NVDA` (no stock named means cash) sends $1 of shares or cash to that X
+account, straight from the sender's account. Two routes deliver tweets: X's own Activity API
+(`post.mention.create` for @trymorrow) posts to `/api/x/events`, and SocialData's search monitor
+posts to `/api/x/webhook`. X's search hides some tweets, so the monitor alone misses tips; the
+mention event doesn't. Both fetch the tweet in SocialData's shape and call `handleTipTweet`
+(`tips.ts`), and `tips.tweet_id` is unique, so a tweet seen twice is handled once.
 
-- **A tweet is a request, never a payment.** It writes a `tips` row; the sender opens Morrow
-  (Home's "tips to send", or the push), lands on `/send` filled in with `tip=<id>`, sees the fee
-  and signs. `POST /api/gifts` links the tip only when it's that sender's, still pending, and the
-  one recipient is the X id they tagged; the gift's `submit` marks it sent and replies once.
-- **Silence is the default.** No row and no reply unless the tweet parses, isn't ours or a
-  retweet, is under 30 minutes old, names someone else, comes from an X account signed in to
-  Morrow, and that person holds at least the amount right now. Never answer with a reason: "not
-  enough cash" in public tells everyone their balance.
-- **Replies cost $0.01 each and never carry a link** (a link makes it $0.20). Two per tip at most
-  (`ack_reply_id`, `sent_reply_id`), `MAX_REPLIES_PER_DAY` across everyone, and
-  `MAX_TIPS_PER_SENDER_PER_DAY`. A tip lasts `TIP_LIFETIME_HOURS` (24); no cron, it just stops
-  showing.
+- **Only for people who turned it on.** Profile → X → "Send tips from X" adds Morrow's signer
+  (`PUBLIC_PRIVY_TIP_SIGNER_ID`) to the wallet with the tip policy (`PUBLIC_PRIVY_TIP_POLICY_ID`),
+  then saves `users.tip_auto` and the limits (`tip_max_usd`, default $10; `tip_daily_usd`, $25).
+  Turning it off removes the signer before the server hears about it. Both ids and the key come
+  from `scripts/setup-tip-signer.mjs`, run once.
+- **The gift is the send screen's gift.** `createGiftDrafts` (`gift-drafts.ts`) and
+  `submitGiftTransaction` (`gift-submit.ts`) are shared with `/api/gifts` and its `submit`, so a
+  tip gets the same recipient locking, fees and transaction checks. `signTipTransaction`
+  (`tip-signer.ts`) adds the sender's signature through Privy with `PRIVY_AUTHORIZATION_KEY`. The
+  policy only allows a fee in cash, so a tip whose fee would come out of shares is refused.
+- **Stocks go by today's price:** `$1 NVDA` is $1 ÷ the price per raw token (`tokenPriceUsd`), in
+  whichever issuer's NVDA they hold at least $1 of. It's priced when the tip is sent.
+- **Silence is the default, and the order is cheapest first.** No row and no reply unless the
+  tweet parses, isn't ours or a retweet, is under 30 minutes old, names someone else, comes from
+  an X account signed in to or linked with a Morrow account that turned tips on, fits both
+  limits and `MAX_TIPS_PER_SENDER_PER_DAY`, and they hold the amount. Last, X itself must confirm
+  the post (`readPostOnX`, $0.005): same author, same recipient id, same command. Never answer
+  with a reason: "not enough cash" in public tells everyone their balance.
+- **One reply per tip, after it lands**, from `completeTipForGift`: "@rahx @kyy sent you $1 of
+  NVDA 🎁". $0.01, never a link (a link makes it $0.20), `MAX_REPLIES_PER_DAY` across everyone. A
+  tip that fails is kept with `status = 'failed'` and the reason in `failure`, and gets no reply.
 - `/api/x/events` answers X's CRC (`GET ?crc_token`) and checks `X-Twitter-Webhooks-Signature`,
   both HMAC-SHA256 with the consumer secret (`X_API_SECRET`), base64 with `sha256=`. Each
   delivered mention costs $0.005 whether or not it's a tip, and only ones saying "tip" are fetched.
-- The SocialData webhook verifies `X-Signature: v1=<hex>`, HMAC-SHA256 over `{X-Event-Id}.{X-Timestamp}.{raw body}` with
-  `SOCIALDATA_WEBHOOK_SECRET` and a 5-minute window, and refuses everything while it's unset.
-  SocialData doesn't retry, so a tweet that fails is logged, not bounced.
+- The SocialData webhook verifies `X-Signature: v1=<hex>`, HMAC-SHA256 over
+  `{X-Event-Id}.{X-Timestamp}.{raw body}` with `SOCIALDATA_WEBHOOK_SECRET` and a 5-minute window,
+  and refuses everything while it's unset. SocialData doesn't retry, so a failed tweet is lost.
 - The parser (`lib/tips.ts`) takes `$1 NVDA`, `$NVDA $1`, `$1 of nvda`, `$1 cash`; a word it
   can't place fails the whole tweet, and `NVDA` finds the xStock `NVDAx`.
 

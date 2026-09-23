@@ -313,8 +313,6 @@ function SendGift() {
     const cash = Number.parseFloat(params.get('cash') ?? '')
     return {
       to: params.get('to') ?? '',
-      // A tip tweeted at @trymorrow; the server only links it when this gift really answers it
-      tip: params.get('tip'),
       ticker: params.get('stock')?.toUpperCase() ?? null,
       amount: Number.isFinite(amount) && amount >= MIN_GIFT_USD ? amount : null,
       cash: Number.isFinite(cash) && cash >= MIN_GIFT_USD ? cash : null,
@@ -528,7 +526,7 @@ function SendGift() {
       }
     })
     send.mutate(
-      { recipients: recipients.map(recipientQuery), items, message, tipId: asked.tip ?? undefined },
+      { recipients: recipients.map(recipientQuery), items, message },
       { onSuccess: setResult },
     )
   }
