@@ -57,7 +57,7 @@ export function Providers({ children }: { children: ReactNode }) {
       config={{
         // Telegram rides last so it stays the fallback rather than the front door; inside a
         // Telegram Mini App Privy logs people in seamlessly without ever showing this list
-        loginMethods: ['email', 'google', 'telegram'],
+        loginMethods: ['email', 'google', 'twitter', 'telegram'],
         appearance: {
           theme: 'light',
           accentColor: '#F66F00',

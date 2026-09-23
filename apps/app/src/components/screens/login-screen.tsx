@@ -1,5 +1,5 @@
 import { navigate } from 'astro:transitions/client'
-import { CurrencyDollarIcon, EnvelopeIcon, WalletIcon } from '@phosphor-icons/react'
+import { CurrencyDollarIcon, EnvelopeIcon, WalletIcon, XLogoIcon } from '@phosphor-icons/react'
 import { useLoginWithOAuth, usePrivy } from '@privy-io/react-auth'
 import { useEffect, useState } from 'react'
 import { EmailLogin } from '@/components/email-login'
@@ -22,6 +22,7 @@ function Login() {
   const { mutate: syncProfile } = useSyncProfileMutation()
   const [view, setView] = useState<'welcome' | 'email'>('welcome')
   const [oauthError, setOauthError] = useState<string | null>(null)
+  const [oauthProvider, setOauthProvider] = useState<'google' | 'twitter' | null>(null)
   const [headlineIndex, setHeadlineIndex] = useState(0)
   const { initOAuth, state: oauth } = useLoginWithOAuth()
 
@@ -33,7 +34,7 @@ function Login() {
     return () => window.clearInterval(interval)
   }, [])
 
-  // Runs after email or Google login (and when someone lands here already signed in).
+  // Runs after email, Google or X login (and when someone lands here already signed in).
   // Waits for the account's wallet: leaving the page earlier interrupts Privy creating it.
   useEffect(() => {
     if (!ready || !authenticated || !wallet.ready) return
@@ -61,8 +62,9 @@ function Login() {
     )
   }
 
-  const startOAuth = async (provider: 'google') => {
+  const startOAuth = async (provider: 'google' | 'twitter') => {
     setOauthError(null)
+    setOauthProvider(provider)
     try {
       await initOAuth({ provider })
     } catch {
@@ -134,15 +136,23 @@ function Login() {
           <EnvelopeIcon className="size-5" />
           Continue with email
         </Button>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           <Button
             variant="outline"
             size="md"
-            loading={oauth.status === 'loading'}
+            loading={oauth.status === 'loading' && oauthProvider === 'google'}
             onClick={() => startOAuth('google')}
           >
             <img src="/google-logo.svg" alt="" className="size-5" />
             Google
+          </Button>
+          <Button
+            variant="outline"
+            size="md"
+            loading={oauth.status === 'loading' && oauthProvider === 'twitter'}
+            onClick={() => startOAuth('twitter')}
+          >
+            <XLogoIcon weight="bold" className="size-5" />X
           </Button>
           {/* Privy's modal lists Solana wallets and signs a SIWS message to log in */}
           <Button variant="dark" size="md" onClick={() => login({ loginMethods: ['wallet'] })}>
