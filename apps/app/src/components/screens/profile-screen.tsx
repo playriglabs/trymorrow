@@ -115,6 +115,26 @@ function ProfilePage() {
         </Card>
 
         <Card className="flex flex-col divide-y divide-line px-4">
+          {x ? (
+            <div className="flex h-13 items-center gap-3">
+              <XLogoIcon weight="bold" className="size-5" />
+              <span className="flex-1">X</span>
+              <span className="text-[14px] text-stone">@{x.username}</span>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="flex h-13 cursor-pointer items-center gap-3 text-left"
+              onClick={() => {
+                setLinkError(null)
+                linkTwitter()
+              }}
+            >
+              <XLogoIcon weight="bold" className="size-5" />
+              <span className="flex-1">Link your X account</span>
+              <CaretRightIcon className="size-4.5 text-steel" />
+            </button>
+          )}
           <a href="/ask" className="flex h-13 items-center gap-3">
             <GiftIcon className="size-5" />
             <span className="flex-1">Ask for a gift</span>
@@ -166,26 +186,6 @@ function ProfilePage() {
             >
               <KeyIcon className="size-5" />
               <span className="flex-1">Reveal key</span>
-              <CaretRightIcon className="size-4.5 text-steel" />
-            </button>
-          )}
-          {x ? (
-            <div className="flex h-13 items-center gap-3">
-              <XLogoIcon weight="bold" className="size-5" />
-              <span className="flex-1">X</span>
-              <span className="text-[14px] text-stone">@{x.username}</span>
-            </div>
-          ) : (
-            <button
-              type="button"
-              className="flex h-13 cursor-pointer items-center gap-3 text-left"
-              onClick={() => {
-                setLinkError(null)
-                linkTwitter()
-              }}
-            >
-              <XLogoIcon weight="bold" className="size-5" />
-              <span className="flex-1">Link your X account</span>
               <CaretRightIcon className="size-4.5 text-steel" />
             </button>
           )}
