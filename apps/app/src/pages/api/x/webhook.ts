@@ -37,13 +37,16 @@ export const POST = route(async ({ request }) => {
   return json({ ok: true })
 })
 
-/** Their docs don't pin the encoding, so accept the digest as hex or base64 */
-function matches(signature: string, digest: Buffer): boolean {
-  const given = signature.replace(/^sha256=/, '')
-  for (const expected of [digest.toString('hex'), digest.toString('base64')]) {
-    const a = new TextEncoder().encode(given)
-    const b = new TextEncoder().encode(expected)
-    if (a.length === b.length && timingSafeEqual(a, b)) return true
-  }
-  return false
+/**
+ * The header reads `v1=<hex>`. A versioned scheme can carry more than one signature while a
+ * secret rotates, so any `v1` entry that matches will do.
+ */
+function matches(header: string, digest: Buffer): boolean {
+  const expected = new TextEncoder().encode(digest.toString('hex'))
+  return header.split(/[\s,]+/).some((entry) => {
+    const [version, value] = entry.split('=')
+    if (version !== 'v1' || !value) return false
+    const given = new TextEncoder().encode(value.toLowerCase())
+    return given.length === expected.length && timingSafeEqual(given, expected)
+  })
 }

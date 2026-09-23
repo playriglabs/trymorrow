@@ -12,8 +12,9 @@ import {
   SignOutIcon,
   TicketIcon,
   WalletIcon,
+  XLogoIcon,
 } from '@phosphor-icons/react'
-import { usePrivy } from '@privy-io/react-auth'
+import { useLinkAccount, usePrivy } from '@privy-io/react-auth'
 import { useExportWallet, useWallets } from '@privy-io/react-auth/solana'
 import { useState } from 'react'
 import { AvatarPicker } from '@/components/avatar-picker'
@@ -52,12 +53,27 @@ function ProfilePage() {
   const [copied, setCopied] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
   const [blocked, setBlocked] = useState(false)
+  const [linkError, setLinkError] = useState<string | null>(null)
+  // Linking goes to X and back, so these fire when the profile loads again after it
+  const { linkTwitter } = useLinkAccount({
+    onSuccess: () => setLinkError(null),
+    onError: (error) =>
+      setLinkError(
+        error === 'linked_to_another_user'
+          ? 'That X account already has its own Morrow account. Anything sent to it stays there, so write to help@trymorrow.money and we’ll move it over.'
+          : error === 'exited_link_flow'
+            ? null
+            : 'That didn’t finish linking. Try again.',
+      ),
+  })
 
   if (!session.ready || !session.profile) return <Loading />
   const { profile } = session
   const link = `${location.host}/${profile.handle}`
   const address = wallets[0]?.address
   const account = findOurAccount(user, address)
+  // With X linked, gifts to this X name and tips tweeted from it both find this account
+  const x = user?.twitter
 
   /** The key is shown on Privy's own domain, so we never see it ourselves */
   const openKey = () => {
@@ -153,6 +169,26 @@ function ProfilePage() {
               <CaretRightIcon className="size-4.5 text-steel" />
             </button>
           )}
+          {x ? (
+            <div className="flex h-13 items-center gap-3">
+              <XLogoIcon weight="bold" className="size-5" />
+              <span className="flex-1">X</span>
+              <span className="text-[14px] text-stone">@{x.username}</span>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="flex h-13 cursor-pointer items-center gap-3 text-left"
+              onClick={() => {
+                setLinkError(null)
+                linkTwitter()
+              }}
+            >
+              <XLogoIcon weight="bold" className="size-5" />
+              <span className="flex-1">Link your X account</span>
+              <CaretRightIcon className="size-4.5 text-steel" />
+            </button>
+          )}
           <a href="mailto:help@trymorrow.money" className="flex h-13 items-center gap-3">
             <QuestionIcon className="size-5" />
             <span className="flex-1">Help</span>
@@ -176,6 +212,7 @@ function ProfilePage() {
         )}
 
         {exportError && <Notice tone="warning">{exportError}</Notice>}
+        {linkError && <Notice tone="warning">{linkError}</Notice>}
 
         <Button
           variant="danger"
