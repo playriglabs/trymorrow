@@ -4,7 +4,7 @@ Read [README.md](./README.md) for setup, commands and env vars, [DESIGN.md](./DE
 
 ## Product in one paragraph
 
-Morrow is a mobile-first PWA for gifting tokenized stocks (xStocks, plus PreStocks for private companies before they list) on Solana. A gift is locked to one recipient's wallet and only they can open it; unopened gifts go back to the sender after 30 days. People also buy and sell stocks with cash (USDC) through Jupiter. Built for the Solana Foundation Stocklana hackathon (deadline Fri 2026-09-18, 4pm ET), and meant to survive as a real product, so nothing should quietly cost us money.
+Morrow is a mobile-first PWA for gifting tokenized stocks (xStocks, plus PreStocks for private companies before they list) on Solana. A gift is locked to one recipient's wallet and only they can open it; unopened gifts go back to the sender after 30 days. People also buy and sell stocks with cash (USDC) through Jupiter. Built for the Solana Foundation Stocklana hackathon (deadline Fri 2026-09-25, 4pm ET), and meant to survive as a real product, so nothing should quietly cost us money.
 
 ## Rules that aren't negotiable
 
