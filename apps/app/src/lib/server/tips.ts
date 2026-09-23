@@ -260,8 +260,16 @@ export async function linkTipToGift(
     .gt('expires_at', new Date().toISOString())
 }
 
-/** After the gift lands on-chain: marks its tip sent and tells the recipient, in the same thread */
-export async function completeTipForGift(giftId: string, label: string): Promise<void> {
+/**
+ * After the gift lands on-chain: marks its tip sent and tells the recipient, in the same thread.
+ * The receipt is the bare signature, so anyone can look it up; as a link it would cost $0.20 a
+ * reply instead of $0.01.
+ */
+export async function completeTipForGift(
+  giftId: string,
+  label: string,
+  receipt: string | null,
+): Promise<void> {
   const { data, error } = await db
     .from('tips')
     .update({ status: 'sent' })
@@ -274,6 +282,6 @@ export async function completeTipForGift(giftId: string, label: string): Promise
   if (!tip) return
   await replyOnce(
     tip,
-    `@${tip.recipient_x_username} @${tip.sender_x_username} sent you ${label} 🎁 Sign in to Morrow with X to open it.`,
+    `@${tip.recipient_x_username} @${tip.sender_x_username} sent you ${label} 🎁 Sign in to Morrow with X to open it.${receipt ? `\n\nReceipt: ${receipt}` : ''}`,
   )
 }

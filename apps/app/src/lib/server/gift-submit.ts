@@ -222,7 +222,7 @@ export async function submitGiftTransaction(
   // A gift that answers a tweet gets its reply in the same thread; best effort, like the above
   if (action === 'createGift') {
     await giftLabel(sent)
-      .then((label) => completeTipForGift(sent.id, label))
+      .then((label) => completeTipForGift(sent.id, label, sent.create_signature))
       .catch((error) => console.error('Tip reply failed', error))
   }
 

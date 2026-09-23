@@ -304,7 +304,8 @@ mention event doesn't. Both fetch the tweet in SocialData's shape and call `hand
   the post (`readPostOnX`, $0.005): same author, same recipient id, same command. Never answer
   with a reason: "not enough cash" in public tells everyone their balance.
 - **One reply per tip, after it lands**, from `completeTipForGift`: "@rahx @kyy sent you $1 of
-  NVDA 🎁". $0.01, never a link (a link makes it $0.20), `MAX_REPLIES_PER_DAY` across everyone. A
+  NVDA 🎁" with "Receipt: <signature>" under it, bare so anyone can look it up. $0.01, never a
+  link (a link makes it $0.20), `MAX_REPLIES_PER_DAY` across everyone. A
   tip that fails is kept with `status = 'failed'` and the reason in `failure`, and gets no reply.
 - `/api/x/events` answers X's CRC (`GET ?crc_token`) and checks `X-Twitter-Webhooks-Signature`,
   both HMAC-SHA256 with the consumer secret (`X_API_SECRET`), base64 with `sha256=`. Each
