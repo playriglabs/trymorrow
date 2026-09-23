@@ -31,6 +31,23 @@ const giftSteps = [
   },
 ]
 
+const tipExamples = [
+  {
+    handle: '@maya',
+    command: '@trymorrow tip @maya $5 NVDA',
+    result: '$5.00 of $NVDA',
+    color: 'bg-[#dbe7c9]',
+    tilt: 'rotate-3',
+  },
+  {
+    handle: '@alex',
+    command: '@trymorrow tip @alex $10',
+    result: '$10.00 in cash',
+    color: 'bg-[#ded1f1]',
+    tilt: '-rotate-3',
+  },
+]
+
 // The gift card stack: the front one stays the $50 mix, the two behind show a single share and a
 // pre-IPO company, so the panel reads as "any of these" rather than one fixed product.
 const giftCards = [
@@ -134,17 +151,18 @@ onMount(() => {
       <div class="hero-intro relative z-10 mx-auto px-5">
         <h1
           id="hero-title"
-          class="mx-auto max-w-page font-sans text-[clamp(48px,8.8vw,126px)] leading-[0.92] tracking-[-0.075em]"
+          class="mx-auto max-w-page font-sans text-[clamp(48px,8vw,112px)] leading-[0.92] tracking-[-0.07em]"
         >
-          <span class="block">Buy, gift, grow.</span><span class="block text-orange"
-            >A big tomorrow.</span
+          <span class="block">Money should move</span><span class="block text-orange"
+            >like a message.</span
           >
         </h1>
         <p
-          class="mx-auto mt-7 max-w-90 text-sm leading-relaxed text-stone md:max-w-110 md:text-base"
+          class="mx-auto mt-7 max-w-90 text-sm leading-relaxed text-stone md:max-w-145 md:text-base"
         >
-          Send cash, Buy stocks, Gift them. Build a future together.<br class="hidden sm:block" /> A little
-          today can mean a lot tomorrow.
+          Buy and sell shares of real companies, send cash, tip people you follow,<br
+            class="hidden md:block"
+          /> or gift stocks to someone you care about.
         </p>
         <a
           href="https://app.trymorrow.money/login"
@@ -175,19 +193,35 @@ onMount(() => {
             loading="eager"
           />
         </div>
-        <div
-          class="hero-stock absolute top-24 right-[7%] z-20 w-55 rotate-10 rounded-3xl bg-[#ded1f1] p-5 text-left md:z-0 lg:z-20"
-        >
-          <div class="flex justify-between">
-            <StockMark stock="apple" color="#fffefb" size={45} /><Icon name="diagonal" size={19} />
-          </div>
-          <p class="mt-7 text-xs text-ink/70">A piece of something big.</p>
-          <p class="mt-0.5 font-sans text-[44px] leading-none tracking-[-0.06em]">Apple</p>
-          <div class="mt-4 flex items-baseline gap-2 border-t border-ink/15 pt-3">
-            <span class="font-sans text-lg tracking-tight">$2.50</span><span class="text-[11px]"
-              >a share, or less</span
+        <div class="hero-tips absolute top-22 right-[3%] z-20 w-67 text-left lg:right-[5%]">
+          {#each tipExamples as tip, i}
+            <div
+              class="hero-tip relative rounded-3xl border border-white/60 p-4 shadow-[0_18px_40px_-24px_rgb(76_40_6/0.5)] {tip.color} {tip.tilt} {i ===
+              1
+                ? '-mt-1 ml-7'
+                : ''}"
             >
-          </div>
+              <div class="flex items-center gap-2 text-[10px]">
+                <span class="flex size-7 items-center justify-center rounded-full bg-ink text-cream"
+                  ><SocialIcon name="x" small /></span
+                >
+                <span class="font-medium">You</span><span class="text-stone">just now</span>
+              </div>
+              <p class="mt-3 text-[12px] leading-relaxed">{tip.command}</p>
+              <div
+                class="mt-3 flex items-center justify-between rounded-2xl bg-surface/80 px-3 py-2"
+              >
+                <div>
+                  <p class="text-[9px] text-stone">Tip sent to {tip.handle}</p>
+                  <p class="mt-0.5 font-sans text-sm">{tip.result}</p>
+                </div>
+                <span
+                  class="flex size-7 items-center justify-center rounded-full bg-gain text-white"
+                  ><Icon name="check" size={14} /></span
+                >
+              </div>
+            </div>
+          {/each}
         </div>
         <!-- The gift card, the other way to send one: a code anyone can redeem. -->
         <div
@@ -219,11 +253,6 @@ onMount(() => {
               </div>
             </div>
           </div>
-        </div>
-        <div
-          class="hero-note absolute top-103.75 right-[12%] z-20 -rotate-6 rounded-full bg-[#d9e9c8] px-5 py-3 text-xs"
-        >
-          <span class="mr-2">✳</span> A future worth sharing.
         </div>
       </div>
       <p class="relative z-30 mt-6 hidden px-5 pb-2 text-xs text-stone md:block">
@@ -371,6 +400,161 @@ onMount(() => {
       </div>
     </section>
 
+    <!-- One feature, two entry points: send inside Morrow or tip from the conversation on X. -->
+    <section
+      id="gifting"
+      aria-labelledby="sending-title"
+      class="scroll-mt-10 bg-white px-5 py-20 text-ink md:px-10 md:py-28"
+    >
+      <div class="mx-auto max-w-page">
+        <div class="sending-intro flex flex-col justify-between gap-6 md:flex-row md:items-end">
+          <div>
+            <span class="text-[10px] tracking-widest text-stone">SEND IT YOUR WAY</span>
+            <h2 id="sending-title" class="section-title mt-4">
+              One thoughtful gift.<br /><span class="text-orange">Two simple ways.</span>
+            </h2>
+          </div>
+          <p class="max-w-91 text-sm leading-relaxed text-stone md:pb-1">
+            Send stocks or cash from Morrow, or tip right from a post on X. Either way, it lands as
+            a personal gift they can open themselves.
+          </p>
+        </div>
+
+        <div class="mt-12 grid gap-6 lg:grid-cols-2">
+          <article class="sending-card flex min-w-0 flex-col rounded-3xl bg-[#f1dfc7] p-5 md:p-7">
+            <div class="flex items-center justify-between gap-3">
+              <span class="rounded-full bg-white/70 px-3 py-1.5 text-[10px] text-stone"
+                >IN MORROW</span
+              >
+              <Icon name="gift" size={21} />
+            </div>
+            <h3
+              class="mt-5 font-sans text-[clamp(30px,3.4vw,46px)] leading-[1.02] tracking-[-0.05em]"
+            >
+              Three taps, and<br />it’s on its way.
+            </h3>
+            <p class="mt-3 max-w-105 text-sm leading-relaxed text-stone">
+              Pick cash or shares, add your words, and send it to their email, Morrow handle or
+              Telegram name.
+            </p>
+
+            <div class="group relative my-9 flex h-65 items-center justify-center md:h-73">
+              <CardOrnament variant="sparkles" />
+              <div class="relative h-52 w-58 md:h-56 md:w-64">
+                {#each giftCards as card, i}
+                  <div
+                    aria-hidden={i < giftCards.length - 1}
+                    class="gift-card absolute inset-x-0 top-0 overflow-hidden rounded-[22px] bg-surface text-left shadow-[0_18px_40px_-22px_rgb(76_40_6/0.45)]"
+                    style:--rest={card.rest}
+                    style:--spread={card.spread}
+                  >
+                    <div class="px-5 pt-5 pb-6 {card.head}">
+                      <div class="flex items-center justify-between text-[11px]">
+                        <span>Morrow gift card</span><Icon name="gift" size={16} />
+                      </div>
+                      <p class="mt-4 font-sans text-[34px] leading-none tracking-[-0.05em]">
+                        {card.amount}
+                      </p>
+                      <p class="mt-1 text-[11px] opacity-85">{card.note}</p>
+                    </div>
+                    <div class="border-t border-dashed border-line px-5 py-4">
+                      <div class="flex items-end justify-between gap-2">
+                        <div>
+                          <p class="text-[10px] text-stone">Redeem code</p>
+                          <p class="mt-0.5 font-sans text-sm tracking-tight">{card.code}</p>
+                        </div>
+                        <div class="flex shrink-0 items-center -space-x-1.5">
+                          {#each card.marks as mark}
+                            <span class="inline-flex rounded-full ring-2 ring-surface"
+                              ><StockMark stock={mark.stock} size={24} scale={mark.scale} /></span
+                            >
+                          {/each}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                {/each}
+              </div>
+            </div>
+
+            <ol class="mt-auto grid grid-cols-3 gap-2 border-t border-ink/10 pt-5">
+              {#each giftSteps as step, i}
+                <li class="min-w-0">
+                  <span class="text-[10px] text-orange">0{i + 1}</span>
+                  <p class="mt-1 text-xs leading-snug md:text-sm">{step.title}</p>
+                </li>
+              {/each}
+            </ol>
+          </article>
+
+          <article class="sending-card flex min-w-0 flex-col rounded-3xl bg-[#e4ead9] p-5 md:p-7">
+            <div class="flex items-center justify-between gap-3">
+              <span class="rounded-full bg-white/70 px-3 py-1.5 text-[10px] text-stone">FROM X</span
+              >
+              <span class="flex size-8 items-center justify-center rounded-full bg-ink text-cream"
+                ><SocialIcon name="x" small /></span
+              >
+            </div>
+            <h3
+              class="mt-5 font-sans text-[clamp(30px,3.4vw,46px)] leading-[1.02] tracking-[-0.05em]"
+            >
+              Turn a post into<br />a little ownership.
+            </h3>
+            <p class="mt-3 max-w-105 text-sm leading-relaxed text-stone">
+              Mention Morrow, name the person and amount, then add a ticker for stock—or leave it
+              out to send cash.
+            </p>
+
+            <div class="my-7 flex flex-col gap-3 rounded-[26px] bg-[#f5efe5] p-3 md:my-8 md:p-4">
+              <div class="flex items-center justify-between px-1 pb-1">
+                <div class="flex items-center gap-2">
+                  <span
+                    class="flex size-8 items-center justify-center rounded-full bg-ink text-cream"
+                    ><SocialIcon name="x" small /></span
+                  ><span class="text-xs">Tips from X</span>
+                </div>
+                <span class="rounded-full bg-[#dbe7c9] px-2.5 py-1 text-[9px] text-[#345839]"
+                  >Limits on</span
+                >
+              </div>
+              {#each tipExamples as tip, i}
+                <div class="rounded-2xl bg-white p-3.5 md:p-4">
+                  <p class="text-xs leading-relaxed">{tip.command}</p>
+                  <div class="mt-3 flex items-center gap-3 rounded-xl bg-cream p-2.5">
+                    {#if i === 0}
+                      <StockMark stock="nvidia" color="#d5efb2" size={34} scale={0.66} />
+                    {:else}
+                      <span
+                        class="flex size-8.5 items-center justify-center rounded-full bg-sun font-sans"
+                        >$</span
+                      >
+                    {/if}
+                    <div class="min-w-0">
+                      <p class="text-[9px] text-stone">Sent to {tip.handle}</p>
+                      <p class="truncate font-sans text-sm">{tip.result}</p>
+                    </div>
+                    <span
+                      class="ml-auto flex size-7 shrink-0 items-center justify-center rounded-full bg-gain text-white"
+                      ><Icon name="check" size={13} /></span
+                    >
+                  </div>
+                </div>
+              {/each}
+            </div>
+
+            <ol class="mt-auto grid grid-cols-3 gap-2 border-t border-ink/10 pt-5">
+              {#each ['Connect X', 'Set your limits', 'Post a tip'] as step, i}
+                <li class="min-w-0">
+                  <span class="text-[10px] text-orange">0{i + 1}</span>
+                  <p class="mt-1 text-xs leading-snug md:text-sm">{step}</p>
+                </li>
+              {/each}
+            </ol>
+          </article>
+        </div>
+      </div>
+    </section>
+
     <section aria-labelledby="together-title" class="together-section relative bg-surface">
       <div class="together-stage relative h-svh w-full overflow-hidden">
         <div class="together-canvas relative mx-auto h-full max-w-360">
@@ -448,93 +632,6 @@ onMount(() => {
             {/each}
             <p class="mt-7 text-sm text-stone">A little of each. All in Morrow.</p>
           </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- The gift itself, start to finish: the one flow everything else on this page leads to. -->
-    <section
-      id="gifting"
-      aria-labelledby="gifting-title"
-      class="mx-auto max-w-page scroll-mt-10 px-5 pt-24 pb-20 md:px-10 md:pt-32 md:pb-28"
-    >
-      <div class="reveal grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
-        <div>
-          <span class="text-[10px] tracking-widest text-stone">SENDING ONE</span>
-          <h2 id="gifting-title" class="section-title mt-4">
-            Three taps, and<br />it’s on its way.
-          </h2>
-          <p class="mt-5 max-w-97.5 text-sm leading-relaxed text-stone">
-            No wrapping paper, no gift shop, nothing for them to sign up for first. Most gifts cost
-            under 50¢ to send.
-          </p>
-          <ol class="mt-8 flex flex-col">
-            {#each giftSteps as step, i}
-              <li class="flex items-start gap-5 border-t border-line py-5">
-                <span
-                  class="flex size-11 shrink-0 items-center justify-center rounded-[15px] bg-orange-wash font-sans text-lg text-orange"
-                  >{i + 1}</span
-                >
-                <div>
-                  <h3 class="text-xl">{step.title}</h3>
-                  <p class="mt-1 max-w-95 text-sm leading-relaxed text-stone">{step.text}</p>
-                </div>
-              </li>
-            {/each}
-          </ol>
-          <a
-            href="{appUrl}/login"
-            class="cta group mt-8 inline-flex min-h-13 items-center justify-center gap-4 rounded-full bg-ink px-7 text-sm text-cream"
-            >Send your first gift <span class="transition-transform group-hover:translate-x-1"
-              ><Icon size={19} /></span
-            ></a
-          >
-        </div>
-        <!-- The other way to send one, for someone who isn’t here yet: a card with a code. -->
-        <div
-          class="group relative flex aspect-[0.92] items-center justify-center overflow-hidden rounded-3xl bg-[#f1dfc7] px-8 md:aspect-[1.15]"
-        >
-          <CardOrnament variant="sparkles" />
-          <!-- Stacked in paint order, back to front; hovering the panel fans them out -->
-          <div class="relative h-56 w-64">
-            {#each giftCards as card, i}
-              <div
-                aria-hidden={i < giftCards.length - 1}
-                class="gift-card absolute inset-x-0 top-0 overflow-hidden rounded-[22px] bg-surface text-left shadow-[0_18px_40px_-22px_rgb(76_40_6/0.45)]"
-                style:--rest={card.rest}
-                style:--spread={card.spread}
-              >
-                <div class="px-5 pt-5 pb-6 {card.head}">
-                  <div class="flex items-center justify-between text-[11px]">
-                    <span>Morrow gift card</span><Icon name="gift" size={16} />
-                  </div>
-                  <p class="mt-4 font-sans text-[34px] leading-none tracking-[-0.05em]">
-                    {card.amount}
-                  </p>
-                  <p class="mt-1 text-[11px] opacity-85">{card.note}</p>
-                </div>
-                <div class="border-t border-dashed border-line px-5 py-4">
-                  <div class="flex items-end justify-between gap-2">
-                    <div>
-                      <p class="text-[10px] text-stone">Redeem code</p>
-                      <p class="mt-0.5 font-sans text-sm tracking-tight">{card.code}</p>
-                    </div>
-                    <div class="flex shrink-0 items-center -space-x-1.5">
-                      {#each card.marks as mark}
-                        <span class="inline-flex rounded-full ring-2 ring-surface"
-                          ><StockMark stock={mark.stock} size={24} scale={mark.scale} /></span
-                        >
-                      {/each}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            {/each}
-          </div>
-          <span
-            class="absolute right-5 bottom-6 rotate-[-8deg] rounded-full bg-[#d3e7bb] px-4 py-2 font-sans text-sm"
-            >Anyone can open it.</span
-          >
         </div>
       </div>
     </section>

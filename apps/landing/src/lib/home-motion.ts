@@ -24,7 +24,7 @@ export function initHomeMotion(root: HTMLElement) {
           delay: 0.3,
           ease: 'power3.out',
         })
-        gsap.from('.hero-gift, .hero-stock, .hero-redeem, .hero-note', {
+        gsap.from('.hero-gift, .hero-tip, .hero-redeem', {
           y: 65,
           opacity: 0,
           scale: 0.85,
@@ -41,10 +41,18 @@ export function initHomeMotion(root: HTMLElement) {
           repeat: -1,
           ease: 'sine.inOut',
         })
-        gsap.to('.hero-stock', {
-          y: 15,
-          rotation: 7,
+        gsap.to('.hero-tip:first-child', {
+          y: 12,
+          rotation: 2,
           duration: 3.8,
+          yoyo: true,
+          repeat: -1,
+          ease: 'sine.inOut',
+        })
+        gsap.to('.hero-tip:last-child', {
+          y: -10,
+          rotation: -2,
+          duration: 4.1,
           yoyo: true,
           repeat: -1,
           ease: 'sine.inOut',
@@ -57,7 +65,6 @@ export function initHomeMotion(root: HTMLElement) {
           repeat: -1,
           ease: 'sine.inOut',
         })
-        gsap.to('.hero-note', { y: -10, duration: 3, yoyo: true, repeat: -1, ease: 'sine.inOut' })
         gsap.utils.toArray<HTMLElement>('.reveal').forEach((element) => {
           gsap.from(element, {
             y: 45,
@@ -68,6 +75,50 @@ export function initHomeMotion(root: HTMLElement) {
             clearProps: 'all',
           })
         })
+        const sending = root.querySelector<HTMLElement>('#gifting')
+        if (sending) {
+          const sendingReveal = gsap.timeline({
+            scrollTrigger: {
+              trigger: sending,
+              start: 'top 78%',
+              once: true,
+            },
+          })
+          sendingReveal
+            .from('.sending-intro > *', {
+              y: 30,
+              opacity: 0,
+              stagger: 0.1,
+              duration: 0.7,
+              ease: 'power3.out',
+              clearProps: 'all',
+            })
+            .from(
+              '.sending-card',
+              {
+                y: 52,
+                opacity: 0,
+                scale: 0.97,
+                stagger: 0.16,
+                duration: 0.8,
+                ease: 'power3.out',
+                clearProps: 'all',
+              },
+              '-=0.38',
+            )
+            .from(
+              '.sending-card ol > li',
+              {
+                y: 12,
+                opacity: 0,
+                stagger: 0.06,
+                duration: 0.4,
+                ease: 'power2.out',
+                clearProps: 'all',
+              },
+              '-=0.42',
+            )
+        }
         // Controlled by you: tied to the scroll, so the words rise one at a time as the section
         // comes up and the lock drops into its slot between them, then the promise underneath.
         const ownership = root.querySelector<HTMLElement>('.ownership-section')

@@ -136,9 +136,8 @@
     top: 24px;
   }
   .hero-gift,
-  .hero-stock,
   .hero-redeem,
-  .hero-note {
+  .hero-tips {
     display: none;
   }
   .together-stage {
