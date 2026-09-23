@@ -222,9 +222,21 @@ export type TradeResult = {
   quote: TradeQuote
 }
 
+/** An X account a gift can be locked to, shown so the sender can check it's the right person */
+export type XProfile = {
+  username: string
+  name: string
+  avatarUrl: string | null
+  followers: number
+  verified: boolean
+  /** Already signed in to Morrow with this X account */
+  onMorrow: boolean
+}
+
 export type RecipientResolution =
   | { kind: 'user'; profile: PublicProfile }
   | { kind: 'email'; email: string }
+  | { kind: 'x'; account: XProfile }
   | { kind: 'self' }
   | { kind: 'not_found' }
   | { kind: 'invalid' }
@@ -286,6 +298,8 @@ export type GiftView = {
   /** Handle/name for Morrow users, a masked email otherwise */
   recipientLabel: string
   recipientIsEmail: boolean
+  /** The X name it was sent to, while its person has no Morrow profile to show instead */
+  recipientX: string | null
   /** Locked to a redeem code rather than a person; whoever redeems it becomes the recipient */
   codeCard: boolean
   /** The stocks inside, largest first */
@@ -456,6 +470,19 @@ export type NotificationSettings = {
   pushEnabled: boolean
   /** Whether the same things also reach their inbox */
   emailEnabled: boolean
+}
+
+/** A tip someone tweeted (`@trymorrow tip @rahx $1 NVDA`) that's waiting for them to send it */
+export type TipView = {
+  id: string
+  recipientUsername: string
+  recipientName: string | null
+  amountUsd: number
+  /** "$1 of NVDA", "$1 in cash" */
+  label: string
+  /** The send screen, filled in with this tip */
+  sendPath: string
+  expiresAt: string
 }
 
 export type NotificationKind =

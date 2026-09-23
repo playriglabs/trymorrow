@@ -49,6 +49,64 @@ export function emailOf(user: User): string | null {
   return null
 }
 
+/** The X account someone signed in with, by X's numeric id */
+export function xSubjectOf(user: User): string | null {
+  for (const account of user.linked_accounts) {
+    if (account.type === 'twitter_oauth') return account.subject
+  }
+  return null
+}
+
+/** The wallet for this X account if Privy already has one; never creates anything */
+export async function findWalletForX(subject: string): Promise<string | null> {
+  try {
+    return solanaWalletOf(await privy.users().getByTwitterSubject({ subject }))
+  } catch (error) {
+    if (error instanceof NotFoundError) return null
+    throw error
+  }
+}
+
+/**
+ * The Solana wallet that belongs to whoever signs in with this X account. Like `walletForEmail`,
+ * it creates the Privy user and pregenerates the wallet for someone who has never signed in. The
+ * account is keyed by X's id, so a renamed account still opens its gift and a new owner of the old
+ * name doesn't.
+ */
+export async function walletForX(account: {
+  id: string
+  username: string
+  name: string
+}): Promise<string> {
+  let user: User
+  try {
+    user = await privy.users().getByTwitterSubject({ subject: account.id })
+  } catch (error) {
+    if (!(error instanceof NotFoundError)) throw error
+    user = await privy.users().create({
+      linked_accounts: [
+        {
+          type: 'twitter_oauth',
+          subject: account.id,
+          username: account.username,
+          name: account.name,
+        },
+      ],
+      wallets: [{ chain_type: 'solana' }],
+    })
+  }
+  return solanaWalletOf(user) ?? pregenerateWallet(user.id)
+}
+
+async function pregenerateWallet(userId: string): Promise<string> {
+  const updated = await privy
+    .users()
+    .pregenerateWallets(userId, { wallets: [{ chain_type: 'solana' }] })
+  const wallet = solanaWalletOf(updated)
+  if (!wallet) throw new Error(`Privy returned no Solana wallet for user ${userId}`)
+  return wallet
+}
+
 /** The wallet for this email if Privy already has one; never creates anything */
 export async function findWalletForEmail(email: string): Promise<string | null> {
   try {
@@ -76,13 +134,5 @@ export async function walletForEmail(email: string): Promise<string> {
     })
   }
 
-  const existing = solanaWalletOf(user)
-  if (existing) return existing
-
-  const updated = await privy
-    .users()
-    .pregenerateWallets(user.id, { wallets: [{ chain_type: 'solana' }] })
-  const wallet = solanaWalletOf(updated)
-  if (!wallet) throw new Error(`Privy returned no Solana wallet for user ${user.id}`)
-  return wallet
+  return solanaWalletOf(user) ?? pregenerateWallet(user.id)
 }

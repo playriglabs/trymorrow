@@ -36,6 +36,7 @@ import type {
   StockSendQuote,
   StockSendView,
   StocksResponse,
+  TipView,
   TradeHistoryPage,
   TradeQuote,
   TradeResult,
@@ -53,7 +54,8 @@ export const queryKeys = {
   gifts: (box?: GiftBox) => (box ? (['gifts', box] as const) : (['gifts'] as const)),
   gift: (giftId: string, viewerId?: string | null) =>
     viewerId === undefined ? (['gift', giftId] as const) : (['gift', giftId, viewerId] as const),
-  recipient: (query: string) => ['recipient', query] as const,
+  recipient: (query: string, x: boolean) => ['recipient', query, x] as const,
+  tips: () => ['tips'] as const,
   giftFee: (recipients: string[], mints: string[]) =>
     ['gift-fee', [...recipients].sort().join(','), [...mints].sort().join(',')] as const,
   giftCardFee: (mints: string[]) => ['gift-card-fee', [...mints].sort().join(',')] as const,
@@ -158,12 +160,29 @@ export function useGiftQuery(
   })
 }
 
-export function useRecipientQuery(query: string, { enabled = true }: Options = {}) {
+/** Tips tweeted at @trymorrow that are still waiting to be sent */
+export function useTipsQuery({ enabled = true }: Options = {}) {
   const api = useApi()
   return useQuery({
-    queryKey: queryKeys.recipient(query),
+    queryKey: queryKeys.tips(),
+    enabled,
+    queryFn: () => api<{ tips: TipView[] }>('/api/tips').then((data) => data.tips),
+  })
+}
+
+/** `x` also looks the name up on X, for gifts: only they can wait for someone to sign in */
+export function useRecipientQuery(
+  query: string,
+  { enabled = true, x = false }: Options & { x?: boolean } = {},
+) {
+  const api = useApi()
+  return useQuery({
+    queryKey: queryKeys.recipient(query, x),
     enabled: enabled && query.length >= 3,
-    queryFn: () => api<RecipientResolution>('/api/recipients', { method: 'POST', body: { query } }),
+    // Backspacing over a name already looked up shouldn't ask again; X names cost a request
+    staleTime: 5 * 60_000,
+    queryFn: () =>
+      api<RecipientResolution>('/api/recipients', { method: 'POST', body: { query, x } }),
   })
 }
 
@@ -629,6 +648,8 @@ export type SendGiftInput = {
     usdValue: number
   }[]
   message: string
+  /** The tweeted tip this gift answers, so @trymorrow can reply once it lands */
+  tipId?: string
 }
 
 export type SendGiftResult = {
@@ -672,6 +693,7 @@ export function useSendGiftMutation() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.portfolio() })
       queryClient.invalidateQueries({ queryKey: queryKeys.gifts() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.tips() })
     },
   })
 }

@@ -27,6 +27,7 @@ import {
   tokenTransfers,
 } from '@/lib/server/solana'
 import { db } from '@/lib/server/supabase'
+import { completeTipForGift } from '@/lib/server/tips'
 import { requireUser, requireWallet } from '@/lib/server/users'
 
 const schema = z.object({ transaction: z.string().min(100).max(4000) })
@@ -223,6 +224,13 @@ export const POST = route(async ({ params, request }) => {
     }
   } catch (notifyError) {
     console.error('Gift notification failed', notifyError)
+  }
+
+  // A gift that answers a tweet gets its reply in the same thread; best effort, like the above
+  if (action === 'createGift') {
+    await giftLabel(sent)
+      .then((label) => completeTipForGift(sent.id, label))
+      .catch((error) => console.error('Tip reply failed', error))
   }
 
   return json({ gift: await toGiftView(sent, viewer) })
