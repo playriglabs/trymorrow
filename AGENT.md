@@ -247,6 +247,58 @@ The app also runs as a Telegram Mini App, and Telegram names work wherever a han
 - **Web push is off inside Telegram** (`pushAvailable` checks `inTelegram()`): the webview never offers it. Their phone notifications are bot messages instead — the layout asks once, ever, with `Telegram.WebApp.requestWriteAccess()` (bots can't write otherwise), `syncUser` stores the Telegram person into `users.telegram_user_id`, and `sendPhoneNotifications` (`telegram.ts`) sends a message through the Bot API in place of the web push, falling back to it whenever the bot can't write. A bot that gets blocked loses the link, never the notification.
 - **A Telegram name resolves only to someone who has already signed in.** `telegramRowByUsername` (`users.ts`) maps a Telegram username through Privy to our row, and never creates or pregenerates anything — the opposite of email, which pregenerates so a gift can wait. Names 11–32 characters (longer than any handle) parse as Telegram outright; shorter ones fall back to Telegram only when no Morrow handle matches, and never when the word is one of `RESERVED_HANDLES`. Gifts, cash outs and share sends all resolve the same way, so `resolveCashoutTarget` and `resolveGiftRecipients` agree on who a name is.
 
+### Gifts to an X name
+
+A gift can go to someone's X account before they have Morrow, the way it can go to an email.
+The To field takes `@rahx` or a pasted `x.com/rahx`; the gift waits for whoever signs in with that
+X account, and after 30 days it goes back to the sender like any other.
+
+- **Names come from SocialData, not X's API** (`x-accounts.ts`, `SOCIALDATA_API_KEY`; unset turns
+  X names off). $0.0002 a profile with three free requests a minute, against X's $0.01. It's
+  read-only and we never post, so `@trymorrow` is only a name people tag.
+- **The lock is X's numeric id, never the name.** `walletForX` pregenerates a Privy user with a
+  `twitter_oauth` account for that id, which is what Privy matches when the person signs in with
+  X, so a renamed account still opens its gift and whoever takes the old name doesn't.
+  `gifts.recipient_x_id` records it; `recipient_x_username` is only how screens name them.
+- **An existing account always wins.** A bare name is X only once no Morrow handle or Telegram
+  name matches; a pasted x.com link is always X, and that's the form the send screen sends back,
+  so the name resolved while typing is the one the gift is locked to.
+- **X names are gifts only.** `/api/recipients` looks on X only when asked (`x: true`); cash outs
+  and share sends never can, because they can't wait for someone to sign in.
+- The sender checks the picture, name and followers before sending, since a lookup we can't
+  verify decides who the gift is for. Protected accounts and all-digit names don't resolve.
+- **Lookups are bought once.** Before a paid request: the browser's query cache (5 minutes),
+  the instance's memory (5 minutes), a lookup already in flight for that name, then `x_accounts`,
+  shared by every instance (6 hours for an account, 1 hour for a name nobody has).
+- After sending, "Tell @rahx on X" opens X's own composer filled in with the gift link, and the
+  sender posts it from their account. Posting from ours would cost $0.20 per post with a link.
+- Same gotcha as Google: someone already on Morrow by email who signs in with X gets a second
+  account. Linking X in settings (TODO) closes that.
+
+### Tips by tweet
+
+`@trymorrow tip @rahx $1 NVDA` (no stock named means cash). SocialData's search monitor posts
+each matching tweet to `POST /api/x/webhook`; `handleTipTweet` (`tips.ts`) decides, and
+@trymorrow answers through X's own API (`x-posts.ts`, OAuth 1.0a with the account's tokens).
+
+- **A tweet is a request, never a payment.** It writes a `tips` row; the sender opens Morrow
+  (Home's "tips to send", or the push), lands on `/send` filled in with `tip=<id>`, sees the fee
+  and signs. `POST /api/gifts` links the tip only when it's that sender's, still pending, and the
+  one recipient is the X id they tagged; the gift's `submit` marks it sent and replies once.
+- **Silence is the default.** No row and no reply unless the tweet parses, isn't ours or a
+  retweet, is under 30 minutes old, names someone else, comes from an X account signed in to
+  Morrow, and that person holds at least the amount right now. Never answer with a reason: "not
+  enough cash" in public tells everyone their balance.
+- **Replies cost $0.01 each and never carry a link** (a link makes it $0.20). Two per tip at most
+  (`ack_reply_id`, `sent_reply_id`), `MAX_REPLIES_PER_DAY` across everyone, and
+  `MAX_TIPS_PER_SENDER_PER_DAY`. A tip lasts `TIP_LIFETIME_HOURS` (24); no cron, it just stops
+  showing.
+- The webhook verifies HMAC-SHA256 over `{X-Event-Id}.{X-Timestamp}.{raw body}` with
+  `SOCIALDATA_WEBHOOK_SECRET` and a 5-minute window, and refuses everything while it's unset.
+  SocialData doesn't retry, so a tweet that fails is logged, not bounced.
+- The parser (`lib/tips.ts`) takes `$1 NVDA`, `$NVDA $1`, `$1 of nvda`, `$1 cash`; a word it
+  can't place fails the whole tweet, and `NVDA` finds the xStock `NVDAx`.
+
 ### Watchlists
 
 Stocks someone follows without buying, grouped into named lists with an emoji. `lib/client/watchlists.ts` is the whole store: `localStorage` under `morrow.watchlists.v1.<privy user id>`, one store per account (the same identity `providers.tsx` scopes the query cache to), read through `useSyncExternalStore` so every screen and every tab of the app agrees. Signing in as someone else on the same phone therefore shows their own lists, not the last person's. Nothing reaches the server — it isn't money, and keeping it local costs nothing to run. `useWatchlists()` hands back the lists and the actions; nothing writes storage directly.

@@ -8,6 +8,7 @@ import {
   PlusIcon,
   ShareIcon,
   XIcon,
+  XLogoIcon,
 } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { useMemo, useState } from 'react'
@@ -41,7 +42,7 @@ import { useSession } from '@/lib/client/session'
 import { cashGiftFeeDeductions } from '@/lib/fee-deductions'
 import { formatShares, formatUsd } from '@/lib/format'
 import { giftAmountLabel, MAX_GIFT_RECIPIENTS } from '@/lib/gifts'
-import type { RecipientResolution } from '@/lib/types'
+import type { GiftView, RecipientResolution } from '@/lib/types'
 
 const PRESETS = [10, 25, 50, 100]
 const MAX_PRESET = Math.max(...PRESETS)
@@ -52,11 +53,34 @@ const AMOUNT_PATTERN = /^\d{0,7}(\.\d{0,2})?$/
 /** Per person; keeps every stock's share of the gift above zero base units */
 const MIN_GIFT_USD = 1
 
-type Recipient = Extract<RecipientResolution, { kind: 'user' | 'email' }>
+type Recipient = Extract<RecipientResolution, { kind: 'user' | 'email' | 'x' }>
 
-/** What the server resolves again when the gift is created */
+/**
+ * What the server resolves again when the gift is created. An X name goes back as its profile
+ * link, so a Morrow handle that happens to match can never take its place.
+ */
 const recipientQuery = (recipient: Recipient) =>
-  recipient.kind === 'user' ? `@${recipient.profile.handle}` : recipient.email
+  match(recipient)
+    .with({ kind: 'user' }, ({ profile }) => `@${profile.handle}`)
+    .with({ kind: 'email' }, ({ email }) => email)
+    .with({ kind: 'x' }, ({ account }) => `x.com/${account.username}`)
+    .exhaustive()
+
+const recipientName = (recipient: Recipient) =>
+  match(recipient)
+    .with({ kind: 'user' }, ({ profile }) => profile.name)
+    .with({ kind: 'email' }, ({ email }) => email)
+    .with({ kind: 'x' }, ({ account }) => account.name)
+    .exhaustive()
+
+const followersLabel = (count: number) =>
+  `${new Intl.NumberFormat('en-US', { notation: 'compact' }).format(count)} ${count === 1 ? 'follower' : 'followers'}`
+
+/** X's own composer, filled in; the sender posts it from their account, so it costs us nothing */
+function xPostUrl(gift: GiftView, url: string): string {
+  const text = `@${gift.recipientX} I sent you ${giftAmountLabel(gift.usdValue, gift.items)} on @trymorrow 🎁 Sign in with X to open it:`
+  return `https://x.com/intent/post?${new URLSearchParams({ text, url })}`
+}
 
 const canShare = () => typeof navigator.share === 'function'
 
@@ -97,12 +121,32 @@ function RecipientHint({ resolution }: { resolution: RecipientResolution | undef
           Only {resolution.email} can open this gift.
         </p>
       )
+    case 'x':
+      return (
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-2.5 text-[14px]">
+            <Avatar name={resolution.account.name} url={resolution.account.avatarUrl} size={28} />
+            <span className="min-w-0 truncate">
+              {resolution.account.name}{' '}
+              <span className="text-stone">
+                @{resolution.account.username} on X · {followersLabel(resolution.account.followers)}
+              </span>
+            </span>
+          </div>
+          <p className="flex items-center gap-1.5 text-[13px] text-stone">
+            <LockIcon className="size-3.5 shrink-0" />
+            {resolution.account.onMorrow
+              ? 'Already on Morrow. Only they can open this gift.'
+              : 'Check it’s them. Only they can open it, by signing in with X.'}
+          </p>
+        </div>
+      )
     case 'self':
       return <p className="text-[13px] text-loss">That’s you. Pick someone else.</p>
     case 'not_found':
       return (
         <p className="text-[13px] text-loss">
-          No one has that gift link yet. Try their email or Telegram name.
+          No one has that name yet. Try their email, Telegram or X name.
         </p>
       )
     default:
@@ -111,11 +155,13 @@ function RecipientHint({ resolution }: { resolution: RecipientResolution | undef
 }
 
 function RecipientChip({ recipient, onRemove }: { recipient: Recipient; onRemove: () => void }) {
-  const label = recipient.kind === 'user' ? recipient.profile.name : recipient.email
+  const label = recipientName(recipient)
   return (
     <span className="flex h-10 max-w-full items-center gap-2 rounded-link border border-line bg-surface pr-1 pl-1.5 text-[14px]">
       {recipient.kind === 'user' ? (
         <Avatar name={recipient.profile.name} url={recipient.profile.avatarUrl} size={28} />
+      ) : recipient.kind === 'x' ? (
+        <Avatar name={recipient.account.name} url={recipient.account.avatarUrl} size={28} />
       ) : (
         <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-orange-wash">
           <EnvelopeIcon className="size-4 text-stone" />
@@ -134,7 +180,7 @@ function RecipientChip({ recipient, onRemove }: { recipient: Recipient; onRemove
   )
 }
 
-function GiftLink({ url, label }: { url: string; label?: string }) {
+function GiftLink({ url, label, xPost }: { url: string; label?: string; xPost?: string }) {
   const [copied, setCopied] = useState(false)
   const copy = () => copyText(url).then(setCopied)
   return (
@@ -150,6 +196,19 @@ function GiftLink({ url, label }: { url: string; label?: string }) {
           {url.replace(/^https?:\/\//, '')}
         </span>
       </div>
+      {xPost && (
+        <LinkButton
+          href={xPost}
+          target="_blank"
+          rel="noopener"
+          variant="soft"
+          size="sm"
+          className="px-3"
+          aria-label="Tell them on X"
+        >
+          <XLogoIcon weight="bold" className="size-4" />
+        </LinkButton>
+      )}
       {label && canShare() && (
         <Button
           variant="soft"
@@ -181,7 +240,14 @@ function GiftsReady({ result }: { result: SendGiftResult }) {
       footer={
         single ? (
           <>
+            {first.gift.recipientX && (
+              <LinkButton href={xPostUrl(first.gift, first.url)} target="_blank" rel="noopener">
+                <XLogoIcon weight="bold" className="size-5" />
+                Tell @{first.gift.recipientX} on X
+              </LinkButton>
+            )}
             <Button
+              variant={first.gift.recipientX ? 'soft' : undefined}
               onClick={() =>
                 canShare()
                   ? navigator.share({ title: 'A gift for you', url: first.url }).catch(() => {})
@@ -213,7 +279,12 @@ function GiftsReady({ result }: { result: SendGiftResult }) {
         </div>
         <Card className="flex w-full flex-col divide-y divide-line px-4">
           {links.map(({ gift, url }) => (
-            <GiftLink key={gift.id} url={url} label={single ? undefined : gift.recipientLabel} />
+            <GiftLink
+              key={gift.id}
+              url={url}
+              label={single ? undefined : gift.recipientLabel}
+              xPost={gift.recipientX ? xPostUrl(gift, url) : undefined}
+            />
           ))}
         </Card>
         {result.failed > 0 && (
@@ -242,6 +313,8 @@ function SendGift() {
     const cash = Number.parseFloat(params.get('cash') ?? '')
     return {
       to: params.get('to') ?? '',
+      // A tip tweeted at @trymorrow; the server only links it when this gift really answers it
+      tip: params.get('tip'),
       ticker: params.get('stock')?.toUpperCase() ?? null,
       amount: Number.isFinite(amount) && amount >= MIN_GIFT_USD ? amount : null,
       cash: Number.isFinite(cash) && cash >= MIN_GIFT_USD ? cash : null,
@@ -286,9 +359,12 @@ function SendGift() {
 
   const typedText = to.trim()
   const query = useDebounced(typedText)
-  const recipient = useRecipientQuery(query, { enabled: session.ready })
+  const recipient = useRecipientQuery(query, { enabled: session.ready, x: true })
   const resolution = query === typedText ? recipient.data : undefined
-  const typed = resolution?.kind === 'user' || resolution?.kind === 'email' ? resolution : null
+  const typed =
+    resolution?.kind === 'user' || resolution?.kind === 'email' || resolution?.kind === 'x'
+      ? resolution
+      : null
   const typedDuplicate =
     typed != null && added.some((entry) => recipientQuery(entry) === recipientQuery(typed))
   const full = added.length >= MAX_GIFT_RECIPIENTS
@@ -452,7 +528,7 @@ function SendGift() {
       }
     })
     send.mutate(
-      { recipients: recipients.map(recipientQuery), items, message },
+      { recipients: recipients.map(recipientQuery), items, message, tipId: asked.tip ?? undefined },
       { onSuccess: setResult },
     )
   }
@@ -663,7 +739,9 @@ function SendGift() {
             <div className="min-w-0 flex-1">
               <TextInput
                 id="to"
-                placeholder={added.length > 0 ? 'Add another @handle or email' : '@handle or email'}
+                placeholder={
+                  added.length > 0 ? 'Add another name or email' : '@handle, X name or email'
+                }
                 autoCapitalize="none"
                 autoCorrect="off"
                 enterKeyHint="done"

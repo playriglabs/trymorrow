@@ -113,6 +113,26 @@ export default defineConfig({
       // Financial Modeling Prep key, for the one-line company descriptions on a stock page.
       // Unset means no descriptions: every stock page just leaves the section out.
       FMP_API_KEY: envField.string({ context: 'server', access: 'secret', optional: true }),
+      // SocialData key, for finding who an X name belongs to so a gift can wait for them.
+      // Unset means X names don't resolve: gifts go by handle, email or Telegram name only.
+      SOCIALDATA_API_KEY: envField.string({ context: 'server', access: 'secret', optional: true }),
+      // Signs what SocialData's search monitor posts to /api/x/webhook (tweets that tip).
+      // Unset means the webhook refuses everything, so nobody can tip by tweeting.
+      SOCIALDATA_WEBHOOK_SECRET: envField.string({
+        context: 'server',
+        access: 'secret',
+        optional: true,
+      }),
+      // @trymorrow's X API keys (OAuth 1.0a, read and write), for replying to tip tweets.
+      // Unset means no replies: tips still arrive in the app.
+      X_API_KEY: envField.string({ context: 'server', access: 'secret', optional: true }),
+      X_API_SECRET: envField.string({ context: 'server', access: 'secret', optional: true }),
+      X_ACCESS_TOKEN: envField.string({ context: 'server', access: 'secret', optional: true }),
+      X_ACCESS_TOKEN_SECRET: envField.string({
+        context: 'server',
+        access: 'secret',
+        optional: true,
+      }),
       // Our trading fee in basis points; Jupiter allows 50-255 and keeps 20% of it
       TRADE_FEE_BPS: envField.number({
         context: 'server',

@@ -19,6 +19,7 @@ import { enforceRateLimit } from '@/lib/server/rate-limit'
 import { resolveGiftRecipients } from '@/lib/server/recipients'
 import { buildRelayedTransaction, relayer, tokenBalance } from '@/lib/server/solana'
 import { db } from '@/lib/server/supabase'
+import { linkTipToGift } from '@/lib/server/tips'
 import { isOnboarded, requireUser, requireWallet } from '@/lib/server/users'
 
 export const GET = route(async ({ request, url }) => {
@@ -50,6 +51,8 @@ const createSchema = z.object({
   recipients: z.array(z.string().trim().min(3).max(254)).min(1).max(MAX_GIFT_RECIPIENTS),
   items: z.array(itemSchema).min(1).max(MAX_GIFT_STOCKS),
   message: z.string().trim().max(280).optional(),
+  /** The tweeted tip this gift answers, when it came from one */
+  tipId: z.string().uuid().optional(),
 })
 
 /**
@@ -157,6 +160,8 @@ export const POST = route(async ({ request }) => {
         recipient_id: recipient.target.userId,
         recipient_email: recipient.target.email,
         recipient_wallet: recipient.wallet,
+        recipient_x_id: recipient.target.x?.id ?? null,
+        recipient_x_username: recipient.target.x?.username ?? null,
         message: body.message || null,
         rent_payer: payer.toBase58(),
         expires_at: expiresAt.toISOString(),
@@ -196,6 +201,7 @@ export const POST = route(async ({ request }) => {
     await db.from('gifts').delete().in('id', giftIds)
     throw itemsError
   }
+  if (body.tipId) await linkTipToGift(body.tipId, sender, recipients, giftIds)
 
   const { data, error } = await db.from('gifts').select(GIFT_COLUMNS).in('id', giftIds)
   if (error) throw error

@@ -224,6 +224,26 @@ place to borrow it against these shares.
 - [x] A second collateral stock is refused in `POST /api/borrow/open` (`one_stock_only`) until the
       bytes and the liquidation maths for two have been measured; the obligation itself holds many
 
+## P1 — tips on X (branch `feat/x-tips`, not launched)
+
+- [x] Gifts to an X name from the app: SocialData lookup, pregenerated wallet locked to the X id,
+      "Tell them on X" through X's composer
+- [ ] Apply `20260923120000_gift_x_recipients.sql` and set `SOCIALDATA_API_KEY`
+- [ ] Try it end to end on mainnet: send $1 to a fresh X account, sign in with X, claim
+- [ ] "Link X" in settings, and store the X id on `users`, so an email account can receive X gifts
+      and a tweet can be matched to its author
+- [x] Tip by tweeting: parser, `tips` table, signed webhook, @trymorrow replies, tips on Home,
+      confirm through the send screen
+- [ ] Apply `20260923130000_tips.sql` and `20260923140000_x_accounts.sql`
+- [ ] X developer app for @trymorrow (pay-per-use, read and write), set `X_API_KEY`,
+      `X_API_SECRET`, `X_ACCESS_TOKEN`, `X_ACCESS_TOKEN_SECRET`; set a monthly spend cap there
+- [ ] Mark @trymorrow as automated in X settings
+- [ ] SocialData: set `SOCIALDATA_WEBHOOK_SECRET` (`POST /webhook-secret`) and create the
+      monitor: `POST /monitors/search-query` with query `"@trymorrow tip" -is:retweet -from:trymorrow`,
+      `refresh_frequency` 60–120, `webhook_url` `https://app.trymorrow.money/api/x/webhook`
+- [ ] After the first real tip, check the X bill shows the replies at $0.01 (no link)
+- [ ] Check with counsel before launch: tokenized stocks tipped in public on X
+
 ## P2 — product
 
 - [x] **Trade history** stored in the DB (`trade_fills`, `pending_trades`), which gives a cost basis

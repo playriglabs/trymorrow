@@ -52,6 +52,9 @@ export type GiftRow = {
   recipient_id: string | null
   recipient_email: string | null
   recipient_wallet: string | null
+  /** Set when the gift was sent to an X name; the wallet is locked to that X id */
+  recipient_x_id: string | null
+  recipient_x_username: string | null
   message: string | null
   status: GiftStatus
   rent_payer: string
@@ -73,7 +76,7 @@ export type GiftRow = {
 }
 
 export const GIFT_COLUMNS =
-  'id, sender_id, sender_wallet, recipient_id, recipient_email, recipient_wallet, message, status, rent_payer, expires_at, create_signature, settle_signature, claimed_at, created_at, thanks_note, thanked_at, fee_raw, fee_mint, fee_usd, code_hash, gift_items (id, mint, amount_raw, usd_value)'
+  'id, sender_id, sender_wallet, recipient_id, recipient_email, recipient_wallet, recipient_x_id, recipient_x_username, message, status, rent_payer, expires_at, create_signature, settle_signature, claimed_at, created_at, thanks_note, thanked_at, fee_raw, fee_mint, fee_usd, code_hash, gift_items (id, mint, amount_raw, usd_value)'
 
 export const GIFT_LIFETIME_DAYS = 30
 
@@ -207,12 +210,14 @@ export async function toGiftViews(gifts: GiftRow[], viewer: UserRow | null): Pro
     const recipient = gift.recipient_id ? users.get(gift.recipient_id) : undefined
     const role = viewerRole(gift, viewer)
     const codeCard = gift.code_hash != null
-    const recipientLabel = match({ codeCard, recipient })
+    const recipientX = codeCard ? null : gift.recipient_x_username
+    const recipientLabel = match({ codeCard, recipient, recipientX })
       .with({ codeCard: true }, () => recipient?.name ?? 'Anyone with the code')
       .with(
         { recipient: { handle: P.string.minLength(1) } },
         ({ recipient }) => recipient.name ?? `@${recipient.handle}`,
       )
+      .with({ recipientX: P.string }, ({ recipientX }) => `@${recipientX} on X`)
       .otherwise(() => maskEmail(gift.recipient_email ?? ''))
 
     const items: GiftItemView[] = [...gift.gift_items]
@@ -251,7 +256,8 @@ export async function toGiftViews(gifts: GiftRow[], viewer: UserRow | null): Pro
         avatarUrl: avatarUrl(sender?.avatar_path ?? null),
       },
       recipientLabel,
-      recipientIsEmail: !codeCard && !recipient?.handle,
+      recipientIsEmail: !codeCard && !recipient?.handle && !recipientX,
+      recipientX,
       codeCard,
       items,
       usdValue,

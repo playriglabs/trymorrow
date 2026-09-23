@@ -1,8 +1,8 @@
-import { LockIcon, UserCircleIcon } from '@phosphor-icons/react'
+import { LockIcon, UserCircleIcon, XLogoIcon } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { useEffect, useState } from 'react'
 import Confetti from 'react-confetti'
-import { match } from 'ts-pattern'
+import { match, P } from 'ts-pattern'
 import { EmailLogin } from '@/components/email-login'
 import { withProviders } from '@/components/providers'
 import { CashLogo, StockLogo } from '@/components/stock-logo'
@@ -451,12 +451,31 @@ function Gift({ giftId }: { giftId: string }) {
         <div className="flex flex-col gap-1.5">
           <h2 className="font-sans text-xl font-medium tracking-[-0.02em]">It’s yours to keep</h2>
           <p className="text-[15px] text-stone">
-            {view.recipientIsEmail
-              ? `This gift is for ${view.recipientLabel}. Sign in with that email to open it.`
-              : `This gift is for ${view.recipientLabel}. Sign in to their Morrow account to open it.`}
+            {match(view)
+              .with(
+                { recipientX: P.string },
+                () =>
+                  `This gift is for ${view.recipientLabel}. Sign in with that X account to open it.`,
+              )
+              .with(
+                { recipientIsEmail: true },
+                () =>
+                  `This gift is for ${view.recipientLabel}. Sign in with that email to open it.`,
+              )
+              .otherwise(
+                () =>
+                  `This gift is for ${view.recipientLabel}. Sign in to their Morrow account to open it.`,
+              )}
           </p>
         </div>
-        <EmailLogin compact intro="We’ll send a code to prove it’s you. No password needed." />
+        {view.recipientX ? (
+          <LinkButton href={`/login?next=${encodeURIComponent(`/gift/${view.id}`)}`}>
+            <XLogoIcon weight="bold" className="size-5" />
+            Sign in with X
+          </LinkButton>
+        ) : (
+          <EmailLogin compact intro="We’ll send a code to prove it’s you. No password needed." />
+        )}
       </Screen>
     )
   }
@@ -491,7 +510,10 @@ function Gift({ giftId }: { giftId: string }) {
         <GiftCard gift={view} />
         <Notice tone="warning" icon={<UserCircleIcon className="size-4.5" />}>
           This gift is for {view.recipientLabel}, and you’re signed in as{' '}
-          {session.profile?.email ?? 'someone else'}. Switch to the right account to open it.
+          {session.profile?.email ?? 'someone else'}.{' '}
+          {view.recipientX
+            ? 'Switch account and sign in with that X account to open it.'
+            : 'Switch to the right account to open it.'}
         </Notice>
       </Screen>
     )
