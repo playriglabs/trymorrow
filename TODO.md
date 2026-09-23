@@ -242,6 +242,9 @@ place to borrow it against these shares.
       monitor: `POST /monitors/search-query` with query `"@trymorrow tip" -is:retweet -from:trymorrow`,
       `refresh_frequency` 60–120, `webhook_url` `https://app.trymorrow.money/api/x/webhook`
 - [ ] After the first real tip, check the X bill shows the replies at $0.01 (no link)
+- [ ] X Console: register webhook `https://app.trymorrow.money/api/x/events`, then subscribe
+      `post.mention.create` with filter user_id `2100075371853127680` (@trymorrow) to it
+- [ ] Once mentions arrive through X, delete the SocialData monitor or slow it to a fallback
 - [ ] Check with counsel before launch: tokenized stocks tipped in public on X
 
 ## P2 — product
