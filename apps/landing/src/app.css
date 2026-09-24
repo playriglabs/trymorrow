@@ -112,6 +112,18 @@
     visibility: hidden;
     opacity: 0;
   }
+  .hero-draggable {
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    will-change: transform;
+  }
+  .hero-float {
+    will-change: transform;
+  }
+  .hero-draggable.is-dragging {
+    cursor: grabbing;
+  }
   /* FAQ rows slide open. Browsers without ::details-content still open them, just
      instantly, so the answer is never hidden by a missing feature. */
   .faq-row::details-content {
@@ -135,8 +147,8 @@
   .hero-screenshot {
     top: 24px;
   }
-  .hero-gift,
-  .hero-redeem,
+  .hero-gift-shell,
+  .hero-redeem-shell,
   .hero-tips {
     display: none;
   }
@@ -400,7 +412,80 @@
   }
 }
 
+@keyframes footer-orbit-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(-4deg);
+  }
+  50% {
+    transform: translate3d(-12px, 15px, 0) rotate(3deg);
+  }
+}
+
+@keyframes footer-stamp-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(-9deg);
+  }
+  50% {
+    transform: translate3d(8px, -13px, 0) rotate(-3deg);
+  }
+}
+
+@keyframes footer-pill-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(5deg);
+  }
+  50% {
+    transform: translate3d(-7px, -10px, 0) rotate(2deg);
+  }
+}
+
+@keyframes footer-squiggle-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(-5deg);
+  }
+  50% {
+    transform: translate3d(10px, -7px, 0) rotate(-1deg);
+  }
+}
+
 @layer components {
+  .footer-ornaments {
+    color: rgb(255 247 233 / 0.9);
+  }
+  .footer-orbit {
+    top: 7%;
+    right: -42px;
+    width: clamp(170px, 16vw, 250px);
+    aspect-ratio: 1;
+    animation: footer-orbit-drift 9s ease-in-out infinite;
+  }
+  .footer-stamp {
+    top: 43%;
+    left: -26px;
+    width: 92px;
+    height: 92px;
+    border: 1px solid rgb(255 247 233 / 0.16);
+    border-radius: 28px;
+    background: rgb(255 247 233 / 0.035);
+    animation: footer-stamp-float 7.5s ease-in-out infinite;
+  }
+  .footer-pill {
+    top: 52%;
+    right: 6%;
+    box-shadow: 0 16px 35px rgb(0 0 0 / 0.22);
+    animation: footer-pill-float 6.8s ease-in-out infinite;
+  }
+  .footer-squiggle {
+    bottom: 17%;
+    left: 7%;
+    width: clamp(130px, 13vw, 210px);
+    opacity: 0.55;
+    animation: footer-squiggle-drift 8.5s ease-in-out infinite;
+  }
   /* Springy press feel for footer links: lift on hover, squish on press. */
   .footer-pop {
     transition:
@@ -414,6 +499,28 @@
   .footer-pop:active {
     transform: scale(0.95);
     transition-duration: 0.12s;
+  }
+}
+
+@media (max-width: 767px) {
+  .footer-orbit {
+    top: 3%;
+    right: -78px;
+    opacity: 0.65;
+  }
+  .footer-stamp {
+    top: 48%;
+    left: -52px;
+    opacity: 0.7;
+  }
+  .footer-pill {
+    top: auto;
+    right: -22px;
+    bottom: 24%;
+    scale: 0.8;
+  }
+  .footer-squiggle {
+    display: none;
   }
 }
 

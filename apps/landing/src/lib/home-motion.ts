@@ -1,9 +1,138 @@
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 
+function enableHeroDragging(root: HTMLElement) {
+  const bounds = root.querySelector<HTMLElement>('.hero-art')
+  const cards = Array.from(root.querySelectorAll<HTMLElement>('.hero-draggable'))
+  if (!bounds || !cards.length) return () => {}
+  // Leave enough room for the inner card's idle bob so it never floats through the boundary.
+  const dragInset = 24
+
+  let active:
+    | {
+        card: HTMLElement
+        pointerId: number
+        pointerX: number
+        pointerY: number
+        startX: number
+        startY: number
+        minX: number
+        maxX: number
+        minY: number
+        maxY: number
+      }
+    | undefined
+
+  const position = (card: HTMLElement) => ({
+    x: Number(gsap.getProperty(card, 'x')) || 0,
+    y: Number(gsap.getProperty(card, 'y')) || 0,
+  })
+
+  const place = (card: HTMLElement, x: number, y: number, smooth = true) => {
+    if (smooth) {
+      // A short catch-up tween gives the card some weight without adding release inertia.
+      gsap.to(card, { x, y, duration: 0.28, ease: 'power3.out', overwrite: 'auto' })
+    } else {
+      gsap.set(card, { x, y })
+    }
+  }
+
+  const stopDragging = (event: PointerEvent) => {
+    if (!active || active.pointerId !== event.pointerId) return
+    active.card.classList.remove('is-dragging')
+    if (active.card.hasPointerCapture(event.pointerId)) {
+      active.card.releasePointerCapture(event.pointerId)
+    }
+    active = undefined
+  }
+
+  const onPointerDown = (event: PointerEvent) => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return
+    const card = event.currentTarget as HTMLElement
+    const visual = card.querySelector<HTMLElement>(':scope > .hero-float') ?? card
+    const cardRect = visual.getBoundingClientRect()
+    const boundsRect = bounds.getBoundingClientRect()
+    gsap.killTweensOf(card)
+    const offset = position(card)
+
+    card.style.zIndex = '40'
+    card.classList.add('is-dragging')
+    card.setPointerCapture(event.pointerId)
+    active = {
+      card,
+      pointerId: event.pointerId,
+      pointerX: event.clientX,
+      pointerY: event.clientY,
+      startX: offset.x,
+      startY: offset.y,
+      minX: boundsRect.left + dragInset - cardRect.left,
+      maxX: boundsRect.right - dragInset - cardRect.right,
+      minY: boundsRect.top + dragInset - cardRect.top,
+      maxY: boundsRect.bottom - dragInset - cardRect.bottom,
+    }
+    event.preventDefault()
+  }
+
+  const onPointerMove = (event: PointerEvent) => {
+    if (!active || active.pointerId !== event.pointerId) return
+    const deltaX = Math.min(active.maxX, Math.max(active.minX, event.clientX - active.pointerX))
+    const deltaY = Math.min(active.maxY, Math.max(active.minY, event.clientY - active.pointerY))
+    place(active.card, active.startX + deltaX, active.startY + deltaY)
+    event.preventDefault()
+  }
+
+  const keepCardsInside = () => {
+    const boundsRect = bounds.getBoundingClientRect()
+    for (const card of cards) {
+      if (!card.offsetParent) continue
+      const visual = card.querySelector<HTMLElement>(':scope > .hero-float') ?? card
+      const rect = visual.getBoundingClientRect()
+      const offset = position(card)
+      const correctionX =
+        rect.left < boundsRect.left + dragInset
+          ? boundsRect.left + dragInset - rect.left
+          : rect.right > boundsRect.right - dragInset
+            ? boundsRect.right - dragInset - rect.right
+            : 0
+      const correctionY =
+        rect.top < boundsRect.top + dragInset
+          ? boundsRect.top + dragInset - rect.top
+          : rect.bottom > boundsRect.bottom - dragInset
+            ? boundsRect.bottom - dragInset - rect.bottom
+            : 0
+      if (correctionX || correctionY) {
+        place(card, offset.x + correctionX, offset.y + correctionY, false)
+      }
+    }
+  }
+
+  for (const card of cards) {
+    card.addEventListener('pointerdown', onPointerDown)
+    card.addEventListener('pointermove', onPointerMove)
+    card.addEventListener('pointerup', stopDragging)
+    card.addEventListener('pointercancel', stopDragging)
+  }
+  window.addEventListener('resize', keepCardsInside, { passive: true })
+
+  return () => {
+    window.removeEventListener('resize', keepCardsInside)
+    for (const card of cards) {
+      card.removeEventListener('pointerdown', onPointerDown)
+      card.removeEventListener('pointermove', onPointerMove)
+      card.removeEventListener('pointerup', stopDragging)
+      card.removeEventListener('pointercancel', stopDragging)
+      card.classList.remove('is-dragging')
+      gsap.killTweensOf(card)
+      gsap.set(card, { clearProps: 'x,y' })
+      card.style.removeProperty('z-index')
+    }
+  }
+}
+
 export function initHomeMotion(root: HTMLElement) {
   gsap.registerPlugin(ScrollTrigger)
   const media = gsap.matchMedia()
+  const disableHeroDragging = enableHeroDragging(root)
   media.add(
     '(prefers-reduced-motion: no-preference)',
     () => {
@@ -41,7 +170,7 @@ export function initHomeMotion(root: HTMLElement) {
           repeat: -1,
           ease: 'sine.inOut',
         })
-        gsap.to('.hero-tip:first-child', {
+        gsap.to('.hero-tip-one', {
           y: 12,
           rotation: 2,
           duration: 3.8,
@@ -49,7 +178,7 @@ export function initHomeMotion(root: HTMLElement) {
           repeat: -1,
           ease: 'sine.inOut',
         })
-        gsap.to('.hero-tip:last-child', {
+        gsap.to('.hero-tip-two', {
           y: -10,
           rotation: -2,
           duration: 4.1,
@@ -457,5 +586,8 @@ export function initHomeMotion(root: HTMLElement) {
     },
     root,
   )
-  return () => media.revert()
+  return () => {
+    disableHeroDragging()
+    media.revert()
+  }
 }

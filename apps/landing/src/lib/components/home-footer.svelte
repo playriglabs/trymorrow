@@ -22,7 +22,56 @@ const year = new Date().getFullYear()
 <footer
   class="relative z-10 -mt-10 overflow-hidden rounded-t-[40px] bg-ink text-cream md:-mt-14 md:rounded-t-[56px]"
 >
-  <div class="mx-auto max-w-page px-5 pt-16 md:px-10 md:pt-24">
+  <div class="footer-ornaments pointer-events-none absolute inset-0" aria-hidden="true">
+    <div class="footer-orbit absolute">
+      <svg viewBox="0 0 240 240" fill="none" class="size-full">
+        <circle cx="120" cy="120" r="82" stroke="currentColor" stroke-opacity=".2" />
+        <ellipse
+          cx="120"
+          cy="120"
+          rx="108"
+          ry="56"
+          stroke="currentColor"
+          stroke-opacity=".42"
+          stroke-dasharray="4 9"
+          transform="rotate(-28 120 120)"
+        />
+        <ellipse
+          cx="120"
+          cy="120"
+          rx="108"
+          ry="56"
+          stroke="currentColor"
+          stroke-opacity=".25"
+          transform="rotate(32 120 120)"
+        />
+        <circle cx="211" cy="68" r="8" fill="#f66f00" />
+        <circle cx="44" cy="181" r="5" fill="#d3e7bb" />
+      </svg>
+    </div>
+
+    <div class="footer-stamp absolute flex items-center justify-center">
+      <span class="font-sans text-[64px] leading-none text-orange">*</span>
+    </div>
+
+    <div
+      class="footer-pill absolute flex items-center gap-2 rounded-full bg-[#d3e7bb] px-4 py-2.5 text-[10px] tracking-[0.16em] text-ink"
+    >
+      <span class="size-2 rounded-full bg-orange"></span> FOR WHAT’S NEXT
+    </div>
+
+    <svg class="footer-squiggle absolute" viewBox="0 0 210 110" fill="none">
+      <path
+        d="M7 77c31-62 60 39 91-20s61 33 105-45"
+        stroke="#f66f00"
+        stroke-width="5"
+        stroke-linecap="round"
+      />
+      <path d="m186 14 18-2-3 18" stroke="#f66f00" stroke-width="5" stroke-linecap="round" />
+    </svg>
+  </div>
+
+  <div class="relative z-10 mx-auto max-w-page px-5 pt-16 md:px-10 md:pt-24">
     <div class="flex flex-col gap-10 lg:flex-row lg:items-end lg:justify-between">
       <div>
         <p class="text-[10px] tracking-widest text-steel">COME SAY HI</p>
@@ -93,7 +142,7 @@ const year = new Date().getFullYear()
 
   <!-- Oversized wordmark, cut off by the bottom edge on purpose. -->
   <p
-    class="pointer-events-none mt-6 translate-y-[18%] text-center font-sans text-[26vw] leading-[0.8] tracking-[-0.08em] text-cream/[0.07] select-none"
+    class="pointer-events-none relative mt-6 translate-y-[18%] text-center font-sans text-[26vw] leading-[0.8] tracking-[-0.08em] text-cream/[0.07] select-none"
     aria-hidden="true"
   >
     morrow<span class="text-orange/70">*</span>

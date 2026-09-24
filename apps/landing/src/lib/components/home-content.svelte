@@ -179,8 +179,12 @@ onMount(() => {
         <div
           class="hero-halo absolute top-32 left-1/2 h-125 w-212.5 -translate-x-1/2 rounded-[50%] bg-[#f5ddbd]/50 blur-3xl"
         ></div>
-        <div class="hero-gift absolute top-28 left-[8%] z-20 w-65 -rotate-12 md:z-0 lg:z-20">
-          <GiftPreview />
+        <div
+          class="hero-gift-shell hero-draggable absolute top-28 left-[8%] z-20 w-65 md:z-0 lg:z-20"
+        >
+          <div class="hero-gift hero-float -rotate-12">
+            <GiftPreview />
+          </div>
         </div>
         <!-- Add your app screenshot inside this reserved hero slot. -->
         <div class="hero-screenshot absolute top-0 left-1/2 z-10 h-165 w-82.5 -translate-x-1/2">
@@ -195,61 +199,65 @@ onMount(() => {
         </div>
         <div class="hero-tips absolute top-22 right-[3%] z-20 w-67 text-left lg:right-[5%]">
           {#each tipExamples as tip, i}
-            <div
-              class="hero-tip relative rounded-3xl border border-white/60 p-4 shadow-[0_18px_40px_-24px_rgb(76_40_6/0.5)] {tip.color} {tip.tilt} {i ===
-              1
-                ? '-mt-1 ml-7'
-                : ''}"
-            >
-              <div class="flex items-center gap-2 text-[10px]">
-                <span class="flex size-7 items-center justify-center rounded-full bg-ink text-cream"
-                  ><SocialIcon name="x" small /></span
-                >
-                <span class="font-medium">You</span><span class="text-stone">just now</span>
-              </div>
-              <p class="mt-3 text-[12px] leading-relaxed">{tip.command}</p>
+            <div class="hero-draggable relative {i === 1 ? '-mt-1 ml-7' : ''}">
               <div
-                class="mt-3 flex items-center justify-between rounded-2xl bg-surface/80 px-3 py-2"
+                class="hero-tip hero-float {i === 0
+                  ? 'hero-tip-one'
+                  : 'hero-tip-two'} rounded-3xl border border-white/60 p-4 shadow-[0_18px_40px_-24px_rgb(76_40_6/0.5)] {tip.color} {tip.tilt}"
               >
-                <div>
-                  <p class="text-[9px] text-stone">Tip sent to {tip.handle}</p>
-                  <p class="mt-0.5 font-sans text-sm">{tip.result}</p>
+                <div class="flex items-center gap-2 text-[10px]">
+                  <span
+                    class="flex size-7 items-center justify-center rounded-full bg-ink text-cream"
+                    ><SocialIcon name="x" small /></span
+                  >
+                  <span class="font-medium">You</span><span class="text-stone">just now</span>
                 </div>
-                <span
-                  class="flex size-7 items-center justify-center rounded-full bg-gain text-white"
-                  ><Icon name="check" size={14} /></span
+                <p class="mt-3 text-[12px] leading-relaxed">{tip.command}</p>
+                <div
+                  class="mt-3 flex items-center justify-between rounded-2xl bg-surface/80 px-3 py-2"
                 >
+                  <div>
+                    <p class="text-[9px] text-stone">Tip sent to {tip.handle}</p>
+                    <p class="mt-0.5 font-sans text-sm">{tip.result}</p>
+                  </div>
+                  <span
+                    class="flex size-7 items-center justify-center rounded-full bg-gain text-white"
+                    ><Icon name="check" size={14} /></span
+                  >
+                </div>
               </div>
             </div>
           {/each}
         </div>
         <!-- The gift card, the other way to send one: a code anyone can redeem. -->
-        <div
-          class="hero-redeem absolute top-107.5 left-[11%] z-20 w-52 rotate-6 overflow-hidden rounded-3xl bg-surface text-left shadow-[0_18px_40px_-22px_rgb(76_40_6/0.45)]"
-        >
-          <div class="bg-orange px-4 pt-4 pb-5 text-white">
-            <div class="flex items-center justify-between text-[10px]">
-              <span>Morrow gift card</span><Icon name="gift" size={15} />
-            </div>
-            <p class="mt-3 font-sans text-[28px] leading-none tracking-[-0.05em]">$50.00</p>
-          </div>
-          <div class="border-t border-dashed border-line px-4 py-3">
-            <div class="flex items-end justify-between gap-2">
-              <div>
-                <p class="text-[10px] text-stone">Redeem code</p>
-                <p class="mt-0.5 font-sans text-sm tracking-tight">7QF4-2M9K-8RD3</p>
+        <div class="hero-redeem-shell hero-draggable absolute top-107.5 left-[11%] z-20 w-52">
+          <div
+            class="hero-redeem hero-float rotate-6 overflow-hidden rounded-3xl bg-surface text-left shadow-[0_18px_40px_-22px_rgb(76_40_6/0.45)]"
+          >
+            <div class="bg-orange px-4 pt-4 pb-5 text-white">
+              <div class="flex items-center justify-between text-[10px]">
+                <span>Morrow gift card</span><Icon name="gift" size={15} />
               </div>
-              <!-- What's inside the card, so the code isn't the only thing it says. -->
-              <div class="flex shrink-0 items-center -space-x-1.5">
-                <span class="inline-flex rounded-full ring-2 ring-surface"
-                  ><StockMark stock="openai" size={22} /></span
-                >
-                <span class="inline-flex rounded-full ring-2 ring-surface"
-                  ><StockMark stock="anthropic" size={22} /></span
-                >
-                <span class="inline-flex rounded-full ring-2 ring-surface"
-                  ><StockMark stock="nvidia" size={22} scale={0.6} /></span
-                >
+              <p class="mt-3 font-sans text-[28px] leading-none tracking-[-0.05em]">$50.00</p>
+            </div>
+            <div class="border-t border-dashed border-line px-4 py-3">
+              <div class="flex items-end justify-between gap-2">
+                <div>
+                  <p class="text-[10px] text-stone">Redeem code</p>
+                  <p class="mt-0.5 font-sans text-sm tracking-tight">7QF4-2M9K-8RD3</p>
+                </div>
+                <!-- What's inside the card, so the code isn't the only thing it says. -->
+                <div class="flex shrink-0 items-center -space-x-1.5">
+                  <span class="inline-flex rounded-full ring-2 ring-surface"
+                    ><StockMark stock="openai" size={22} /></span
+                  >
+                  <span class="inline-flex rounded-full ring-2 ring-surface"
+                    ><StockMark stock="anthropic" size={22} /></span
+                  >
+                  <span class="inline-flex rounded-full ring-2 ring-surface"
+                    ><StockMark stock="nvidia" size={22} scale={0.6} /></span
+                  >
+                </div>
               </div>
             </div>
           </div>
