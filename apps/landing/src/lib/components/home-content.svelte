@@ -173,7 +173,7 @@ onMount(() => {
         >
       </div>
       <div
-        class="hero-art relative mx-auto mt-12 h-138.75 max-w-262.5 md:mt-14 md:h-165"
+        class="hero-art relative isolate mx-auto mt-12 h-138.75 max-w-262.5 md:mt-14 md:h-165"
         aria-hidden="true"
       >
         <div

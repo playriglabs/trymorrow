@@ -7,7 +7,7 @@ const socials = [
 ] as const
 </script>
 
-<header class="fixed inset-x-0 top-3 z-40 px-3 md:top-4">
+<header class="fixed inset-x-0 top-3 z-[100] px-3 md:top-4">
   <nav aria-label="Main navigation" class="nav-glass mx-auto max-w-135 rounded-3xl p-1.5">
     <div class="flex items-center justify-between gap-1 md:gap-5">
       <a
