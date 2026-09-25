@@ -60,8 +60,8 @@ const jsonLd = $derived(
   <meta property="og:image:secure_url" content={imageUrl} />
   <meta property="og:image:type" content="image/jpeg" />
   <meta property="og:image:alt" content={imageAlt} />
-  <meta property="og:image:width" content="1200" />
-  <meta property="og:image:height" content="630" />
+  <meta property="og:image:width" content="1300" />
+  <meta property="og:image:height" content="683" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:site" content="@trymorrow" />
   <meta name="twitter:creator" content="@trymorrow" />

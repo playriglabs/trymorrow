@@ -27,8 +27,8 @@ const {
 const url = new URL(Astro.url.pathname, PUBLIC_APP_URL).href
 const siteUrl = new URL('/', PUBLIC_APP_URL).href
 const imageUrl = new URL(image || '/og-image.jpg', siteUrl).href
-const width = imageWidth ?? (!image ? 1200 : undefined)
-const height = imageHeight ?? (!image ? 630 : undefined)
+const width = imageWidth ?? (!image ? 1300 : undefined)
+const height = imageHeight ?? (!image ? 683 : undefined)
 const structuredData = JSON.stringify({
   '@context': 'https://schema.org',
   '@graph': [
